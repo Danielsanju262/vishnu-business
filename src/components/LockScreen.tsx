@@ -1,40 +1,40 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Fingerprint, Lock, KeyRound } from 'lucide-react';
+import { Fingerprint, Lock, KeyRound, Loader2 } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 
 export default function LockScreen() {
-    const { authenticate, authenticatePin, isEnabled, hasPin } = useAuth();
+    const { authenticate, authenticateMasterPin, hasBiometrics } = useAuth();
     const [isAnimating, setIsAnimating] = useState(false);
     const [showPin, setShowPin] = useState(false);
     const [pin, setPin] = useState("");
     const [error, setError] = useState(false);
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        // Auto-prompt on mount if locked and not using PIN mode yet
-        if (isEnabled && !showPin) {
+        // Auto-prompt biometrics on mount if available
+        if (hasBiometrics && !showPin) {
             const t = setTimeout(() => {
                 handleUnlock();
             }, 500);
             return () => clearTimeout(t);
         }
-    }, [isEnabled]);
+    }, [hasBiometrics]);
 
     const handleUnlock = async () => {
         setIsAnimating(true);
-        const success = await authenticate();
+        await authenticate();
         setIsAnimating(false);
-        if (!success && hasPin) {
-            // Bio failed or cancelled, we could auto-show PIN, but let's keep it optional via button
-        }
     };
 
-    const handlePinUnlock = (e: React.FormEvent) => {
+    const handlePinUnlock = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (authenticatePin(pin)) {
-            // Success handled in context
-        } else {
+        setLoading(true);
+        const success = await authenticateMasterPin(pin);
+        setLoading(false);
+
+        if (!success) {
             setError(true);
             setPin("");
             setTimeout(() => setError(false), 500);
@@ -72,49 +72,51 @@ export default function LockScreen() {
                                 inputMode="numeric"
                                 autoFocus
                                 value={pin}
-                                onChange={e => setPin(e.target.value)}
-                                placeholder="Enter PIN"
+                                onChange={e => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                placeholder="Master PIN"
                                 className={`h-14 text-center text-2xl font-black tracking-[0.5em] rounded-2xl ${error ? 'border-rose-500 animate-shake' : ''}`}
-                                maxLength={6}
                             />
                         </div>
                         <Button
                             className="w-full h-12 font-bold rounded-xl"
                             size="lg"
                             type="submit"
+                            disabled={loading || pin.length < 4}
                         >
-                            Unlock
+                            {loading ? <Loader2 className="animate-spin" size={20} /> : "Unlock"}
                         </Button>
-                        <button
-                            type="button"
-                            onClick={() => setShowPin(false)}
-                            className="text-sm text-primary font-bold hover:underline py-2"
-                        >
-                            Use Biometrics
-                        </button>
+                        {hasBiometrics && (
+                            <button
+                                type="button"
+                                onClick={() => setShowPin(false)}
+                                className="text-sm text-primary font-bold hover:underline py-2"
+                            >
+                                Use Biometrics
+                            </button>
+                        )}
                     </form>
                 ) : (
                     <div className="w-full space-y-3">
-                        <Button
-                            size="lg"
-                            onClick={handleUnlock}
-                            className="w-full h-14 rounded-2xl text-lg font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
-                        >
-                            <Fingerprint className="mr-2" size={24} />
-                            Unlock with Screen Lock
-                        </Button>
-
-                        {hasPin && (
+                        {hasBiometrics && (
                             <Button
-                                variant="outline"
                                 size="lg"
-                                onClick={() => setShowPin(true)}
-                                className="w-full h-14 rounded-2xl text-base font-bold transition-all hover:bg-accent"
+                                onClick={handleUnlock}
+                                className="w-full h-14 rounded-2xl text-lg font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
                             >
-                                <KeyRound className="mr-2" size={20} />
-                                Use PIN
+                                <Fingerprint className="mr-2" size={24} />
+                                Unlock with Biometrics
                             </Button>
                         )}
+
+                        <Button
+                            variant="outline"
+                            size="lg"
+                            onClick={() => setShowPin(true)}
+                            className="w-full h-14 rounded-2xl text-base font-bold transition-all hover:bg-accent"
+                        >
+                            <KeyRound className="mr-2" size={20} />
+                            Use Master PIN
+                        </Button>
                     </div>
                 )}
             </div>

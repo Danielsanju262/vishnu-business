@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useToast } from '../components/toast-provider';
+import { supabase } from '../lib/supabase';
 
 // Helper to encode ArrayBuffer to Base64URL string
 const bufferToBase64url = (buffer: ArrayBuffer) => {
@@ -21,22 +22,18 @@ const base64urlToBuffer = (base64url: string) => {
     return bytes.buffer;
 };
 
-// Random challenge generator for WebAuthn (Client-side usage)
+// Random challenge generator for WebAuthn
 const getChallenge = () => {
     return Uint8Array.from(window.crypto.getRandomValues(new Uint8Array(32)));
 };
 
 interface AuthContextType {
     isLocked: boolean;
-    isEnabled: boolean;
-    isAuthenticated: boolean;
-    hasPin: boolean;
     hasBiometrics: boolean;
     registerBiometrics: () => Promise<boolean>;
-    registerPin: (pin: string) => void;
     authenticate: () => Promise<boolean>;
-    authenticatePin: (pin: string) => boolean;
-    disableLock: () => void;
+    authenticateMasterPin: (pin: string) => Promise<boolean>;
+    disableBiometrics: () => void;
     lockApp: () => void;
 }
 
@@ -44,72 +41,36 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { toast } = useToast();
-    const [isEnabled, setIsEnabled] = useState(false);
     const [isLocked, setIsLocked] = useState(false);
-    const [isAuthenticated, setIsAuthenticated] = useState(false);
-    const [hasPin, setHasPin] = useState(false);
     const [hasBiometrics, setHasBiometrics] = useState(false);
 
     useEffect(() => {
-        // Init State
+        // Check if biometrics are set up on this device
         const savedCredId = localStorage.getItem('bio_credential_id');
-        const storedPin = localStorage.getItem('app_pin');
-        const sessionAuth = localStorage.getItem('is_authenticated');
+        const wasLocked = localStorage.getItem('app_locked') === 'true';
 
-        if (savedCredId || storedPin) {
-            setIsEnabled(true);
-            setHasPin(!!storedPin);
-            setHasBiometrics(!!savedCredId);
-
-            if (sessionAuth === 'true') {
-                setIsLocked(false);
-                setIsAuthenticated(true);
-            } else {
+        if (savedCredId) {
+            setHasBiometrics(true);
+            // Only show lock screen if explicitly locked (not on refresh)
+            if (wasLocked) {
                 setIsLocked(true);
             }
         }
     }, []);
 
     const lockApp = () => {
-        if (isEnabled) {
-            localStorage.removeItem('is_authenticated');
-            setIsLocked(true);
-            setIsAuthenticated(false);
-            toast("App Locked", "success");
-        }
-    };
-
-    const registerPin = (pin: string) => {
-        localStorage.setItem('app_pin', pin);
-        localStorage.setItem('is_authenticated', 'true');
-        setHasPin(true);
-        setIsEnabled(true);
-        setIsAuthenticated(true);
-        setIsLocked(false);
-        toast("PIN Security Enabled", "success");
-    };
-
-    const authenticatePin = (pin: string) => {
-        const storedPin = localStorage.getItem('app_pin');
-        if (storedPin === pin) {
-            localStorage.setItem('is_authenticated', 'true');
-            setIsLocked(false);
-            setIsAuthenticated(true);
-            toast("Unlocked", "success");
-            return true;
-        }
-        return false;
+        localStorage.setItem('app_locked', 'true');
+        setIsLocked(true);
+        toast("App Locked", "success");
     };
 
     const registerBiometrics = async () => {
         try {
-            // Check if available
             if (!window.PublicKeyCredential) {
                 toast("Biometrics not supported", "error");
                 return false;
             }
 
-            // Create credential options
             const publicKey: PublicKeyCredentialCreationOptions = {
                 challenge: getChallenge(),
                 rp: { name: "Vishnu Business", id: window.location.hostname },
@@ -120,8 +81,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 },
                 pubKeyCredParams: [{ alg: -7, type: "public-key" }, { alg: -257, type: "public-key" }],
                 authenticatorSelection: {
-                    authenticatorAttachment: "platform", // Forces built-in (TouchID, Windows Hello)
-                    userVerification: "required", // Forces PIN/Biometric
+                    authenticatorAttachment: "platform",
+                    userVerification: "required",
                     residentKey: "preferred",
                     requireResidentKey: false
                 },
@@ -132,15 +93,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const credential = await navigator.credentials.create({ publicKey }) as PublicKeyCredential;
 
             if (credential) {
-                // Store the ID safely
                 const credentialId = bufferToBase64url(credential.rawId);
                 localStorage.setItem('bio_credential_id', credentialId);
-
+                localStorage.removeItem('app_locked'); // Unlock after setup
                 setHasBiometrics(true);
-                setIsEnabled(true);
-                setIsAuthenticated(true);
                 setIsLocked(false);
-                toast("Device Security Linked!", "success");
+                toast("Biometrics Enabled!", "success");
                 return true;
             }
         } catch (error: any) {
@@ -148,7 +106,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (error.name === 'NotAllowedError') {
                 toast("Setup Canceled", "info");
             } else {
-                toast("Setup failed. Try using HTTPS.", "error");
+                toast("Setup failed", "error");
             }
         }
         return false;
@@ -159,7 +117,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const savedId = localStorage.getItem('bio_credential_id');
             if (!savedId) return false;
 
-            // Verify platform credential
             const credential = await navigator.credentials.get({
                 publicKey: {
                     challenge: getChallenge(),
@@ -174,33 +131,61 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             });
 
             if (credential) {
+                localStorage.removeItem('app_locked');
                 setIsLocked(false);
-                setIsAuthenticated(true);
-                toast("Welcome back!", "success");
+                toast("Unlocked!", "success");
                 return true;
             }
         } catch (error: any) {
             console.error(error);
-            // Don't show error toast on simple cancellation, just stay locked
         }
         return false;
     };
 
-    const disableLock = () => {
-        if (isAuthenticated) {
-            localStorage.removeItem('bio_credential_id');
-            localStorage.removeItem('app_pin');
-            localStorage.removeItem('is_authenticated');
-            setIsEnabled(false);
-            setIsLocked(false);
-            setHasPin(false);
-            setHasBiometrics(false);
-            toast("Security Disabled", "success");
+    // Use Master PIN from Supabase to unlock
+    const authenticateMasterPin = async (pin: string) => {
+        try {
+            const { data, error } = await supabase
+                .from('app_settings')
+                .select('master_pin')
+                .eq('id', 1)
+                .single();
+
+            if (error) throw error;
+
+            if (data?.master_pin === pin) {
+                localStorage.removeItem('app_locked');
+                setIsLocked(false);
+                toast("Unlocked!", "success");
+                return true;
+            } else {
+                toast("Incorrect PIN", "error");
+                return false;
+            }
+        } catch (error) {
+            toast("Error verifying PIN", "error");
+            return false;
         }
     };
 
+    const disableBiometrics = () => {
+        localStorage.removeItem('bio_credential_id');
+        localStorage.removeItem('app_locked');
+        setHasBiometrics(false);
+        setIsLocked(false);
+        toast("Biometrics Disabled", "success");
+    };
+
     return (
-        <AuthContext.Provider value={{ isLocked, isEnabled, isAuthenticated, hasPin, hasBiometrics, registerBiometrics, registerPin, authenticate, authenticatePin, disableLock, lockApp }}>
+        <AuthContext.Provider value={{
+            isLocked,
+            hasBiometrics,
+            registerBiometrics,
+            authenticate,
+            authenticateMasterPin,
+            disableBiometrics,
+            lockApp
+        }}>
             {children}
         </AuthContext.Provider>
     );

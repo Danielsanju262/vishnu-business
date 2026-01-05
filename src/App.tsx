@@ -17,7 +17,7 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import LockScreen from "./components/LockScreen";
 
 function AppContent() {
-  const { isLocked, isEnabled } = useAuth();
+  const { isLocked } = useAuth();
   const [isDeviceAuthorized, setIsDeviceAuthorized] = useState<boolean | null>(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
 
@@ -67,7 +67,7 @@ function AppContent() {
   return (
     <Router>
       <ScrollToTop />
-      {isLocked && isEnabled && <LockScreen />}
+      {isLocked && <LockScreen />}
       <Routes>
         <Route path="/" element={<Layout />}>
           <Route index element={<Dashboard />} />

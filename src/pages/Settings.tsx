@@ -1,26 +1,13 @@
-import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, Database, Shield, Moon, Sun, Laptop, Lock, Check, Fingerprint, LogOut } from "lucide-react";
 import { useTheme } from "../components/theme-provider";
 import { useAuth } from "../context/AuthContext";
 import { cn } from "../lib/utils";
 import { Button } from "../components/ui/Button";
-import { Input } from "../components/ui/Input";
 
 export default function Settings() {
     const { theme, setTheme } = useTheme();
-    const { isEnabled, hasPin, hasBiometrics, registerBiometrics, registerPin, disableLock } = useAuth();
-    const [pinInput, setPinInput] = useState("");
-    const [isSettingPin, setIsSettingPin] = useState(false);
-
-    const handlePinSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (pinInput.length >= 4) {
-            registerPin(pinInput);
-            setIsSettingPin(false);
-            setPinInput("");
-        }
-    };
+    const { hasBiometrics, registerBiometrics, disableBiometrics } = useAuth();
 
     return (
         <div className="min-h-screen bg-background p-4 animate-in fade-in">
@@ -45,7 +32,7 @@ export default function Settings() {
                     <div className="space-y-4">
                         <div className="flex justify-between items-center py-2 border-b border-border">
                             <span className="text-sm text-muted-foreground">Version</span>
-                            <span className="text-sm font-medium text-foreground">v1.2.0 (Beta)</span>
+                            <span className="text-sm font-medium text-foreground">v1.3.0</span>
                         </div>
 
                         <div className="py-2 border-b border-border">
@@ -85,7 +72,7 @@ export default function Settings() {
                                     )}
                                 >
                                     <Laptop size={20} />
-                                    <span className="text-xs font-bold">System</span>
+                                    <span className="text-xs font-bold">Auto</span>
                                 </button>
                             </div>
                         </div>
@@ -97,99 +84,43 @@ export default function Settings() {
                     </div>
                 </div>
 
-                {/* Security Card */}
-                {/* Security Card */}
+                {/* Security Card - Simplified */}
                 <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
                     <h2 className="font-bold text-foreground mb-4 flex items-center gap-2">
                         <Lock size={18} className="text-rose-500" />
-                        Security
+                        Quick Unlock
                     </h2>
 
-                    {/* Security Toggle */}
-                    <div className="flex items-center justify-between mb-4">
-                        <div>
-                            <p className="font-bold text-foreground text-sm">App Security</p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                                Lock app with PIN / Biometrics
-                            </p>
-                        </div>
-                        <button
-                            onClick={() => {
-                                if (isEnabled) {
-                                    disableLock();
-                                } else {
-                                    // Start Setup Flow
-                                    if (hasPin) {
-                                        registerBiometrics(); // Try adding bio if PIN exists (or re-enabling)
-                                    } else {
-                                        setIsSettingPin(true);
-                                    }
-                                }
-                            }}
-                            className={cn(
-                                "w-12 h-7 rounded-full transition-colors relative",
-                                isEnabled ? "bg-primary" : "bg-muted"
-                            )}
-                        >
-                            <div className={cn(
-                                "absolute top-1 w-5 h-5 rounded-full bg-white shadow-sm transition-all duration-300 flex items-center justify-center",
-                                isEnabled ? "left-6" : "left-1"
-                            )}>
-                                {isEnabled && <Check size={12} className="text-primary" />}
-                            </div>
-                        </button>
-                    </div>
+                    <p className="text-xs text-muted-foreground mb-4">
+                        Add biometric unlock for quick access when you lock the app. You can always unlock with your Master PIN.
+                    </p>
 
-                    {/* PIN Setup UI */}
-                    {isSettingPin && !isEnabled && (
-                        <div className="mt-4 bg-accent/30 p-4 rounded-xl border border-border/50 animate-in slide-in-from-top-2">
-                            <p className="text-xs font-bold text-foreground mb-3">Create a backup PIN first</p>
-                            <form onSubmit={handlePinSubmit} className="flex gap-2">
-                                <Input
-                                    type="number"
-                                    value={pinInput}
-                                    onChange={e => setPinInput(e.target.value)}
-                                    placeholder="Enter 4-6 digit PIN"
-                                    className="h-10 text-sm font-bold tracking-widest"
-                                    autoFocus
-                                />
-                                <Button size="sm" type="submit" disabled={pinInput.length < 4}>
-                                    Save
-                                </Button>
-                            </form>
-                        </div>
-                    )}
-
-                    {/* Biometric Status */}
-                    {isEnabled && (
-                        <div className="space-y-3 mt-4">
-                            {/* Current Status */}
-                            <div className={cn(
-                                "text-xs p-3 rounded-lg border font-medium flex items-center gap-2",
-                                hasBiometrics
-                                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
-                                    : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
-                            )}>
+                    {hasBiometrics ? (
+                        <div className="space-y-3">
+                            <div className="text-xs p-3 rounded-lg border font-medium flex items-center gap-2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20">
                                 <Check size={14} />
-                                {hasBiometrics ? "PIN + FaceID/Fingerprint Active" : "PIN Only (Add Biometrics below)"}
+                                FaceID / Fingerprint Active
                             </div>
-
-                            {/* Add Biometrics Button */}
-                            {!hasBiometrics && (
-                                <Button
-                                    onClick={() => registerBiometrics()}
-                                    className="w-full"
-                                    variant="outline"
-                                >
-                                    <Fingerprint size={18} className="mr-2" />
-                                    Add FaceID / Fingerprint
-                                </Button>
-                            )}
+                            <Button
+                                variant="outline"
+                                className="w-full"
+                                onClick={disableBiometrics}
+                            >
+                                Remove Biometrics
+                            </Button>
                         </div>
+                    ) : (
+                        <Button
+                            className="w-full"
+                            onClick={registerBiometrics}
+                        >
+                            <Fingerprint size={18} className="mr-2" />
+                            Enable FaceID / Fingerprint
+                        </Button>
                     )}
                 </div>
 
-                {/* Data Management */}
+                {/* Data Card */}
                 <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
                     <h2 className="font-bold text-foreground mb-4 flex items-center gap-2">
                         <Database size={18} className="text-blue-500" />
@@ -203,23 +134,22 @@ export default function Settings() {
                     </button>
                 </div>
 
-                {/* Sign Out */}
+                {/* Device Deauthorize */}
                 <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
                     <h2 className="font-bold text-foreground mb-4 flex items-center gap-2">
                         <LogOut size={18} className="text-rose-500" />
                         Device
                     </h2>
                     <p className="text-xs text-muted-foreground mb-4">
-                        Deauthorize this device. You'll need the Master PIN again.
+                        Remove this device's authorization. You'll need your Master PIN again.
                     </p>
                     <Button
                         variant="outline"
                         className="w-full border-rose-500/30 text-rose-500 hover:bg-rose-500/10"
                         onClick={() => {
                             localStorage.removeItem('device_authorized');
-                            localStorage.removeItem('is_authenticated');
                             localStorage.removeItem('bio_credential_id');
-                            localStorage.removeItem('app_pin');
+                            localStorage.removeItem('app_locked');
                             window.location.reload();
                         }}
                     >
