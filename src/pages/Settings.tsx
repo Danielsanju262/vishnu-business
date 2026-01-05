@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import { ArrowLeft, Database, Shield, Moon, Sun, Laptop, Lock, Check, Fingerprint, LogOut } from "lucide-react";
 import { useTheme } from "../components/theme-provider";
 import { useAuth } from "../context/AuthContext";
-import { supabase } from "../lib/supabase";
 import { cn } from "../lib/utils";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
@@ -208,17 +207,24 @@ export default function Settings() {
                 <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
                     <h2 className="font-bold text-foreground mb-4 flex items-center gap-2">
                         <LogOut size={18} className="text-rose-500" />
-                        Account
+                        Device
                     </h2>
+                    <p className="text-xs text-muted-foreground mb-4">
+                        Deauthorize this device. You'll need the Master PIN again.
+                    </p>
                     <Button
                         variant="outline"
                         className="w-full border-rose-500/30 text-rose-500 hover:bg-rose-500/10"
-                        onClick={async () => {
-                            await supabase.auth.signOut();
+                        onClick={() => {
+                            localStorage.removeItem('device_authorized');
+                            localStorage.removeItem('is_authenticated');
+                            localStorage.removeItem('bio_credential_id');
+                            localStorage.removeItem('app_pin');
+                            window.location.reload();
                         }}
                     >
                         <LogOut size={16} className="mr-2" />
-                        Sign Out
+                        Deauthorize Device
                     </Button>
                 </div>
 
