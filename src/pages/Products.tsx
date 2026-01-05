@@ -249,19 +249,6 @@ export default function Products() {
                                 </select>
                             </div>
                         </div>
-
-                        <div>
-                            <label className="text-xs font-bold text-muted-foreground uppercase mb-1.5 block ml-1">Category</label>
-                            <div className="relative">
-                                <select
-                                    className="w-full appearance-none bg-background border border-border rounded-xl px-4 py-3 text-base font-medium text-foreground focus:ring-2 focus:ring-primary outline-none shadow-sm transition-all"
-                                    value={newCategory}
-                                    onChange={(e) => setNewCategory(e.target.value)}
-                                >
-                                    <option value="general">General</option>
-                                </select>
-                            </div>
-                        </div>
                     </div>
 
                     <Button onClick={handleAdd} className="w-full h-12 text-base font-bold bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-white shadow-lg shadow-emerald-500/20 interactive mt-2">
