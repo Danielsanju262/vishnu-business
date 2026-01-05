@@ -31,6 +31,7 @@ interface AuthContextType {
     isEnabled: boolean;
     isAuthenticated: boolean;
     hasPin: boolean;
+    hasBiometrics: boolean;
     registerBiometrics: () => Promise<boolean>;
     registerPin: (pin: string) => void;
     authenticate: () => Promise<boolean>;
@@ -47,6 +48,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [isLocked, setIsLocked] = useState(false);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [hasPin, setHasPin] = useState(false);
+    const [hasBiometrics, setHasBiometrics] = useState(false);
 
     useEffect(() => {
         // Init State
@@ -57,6 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (savedCredId || storedPin) {
             setIsEnabled(true);
             setHasPin(!!storedPin);
+            setHasBiometrics(!!savedCredId);
 
             if (sessionAuth === 'true') {
                 setIsLocked(false);
@@ -133,6 +136,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 const credentialId = bufferToBase64url(credential.rawId);
                 localStorage.setItem('bio_credential_id', credentialId);
 
+                setHasBiometrics(true);
                 setIsEnabled(true);
                 setIsAuthenticated(true);
                 setIsLocked(false);
@@ -190,12 +194,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setIsEnabled(false);
             setIsLocked(false);
             setHasPin(false);
+            setHasBiometrics(false);
             toast("Security Disabled", "success");
         }
     };
 
     return (
-        <AuthContext.Provider value={{ isLocked, isEnabled, isAuthenticated, hasPin, registerBiometrics, registerPin, authenticate, authenticatePin, disableLock, lockApp }}>
+        <AuthContext.Provider value={{ isLocked, isEnabled, isAuthenticated, hasPin, hasBiometrics, registerBiometrics, registerPin, authenticate, authenticatePin, disableLock, lockApp }}>
             {children}
         </AuthContext.Provider>
     );

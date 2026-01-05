@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Database, Shield, Moon, Sun, Laptop, Lock, Check } from "lucide-react";
+import { ArrowLeft, Database, Shield, Moon, Sun, Laptop, Lock, Check, Fingerprint } from "lucide-react";
 import { useTheme } from "../components/theme-provider";
 import { useAuth } from "../context/AuthContext";
 import { cn } from "../lib/utils";
@@ -9,7 +9,7 @@ import { Input } from "../components/ui/Input";
 
 export default function Settings() {
     const { theme, setTheme } = useTheme();
-    const { isEnabled, hasPin, registerBiometrics, registerPin, disableLock } = useAuth();
+    const { isEnabled, hasPin, hasBiometrics, registerBiometrics, registerPin, disableLock } = useAuth();
     const [pinInput, setPinInput] = useState("");
     const [isSettingPin, setIsSettingPin] = useState(false);
 
@@ -162,9 +162,29 @@ export default function Settings() {
 
                     {/* Biometric Status */}
                     {isEnabled && (
-                        <div className="mt-2 text-xs bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 p-3 rounded-lg border border-emerald-500/20 font-medium flex items-center gap-2">
-                            <Check size={14} />
-                            Security Active (PIN + Biometrics)
+                        <div className="space-y-3 mt-4">
+                            {/* Current Status */}
+                            <div className={cn(
+                                "text-xs p-3 rounded-lg border font-medium flex items-center gap-2",
+                                hasBiometrics
+                                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                                    : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
+                            )}>
+                                <Check size={14} />
+                                {hasBiometrics ? "PIN + FaceID/Fingerprint Active" : "PIN Only (Add Biometrics below)"}
+                            </div>
+
+                            {/* Add Biometrics Button */}
+                            {!hasBiometrics && (
+                                <Button
+                                    onClick={() => registerBiometrics()}
+                                    className="w-full"
+                                    variant="outline"
+                                >
+                                    <Fingerprint size={18} className="mr-2" />
+                                    Add FaceID / Fingerprint
+                                </Button>
+                            )}
                         </div>
                     )}
                 </div>
