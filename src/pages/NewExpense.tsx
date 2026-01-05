@@ -3,14 +3,13 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
-import { ArrowLeft, Check, Flame, Fuel, Utensils, Wrench, Sparkles, Plus, Trash2, Edit2, Settings2, MoreVertical, X, CheckCircle2, Circle } from "lucide-react";
+import { ArrowLeft, Check, Fuel, Utensils, Wrench, Sparkles, Plus, Trash2, Edit2, Settings2, MoreVertical, X, CheckCircle2, Circle } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useToast } from "../components/toast-provider";
 
 type Preset = {
     id: string;
     label: string;
-    is_ghee_ingredient: boolean;
 };
 
 export default function NewExpense() {
@@ -20,7 +19,6 @@ export default function NewExpense() {
     // Form State
     const [title, setTitle] = useState("");
     const [amount, setAmount] = useState("");
-    const [isGhee, setIsGhee] = useState(false);
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [presetSearch, setPresetSearch] = useState("");
@@ -32,7 +30,6 @@ export default function NewExpense() {
 
     // Preset Form
     const [presetName, setPresetName] = useState("");
-    const [presetGhee, setPresetGhee] = useState(false);
     const [editingPresetId, setEditingPresetId] = useState<string | null>(null);
 
     // Menu & Long Press
@@ -83,7 +80,6 @@ export default function NewExpense() {
             .insert([{
                 title,
                 amount: parseFloat(amount),
-                is_ghee_ingredient: isGhee,
                 date: date
             }])
             .select();
@@ -98,7 +94,7 @@ export default function NewExpense() {
                     variant: "default"
                 });
                 if (shouldAdd) {
-                    await supabase.from('expense_presets').insert([{ label: title, is_ghee_ingredient: isGhee }]);
+                    await supabase.from('expense_presets').insert([{ label: title }]);
                     fetchPresets(); // Refresh presets
                 }
             }
@@ -116,7 +112,7 @@ export default function NewExpense() {
             return;
         }
 
-        const payload = { label: presetName, is_ghee_ingredient: presetGhee };
+        const payload = { label: presetName };
 
         let error;
         if (editingPresetId) {
@@ -130,7 +126,6 @@ export default function NewExpense() {
         if (!error) {
             toast(editingPresetId ? "Updated preset" : "Added preset", "success");
             setPresetName("");
-            setPresetGhee(false);
             setEditingPresetId(null);
             setIsAddingPreset(false);
             fetchPresets();
@@ -153,7 +148,6 @@ export default function NewExpense() {
     const editPreset = (p: Preset, e: React.MouseEvent) => {
         e.stopPropagation();
         setPresetName(p.label);
-        setPresetGhee(p.is_ghee_ingredient);
         setEditingPresetId(p.id);
         setIsAddingPreset(true);
     };
@@ -192,9 +186,8 @@ export default function NewExpense() {
         }
     };
 
-    const getIcon = (name: string, isGhee: boolean) => {
+    const getIcon = (name: string) => {
         const lower = name.toLowerCase();
-        if (isGhee) return Flame;
         if (lower.includes('petrol') || lower.includes('fuel')) return Fuel;
         if (lower.includes('food') || lower.includes('lunch')) return Utensils;
         if (lower.includes('repair') || lower.includes('main')) return Wrench;
@@ -267,15 +260,6 @@ export default function NewExpense() {
                                 <span className="font-bold text-base text-foreground">{editingPresetId ? "Edit Expense Type" : "New Expense Type"}</span>
                             </div>
                             <Input placeholder="Label (e.g. Petrol)" value={presetName} onChange={e => setPresetName(e.target.value)} autoFocus className="bg-background" />
-                            <div
-                                onClick={() => setPresetGhee(!presetGhee)}
-                                className={cn("flex items-center gap-4 p-4 rounded-2xl border cursor-pointer transition-all duration-200 hover:border-amber-400", presetGhee ? "bg-amber-100 dark:bg-amber-500/10 border-amber-500" : "bg-accent/50 border-border")}
-                            >
-                                <div className={cn("w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all", presetGhee ? "bg-amber-500 border-amber-500" : "border-muted-foreground/30")}>
-                                    {presetGhee && <Check size={12} className="text-white" />}
-                                </div>
-                                <span className={cn("text-sm font-bold", presetGhee ? "text-amber-700 dark:text-amber-500" : "text-foreground")}>Is Ghee Ingredient?</span>
-                            </div>
                             <Button size="sm" onClick={savePreset} className="w-full h-12 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 font-bold transition-all duration-200 active:scale-[0.98]">Save Preset</Button>
                         </div>
                     ) : (
@@ -292,7 +276,7 @@ export default function NewExpense() {
                                         {presets
                                             .filter(p => p.label.toLowerCase().includes(presetSearch.toLowerCase()))
                                             .map(item => {
-                                                const Icon = getIcon(item.label, item.is_ghee_ingredient);
+                                                const Icon = getIcon(item.label);
                                                 return (
                                                     <div
                                                         key={item.id}
@@ -323,9 +307,6 @@ export default function NewExpense() {
                                                             </div>
                                                             <div>
                                                                 <p className="font-bold text-foreground text-sm">{item.label}</p>
-                                                                {item.is_ghee_ingredient && (
-                                                                    <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-md font-bold uppercase tracking-wide">Ghee</span>
-                                                                )}
                                                             </div>
                                                         </div>
                                                         {!isSelectionMode && (
@@ -347,7 +328,7 @@ export default function NewExpense() {
                                         </div>
                                     )}
                                     {presets.map(item => {
-                                        const Icon = getIcon(item.label, item.is_ghee_ingredient);
+                                        const Icon = getIcon(item.label);
                                         const selected = title === item.label;
                                         return (
                                             <div
@@ -356,7 +337,6 @@ export default function NewExpense() {
                                                     // Only select if menu is not active (prevent selection on menu interaction)
                                                     if (!activeMenuId) {
                                                         setTitle(item.label);
-                                                        setIsGhee(item.is_ghee_ingredient);
                                                     }
                                                 }}
                                                 onTouchStart={() => handleTouchStart(item.id)}
@@ -457,12 +437,11 @@ export default function NewExpense() {
                                                     onMouseDown={(e) => {
                                                         e.preventDefault();
                                                         setTitle(p.label);
-                                                        setIsGhee(p.is_ghee_ingredient);
                                                         setShowSuggestions(false);
                                                     }}
                                                     className="w-full px-4 py-3 text-left hover:bg-zinc-800 flex items-center gap-3 transition-colors border-b border-zinc-800/50 last:border-0"
                                                 >
-                                                    <Flame size={16} className={p.is_ghee_ingredient ? "text-amber-500" : "text-muted-foreground/30"} />
+                                                    <Sparkles size={16} className="text-muted-foreground" />
                                                     <span className="font-bold text-foreground text-sm">{p.label}</span>
                                                 </button>
                                             ))
@@ -493,31 +472,6 @@ export default function NewExpense() {
                                         value={date}
                                         onChange={e => setDate(e.target.value)}
                                     />
-                                </div>
-                            </div>
-
-                            {/* Ghee Toggle Card */}
-                            <div
-                                onClick={() => setIsGhee(!isGhee)}
-                                className={cn(
-                                    "flex items-center gap-4 p-4 rounded-xl border transition-all duration-300 cursor-pointer active:scale-[0.98]",
-                                    isGhee
-                                        ? "bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/50 shadow-inner"
-                                        : "bg-background border-border hover:bg-accent"
-                                )}
-                            >
-                                <div className={cn(
-                                    "w-12 h-7 rounded-full relative transition-colors duration-300 shrink-0",
-                                    isGhee ? "bg-amber-500" : "bg-muted"
-                                )}>
-                                    <div className={cn(
-                                        "absolute top-1 w-5 h-5 rounded-full bg-white shadow-sm transition-all duration-300",
-                                        isGhee ? "left-6" : "left-1"
-                                    )} />
-                                </div>
-                                <div>
-                                    <p className={cn("font-bold text-sm", isGhee ? "text-amber-800 dark:text-amber-400" : "text-foreground")}>Ghee Production Cost</p>
-                                    <p className="text-[10px] text-muted-foreground leading-tight">Enable if this expense is for raw materials like butter/cream.</p>
                                 </div>
                             </div>
 

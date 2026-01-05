@@ -259,7 +259,6 @@ export default function Products() {
                                     onChange={(e) => setNewCategory(e.target.value)}
                                 >
                                     <option value="general">General</option>
-                                    <option value="ghee">Ghee Product</option>
                                 </select>
                             </div>
                         </div>
@@ -407,15 +406,18 @@ export default function Products() {
                         </div>
                     ))}
                 </div>
-            )}
+            )
+            }
 
             {/* Backdrop for Menu */}
-            {activeMenuId && (
-                <div
-                    className="fixed inset-0 z-[40]"
-                    onClick={() => setActiveMenuId(null)}
-                />
-            )}
-        </div>
+            {
+                activeMenuId && (
+                    <div
+                        className="fixed inset-0 z-[40]"
+                        onClick={() => setActiveMenuId(null)}
+                    />
+                )
+            }
+        </div >
     );
 }
