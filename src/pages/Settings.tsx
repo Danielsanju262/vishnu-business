@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Database, Shield, Moon, Sun, Laptop, Lock, Check, Fingerprint } from "lucide-react";
+import { ArrowLeft, Database, Shield, Moon, Sun, Laptop, Lock, Check, Fingerprint, LogOut } from "lucide-react";
 import { useTheme } from "../components/theme-provider";
 import { useAuth } from "../context/AuthContext";
+import { supabase } from "../lib/supabase";
 import { cn } from "../lib/utils";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
@@ -201,6 +202,24 @@ export default function Settings() {
                     <button disabled className="w-full py-2 bg-accent text-muted-foreground rounded-lg text-sm font-medium cursor-not-allowed opacity-50">
                         Backup Data (Coming Soon)
                     </button>
+                </div>
+
+                {/* Sign Out */}
+                <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
+                    <h2 className="font-bold text-foreground mb-4 flex items-center gap-2">
+                        <LogOut size={18} className="text-rose-500" />
+                        Account
+                    </h2>
+                    <Button
+                        variant="outline"
+                        className="w-full border-rose-500/30 text-rose-500 hover:bg-rose-500/10"
+                        onClick={async () => {
+                            await supabase.auth.signOut();
+                        }}
+                    >
+                        <LogOut size={16} className="mr-2" />
+                        Sign Out
+                    </Button>
                 </div>
 
                 {/* Footer */}
