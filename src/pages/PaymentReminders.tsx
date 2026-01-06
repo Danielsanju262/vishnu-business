@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../lib/supabase";
 import { Button } from "../components/ui/Button";
-import { ArrowLeft, Plus, Trash2, CheckCircle2, Search, IndianRupee, Calendar, Receipt, X, Check, XCircle, Wifi, WifiOff } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, CheckCircle2, Search, IndianRupee, Calendar, Receipt, X, Check, XCircle, WifiOff } from "lucide-react";
 import { useToast } from "../components/toast-provider";
 import { cn } from "../lib/utils";
 import { Link } from "react-router-dom";
@@ -126,7 +126,7 @@ export default function PaymentReminders() {
     }, [migrateLocalStorageToSupabase, toast]);
 
     // Setup real-time subscription for payment_reminders table
-    const { isConnected, isPolling } = useRealtimeTable('payment_reminders', loadData, []);
+    useRealtimeTable('payment_reminders', loadData, []);
 
     // Also subscribe to customers for real-time customer updates
     useEffect(() => {
@@ -423,16 +423,7 @@ export default function PaymentReminders() {
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <h1 className="text-xl font-black text-zinc-900 dark:text-white tracking-tight">Payment Reminders</h1>
-                                        {/* Real-time connection indicator */}
-                                        <div className={cn(
-                                            "flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider",
-                                            isConnected
-                                                ? "bg-emerald-100 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
-                                                : "bg-amber-100 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400"
-                                        )}>
-                                            {isConnected ? <Wifi size={10} /> : <WifiOff size={10} />}
-                                            {isConnected ? (isPolling ? "Sync" : "Live") : "Offline"}
-                                        </div>
+
                                     </div>
                                 </div>
                             </div>

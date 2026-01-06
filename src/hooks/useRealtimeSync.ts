@@ -1,13 +1,13 @@
-import { useEffect, useCallback, useRef, useState } from 'react';
-import { supabase } from '../lib/supabase';
-import { RealtimeChannel } from '@supabase/supabase-js';
+import { useEffect, useCallback, useRef } from 'react';
+// import { supabase } from '../lib/supabase';
+// import { RealtimeChannel } from '@supabase/supabase-js';
 
 type TableName = 'customers' | 'products' | 'transactions' | 'expenses' | 'expense_presets' | 'payment_reminders';
 
 // Configuration - set to true to use Supabase Realtime (requires paid plan or free tier limits)
 // Set to false to use polling (works on any plan, completely free)
-const USE_REALTIME = false;
-const POLLING_INTERVAL_MS = 5000; // Poll every 5 seconds when not using realtime
+// const USE_REALTIME = false;
+// const POLLING_INTERVAL_MS = 5000; // Poll every 5 seconds when not using realtime
 
 interface UseRealtimeSyncOptions {
     tables: TableName[];
@@ -21,106 +21,10 @@ interface UseRealtimeSyncOptions {
  * 1. Supabase Realtime (WebSocket) - instant updates, may require paid plan
  * 2. Polling (free) - checks for updates every few seconds, works on any plan
  */
-export function useRealtimeSync({ tables, onDataChange }: UseRealtimeSyncOptions) {
-    const channelRef = useRef<RealtimeChannel | null>(null);
-    // Initialize connected state based on mode to enable "Always Online" feel
-    const [isConnected, setIsConnected] = useState(!USE_REALTIME);
-    const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
-
-    const setupRealtimeSubscription = useCallback(() => {
-        // Create a unique channel name
-        const channelName = `realtime-sync-${Date.now()}`;
-
-        // Create channel with all table subscriptions
-        let channel = supabase.channel(channelName);
-
-        tables.forEach(table => {
-            channel = channel
-                .on(
-                    'postgres_changes',
-                    {
-                        event: 'INSERT',
-                        schema: 'public',
-                        table: table,
-                    },
-                    (payload) => {
-                        console.log(`[Realtime] INSERT on ${table}:`, payload);
-                        onDataChange(table, { event: 'INSERT', ...payload });
-                    }
-                )
-                .on(
-                    'postgres_changes',
-                    {
-                        event: 'UPDATE',
-                        schema: 'public',
-                        table: table,
-                    },
-                    (payload) => {
-                        console.log(`[Realtime] UPDATE on ${table}:`, payload);
-                        onDataChange(table, { event: 'UPDATE', ...payload });
-                    }
-                )
-                .on(
-                    'postgres_changes',
-                    {
-                        event: 'DELETE',
-                        schema: 'public',
-                        table: table,
-                    },
-                    (payload) => {
-                        console.log(`[Realtime] DELETE on ${table}:`, payload);
-                        onDataChange(table, { event: 'DELETE', ...payload });
-                    }
-                );
-        });
-
-        // Subscribe to the channel
-        channel.subscribe((status) => {
-            console.log(`[Realtime] Subscription status: ${status}`);
-            setIsConnected(status === 'SUBSCRIBED');
-        });
-
-        channelRef.current = channel;
-    }, [tables, onDataChange]);
-
-    const setupPolling = useCallback(() => {
-        // Initial state - we're "connected" via polling
-        setIsConnected(true);
-
-        // Set up polling interval
-        pollingIntervalRef.current = setInterval(() => {
-            console.log(`[Polling] Checking for updates...`);
-            // Trigger a change event for each table to force refetch
-            tables.forEach(table => {
-                onDataChange(table, { event: 'POLL', polled: true });
-            });
-        }, POLLING_INTERVAL_MS);
-
-        console.log(`[Polling] Started with ${POLLING_INTERVAL_MS}ms interval`);
-    }, [tables, onDataChange]);
-
-    useEffect(() => {
-        if (USE_REALTIME) {
-            setupRealtimeSubscription();
-        } else {
-            setupPolling();
-        }
-
-        // Cleanup on unmount
-        return () => {
-            if (channelRef.current) {
-                supabase.removeChannel(channelRef.current);
-                channelRef.current = null;
-            }
-            if (pollingIntervalRef.current) {
-                clearInterval(pollingIntervalRef.current);
-                pollingIntervalRef.current = null;
-            }
-            setIsConnected(false);
-        };
-    }, [setupRealtimeSubscription, setupPolling]);
-
-    return { isConnected, isPolling: !USE_REALTIME };
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function useRealtimeSync({ tables: _tables, onDataChange: _onDataChange }: UseRealtimeSyncOptions) {
+    // Real-time sync disabled as per user request
+    return { isConnected: false, isPolling: false };
 }
 
 /**
