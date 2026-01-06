@@ -6,6 +6,7 @@ import { subDays, startOfMonth, startOfWeek } from "date-fns";
 import { Button } from "../components/ui/Button";
 import { cn } from "../lib/utils";
 import { useToast } from "../components/toast-provider";
+import { Modal } from "../components/ui/Modal";
 
 type DateRangeType = "today" | "yesterday" | "week" | "month" | "custom";
 
@@ -570,10 +571,14 @@ export default function Reports() {
                         </div>
 
                         {/* --- DETAIL MODAL --- */}
-                        {selectedDetail && (
-                            <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md animate-in fade-in p-4">
-                                <div className="bg-zinc-950 w-full max-w-lg rounded-3xl max-h-[85vh] flex flex-col shadow-2xl border border-zinc-800 animate-in slide-in-from-bottom-5">
-                                    <div className="p-5 border-b border-zinc-800 flex justify-between items-center bg-zinc-950 rounded-t-3xl">
+                        <Modal
+                            isOpen={!!selectedDetail}
+                            onClose={() => setSelectedDetail(null)}
+                            className="bg-zinc-950 border-zinc-800 border max-w-lg p-0 overflow-hidden flex flex-col max-h-[85vh]"
+                        >
+                            {selectedDetail && (
+                                <>
+                                    <div className="p-5 border-b border-zinc-800 flex justify-between items-center bg-zinc-950 shrink-0">
                                         <h3 className="font-black text-lg flex items-center gap-2 text-white">
                                             {selectedDetail === 'sales' && <><TrendingUp className="text-emerald-500" /> Gross Sales Breakdown</>}
                                             {selectedDetail === 'goods' && <><ShoppingBag className="text-orange-500" /> Goods Cost Breakdown</>}
@@ -651,7 +656,7 @@ export default function Reports() {
                                                 ))
                                         )}
                                     </div>
-                                    <div className="p-4 border-t border-zinc-800 bg-zinc-900/50 rounded-b-3xl">
+                                    <div className="p-4 border-t border-zinc-800 bg-zinc-900/50 shrink-0">
                                         <div className="flex justify-between items-center font-black text-lg text-white">
                                             <span>Total</span>
                                             <span>
@@ -661,9 +666,9 @@ export default function Reports() {
                                             </span>
                                         </div>
                                     </div>
-                                </div>
-                            </div>
-                        )}
+                                </>
+                            )}
+                        </Modal>
                     </div>
                 )}
 
@@ -1071,14 +1076,18 @@ export default function Reports() {
             </div>
 
             {/* MOVED: Customer Detail Modal - To avoid z-index/clipping issues inside animations */}
-            {
-                selectedCustomer && (() => {
-                    const { transactions, totalSold, totalBought, customerProfit } = getCustomerFinancials(selectedCustomer);
+            <Modal
+                isOpen={!!selectedCustomer}
+                onClose={() => setSelectedCustomer(null)}
+                className="bg-neutral-900 border-neutral-800 border max-w-lg p-0 overflow-hidden flex flex-col max-h-[85vh]"
+            >
+                {
+                    selectedCustomer && (() => {
+                        const { transactions, totalSold, totalBought, customerProfit } = getCustomerFinancials(selectedCustomer);
 
-                    return (
-                        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in p-4">
-                            <div className="bg-neutral-900 w-full max-w-lg rounded-3xl max-h-[85vh] flex flex-col shadow-2xl border border-neutral-800 animate-in slide-in-from-bottom-5">
-                                <div className="p-5 border-b border-neutral-800 flex justify-between items-center bg-neutral-900 rounded-t-3xl shrink-0">
+                        return (
+                            <>
+                                <div className="p-5 border-b border-neutral-800 flex justify-between items-center bg-neutral-900 shrink-0">
                                     <div className="flex items-center gap-3">
                                         <div className="p-2 bg-neutral-800 rounded-full text-neutral-400">
                                             <User size={20} />
@@ -1117,7 +1126,7 @@ export default function Reports() {
                                     ))}
                                 </div>
 
-                                <div className="p-5 border-t border-neutral-800 bg-neutral-900 rounded-b-3xl shrink-0">
+                                <div className="p-5 border-t border-neutral-800 bg-neutral-900 shrink-0">
                                     <div className="grid grid-cols-3 gap-2">
                                         <div className="text-center p-2 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
                                             <p className="text-[9px] font-bold text-emerald-600/70 uppercase">Total Sold</p>
@@ -1135,11 +1144,11 @@ export default function Reports() {
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                        </div>
-                    );
-                })()
-            }
+                            </>
+                        );
+                    })()
+                }
+            </Modal>
             {/* Backdrop for Menu */}
             {
                 activeMenuId && (

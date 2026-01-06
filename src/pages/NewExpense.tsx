@@ -7,6 +7,8 @@ import { ArrowLeft, Check, Fuel, Utensils, Wrench, Sparkles, Plus, Trash2, Edit2
 import { cn } from "../lib/utils";
 import { useToast } from "../components/toast-provider";
 
+import { useClickOutside } from "../hooks/useClickOutside";
+
 type Preset = {
     id: string;
     label: string;
@@ -22,6 +24,9 @@ export default function NewExpense() {
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [presetSearch, setPresetSearch] = useState("");
+
+    // Hook for click outside
+    const suggestionsRef = useClickOutside<HTMLDivElement>(() => setShowSuggestions(false));
 
     // Presets Management
     const [presets, setPresets] = useState<Preset[]>([]);
@@ -61,6 +66,18 @@ export default function NewExpense() {
     useEffect(() => {
         fetchPresets();
     }, []);
+
+    // Close menu on ESC
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape") {
+                if (activeMenuId) setActiveMenuId(null);
+                if (showSuggestions) setShowSuggestions(false);
+            }
+        };
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [activeMenuId, showSuggestions]);
 
     const fetchPresets = async () => {
         const { data } = await supabase.from('expense_presets').select('*').is('deleted_at', null).order('label');
@@ -406,7 +423,7 @@ export default function NewExpense() {
                     <div className="bg-card border border-border rounded-t-3xl shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.1)] -mx-4 -mb-4 p-6 space-y-5 animate-in slide-in-from-bottom-6 z-10">
                         {/* Title Input */}
                         <div className="space-y-4">
-                            <div className="relative">
+                            <div className="relative" ref={suggestionsRef}>
                                 <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5 block ml-1">Title</label>
                                 <Input
                                     value={title}
@@ -415,7 +432,6 @@ export default function NewExpense() {
                                         setShowSuggestions(e.target.value.length > 0);
                                     }}
                                     onFocus={() => setShowSuggestions(title.length > 0)}
-                                    onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
                                     placeholder="Expense Name"
                                     className="bg-accent/50 border-border/50 text-foreground placeholder:text-muted-foreground/50 font-bold h-12 rounded-xl focus:bg-background transition-all"
                                 />
@@ -491,7 +507,7 @@ export default function NewExpense() {
             {/* Backdrop for Menu */}
             {activeMenuId && (
                 <div
-                    className="fixed inset-0 z-[40]"
+                    className="fixed inset-0 z-[40] bg-black/5 backdrop-blur-[1px]"
                     onClick={() => setActiveMenuId(null)}
                 />
             )}

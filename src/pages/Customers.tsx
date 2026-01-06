@@ -139,6 +139,17 @@ export default function Customers() {
         }
     };
 
+    // Close menu on ESC
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape" && activeMenuId) {
+                setActiveMenuId(null);
+            }
+        };
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [activeMenuId]);
+
     const filteredCustomers = customers.filter(c =>
         c.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
@@ -331,7 +342,7 @@ export default function Customers() {
             {
                 activeMenuId && (
                     <div
-                        className="fixed inset-0 z-[40]"
+                        className="fixed inset-0 z-[40] bg-black/5 backdrop-blur-[1px]"
                         onClick={() => setActiveMenuId(null)}
                     />
                 )

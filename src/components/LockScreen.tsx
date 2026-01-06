@@ -23,6 +23,14 @@ export default function LockScreen() {
     const canUseBiometrics = hasBiometrics && !pinWasUpdated;
 
     useEffect(() => {
+        // Lock body scroll
+        document.body.style.overflow = 'hidden';
+        return () => {
+            document.body.style.overflow = '';
+        };
+    }, []);
+
+    useEffect(() => {
         // Auto-prompt biometrics on mount if available and PIN is current
         if (canUseBiometrics && !showPin) {
             const t = setTimeout(() => {

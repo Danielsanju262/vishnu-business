@@ -153,6 +153,17 @@ export default function Products() {
         }
     };
 
+    // Close menu on ESC
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape" && activeMenuId) {
+                setActiveMenuId(null);
+            }
+        };
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [activeMenuId]);
+
     const filteredProducts = products.filter(p =>
         p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         p.category.toLowerCase().includes(searchQuery.toLowerCase())
@@ -400,7 +411,7 @@ export default function Products() {
             {
                 activeMenuId && (
                     <div
-                        className="fixed inset-0 z-[40]"
+                        className="fixed inset-0 z-[40] bg-black/5 backdrop-blur-[1px]"
                         onClick={() => setActiveMenuId(null)}
                     />
                 )
