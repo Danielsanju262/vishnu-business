@@ -913,7 +913,10 @@ export default function Reports() {
 
                                                             {activeMenuId === t.id && (
                                                                 <div
-                                                                    className="absolute right-0 top-full mt-1 w-36 bg-card dark:bg-zinc-900 border border-border rounded-xl shadow-2xl z-[100] overflow-hidden animate-in fade-in zoom-in-95 ring-1 ring-black/5"
+                                                                    className="absolute right-0 top-full mt-1 w-36 bg-card dark:bg-zinc-900 border border-border rounded-xl shadow-2xl z-[200] overflow-hidden animate-in fade-in zoom-in-95 ring-1 ring-black/5"
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                    onMouseDown={(e) => e.stopPropagation()}
+                                                                    onTouchStart={(e) => e.stopPropagation()}
                                                                 >
                                                                     <div className="flex flex-col p-1">
                                                                         <button
@@ -1076,7 +1079,10 @@ export default function Reports() {
 
                                                                     {activeMenuId === e.id && (
                                                                         <div
-                                                                            className="absolute right-0 top-full mt-1 w-36 bg-card dark:bg-zinc-900 border border-border rounded-xl shadow-2xl z-[100] overflow-hidden animate-in fade-in zoom-in-95 ring-1 ring-black/5"
+                                                                            className="absolute right-0 top-full mt-1 w-36 bg-card dark:bg-zinc-900 border border-border rounded-xl shadow-2xl z-[200] overflow-hidden animate-in fade-in zoom-in-95 ring-1 ring-black/5"
+                                                                            onClick={(evt) => evt.stopPropagation()}
+                                                                            onMouseDown={(evt) => evt.stopPropagation()}
+                                                                            onTouchStart={(evt) => evt.stopPropagation()}
                                                                         >
                                                                             <div className="flex flex-col p-1">
                                                                                 <button
