@@ -1,10 +1,11 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { Button } from "../components/ui/Button";
 import { ArrowLeft, Trash2, Plus, User, Search, Store, MoreVertical, CheckCircle2, Circle, X, Edit2 } from "lucide-react";
 import { useToast } from "../components/toast-provider";
 import { cn } from "../lib/utils";
+import { useRealtimeTable } from "../hooks/useRealtimeSync";
 
 type Customer = {
     id: string;
@@ -40,16 +41,15 @@ export default function Customers() {
         if (timerRef.current) clearTimeout(timerRef.current);
     };
 
-    useEffect(() => {
-        fetchCustomers();
-    }, []);
-
-    const fetchCustomers = async () => {
+    const fetchCustomers = useCallback(async () => {
         setLoading(true);
         const { data } = await supabase.from("customers").select("*").eq('is_active', true).order("name");
         if (data) setCustomers(data);
         setLoading(false);
-    };
+    }, []);
+
+    // Real-time sync for customers - auto-refreshes when data changes on any device
+    useRealtimeTable('customers', fetchCustomers, []);
 
     const handleSave = async () => {
         if (!newName) return;

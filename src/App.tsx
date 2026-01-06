@@ -9,6 +9,7 @@ import Dashboard from "./pages/Dashboard";
 import NewSale from "./pages/NewSale";
 import NewExpense from "./pages/NewExpense";
 import Reports from "./pages/Reports";
+import PaymentReminders from "./pages/PaymentReminders";
 import Settings from "./pages/Settings";
 import MasterPinSetup from "./pages/MasterPinSetup";
 
@@ -74,6 +75,7 @@ function AppContent() {
           <Route path="customers" element={<Customers />} />
           <Route path="products" element={<Products />} />
           <Route path="reports" element={<Reports />} />
+          <Route path="payment-reminders" element={<PaymentReminders />} />
           <Route path="settings" element={<Settings />} />
         </Route>
 

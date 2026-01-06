@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { Button } from "../components/ui/Button";
@@ -8,6 +8,7 @@ import { cn } from "../lib/utils";
 import { useToast } from "../components/toast-provider";
 
 import { useClickOutside } from "../hooks/useClickOutside";
+import { useRealtimeTable } from "../hooks/useRealtimeSync";
 
 type Preset = {
     id: string;
@@ -63,9 +64,15 @@ export default function NewExpense() {
         if (timerRef.current) clearTimeout(timerRef.current);
     };
 
-    useEffect(() => {
-        fetchPresets();
+    const fetchPresets = useCallback(async () => {
+        const { data } = await supabase.from('expense_presets').select('*').is('deleted_at', null).order('label');
+        if (data && data.length > 0) {
+            setPresets(data);
+        }
     }, []);
+
+    // Real-time sync for expense presets - auto-refreshes when data changes on any device
+    useRealtimeTable('expense_presets', fetchPresets, []);
 
     // Close menu on ESC
     useEffect(() => {
@@ -78,13 +85,6 @@ export default function NewExpense() {
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
     }, [activeMenuId, showSuggestions]);
-
-    const fetchPresets = async () => {
-        const { data } = await supabase.from('expense_presets').select('*').is('deleted_at', null).order('label');
-        if (data && data.length > 0) {
-            setPresets(data);
-        }
-    };
 
     const handleSave = async () => {
         if (!title || !amount || !date) {

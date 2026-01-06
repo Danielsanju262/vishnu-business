@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { Button } from "../components/ui/Button";
 import { ArrowLeft, ChevronRight, Package, Search, Plus, Trash2, ShoppingCart, User, X, ArrowRight, Calendar } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useToast } from "../components/toast-provider";
+import { useRealtimeTables } from "../hooks/useRealtimeSync";
 
 type Customer = { id: string; name: string };
 type Product = { id: string; name: string; unit: string; category: string };
@@ -43,15 +44,17 @@ export default function NewSale() {
     const [newItemName, setNewItemName] = useState("");
     const [newItemUnit, setNewItemUnit] = useState("kg");
 
-    useEffect(() => {
-        Promise.all([
+    const fetchData = useCallback(async () => {
+        const [custRes, prodRes] = await Promise.all([
             supabase.from("customers").select("*").eq('is_active', true).order("name"),
             supabase.from("products").select("*").eq('is_active', true).order("name")
-        ]).then(([custRes, prodRes]) => {
-            if (custRes.data) setCustomers(custRes.data);
-            if (prodRes.data) setProducts(prodRes.data);
-        });
+        ]);
+        if (custRes.data) setCustomers(custRes.data);
+        if (prodRes.data) setProducts(prodRes.data);
     }, []);
+
+    // Real-time sync for customers and products - auto-refreshes when data changes on any device
+    useRealtimeTables(['customers', 'products'], fetchData, []);
 
     // Fetch Last Price when Product Selected
     useEffect(() => {
@@ -171,7 +174,7 @@ export default function NewSale() {
     return (
         <div className="container mx-auto max-w-lg min-h-screen bg-background flex flex-col animate-in fade-in pb-8">
             {/* Glassmorphism Header */}
-            <div className="sticky top-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border shadow-sm px-4 py-3 flex items-center justify-between transition-all">
+            <div className="sticky top-0 z-50 bg-background/95 backdrop-blur-xl border-b border-border shadow-sm px-4 py-3 flex items-center justify-between transition-all">
                 <button
                     onClick={() => {
                         if (step === "details") { setStep("product"); return; }

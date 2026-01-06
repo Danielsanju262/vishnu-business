@@ -1,10 +1,11 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { Button } from "../components/ui/Button";
 import { Trash2, Plus, Milk, Package, ArrowLeft, Search, Tag, Box, MoreVertical, CheckCircle2, Circle, X, Edit2 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useToast } from "../components/toast-provider";
+import { useRealtimeTable } from "../hooks/useRealtimeSync";
 
 type Product = {
     id: string;
@@ -44,16 +45,15 @@ export default function Products() {
     const [newUnit, setNewUnit] = useState("kg");
     const [newCategory, setNewCategory] = useState("general");
 
-    useEffect(() => {
-        fetchProducts();
-    }, []);
-
-    const fetchProducts = async () => {
+    const fetchProducts = useCallback(async () => {
         setLoading(true);
         const { data } = await supabase.from("products").select("*").eq('is_active', true).order("name");
         if (data) setProducts(data);
         setLoading(false);
-    };
+    }, []);
+
+    // Real-time sync for products - auto-refreshes when data changes on any device
+    useRealtimeTable('products', fetchProducts, []);
 
     const cleanForm = () => {
         setNewName("");

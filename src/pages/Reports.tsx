@@ -1,12 +1,14 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { supabase } from "../lib/supabase";
-import { ArrowLeft, Trash2, Calendar, ShoppingBag, Wallet, Edit2, ChevronDown, TrendingUp, TrendingDown, Search, ArrowUpDown, X, ChevronRight, User, CheckCircle2, Circle, MoreVertical } from "lucide-react";
+import { ArrowLeft, Trash2, Calendar, ShoppingBag, Wallet, Edit2, ChevronDown, TrendingUp, TrendingDown, Search, ArrowUpDown, X, ChevronRight, User, CheckCircle2, Circle, MoreVertical, Download } from "lucide-react";
+import Papa from "papaparse";
 import { Link } from "react-router-dom";
 import { subDays, startOfMonth, startOfWeek } from "date-fns";
 import { Button } from "../components/ui/Button";
 import { cn } from "../lib/utils";
 import { useToast } from "../components/toast-provider";
 import { Modal } from "../components/ui/Modal";
+import { useRealtimeTables } from "../hooks/useRealtimeSync";
 
 type DateRangeType = "today" | "yesterday" | "week" | "month" | "custom";
 
@@ -51,11 +53,21 @@ export default function Reports() {
     const [selectedExpenseIds, setSelectedExpenseIds] = useState<Set<string>>(new Set());
     const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
 
+    // Export State
+    const [showExportModal, setShowExportModal] = useState(false);
+    const [isExporting, setIsExporting] = useState(false);
+
 
     // Long Press Refs
     const timerRef = useRef<any>(null);
 
-    const handleTransactionTouchStart = (id: string, currentSelected: boolean) => {
+    const handleTransactionTouchStart = (e: React.TouchEvent | React.MouseEvent, id: string, currentSelected: boolean) => {
+        // Don't start long-press if clicking on a button or menu
+        const target = e.target as HTMLElement;
+        if (target.closest('button') || target.closest('[role="menu"]')) {
+            return;
+        }
+
         timerRef.current = setTimeout(() => {
             if (navigator.vibrate) navigator.vibrate(50);
             if (!isSelectionMode) setIsSelectionMode(true);
@@ -63,7 +75,13 @@ export default function Reports() {
         }, 500);
     };
 
-    const handleExpenseTouchStart = (id: string, currentSelected: boolean) => {
+    const handleExpenseTouchStart = (e: React.TouchEvent | React.MouseEvent, id: string, currentSelected: boolean) => {
+        // Don't start long-press if clicking on a button or menu
+        const target = e.target as HTMLElement;
+        if (target.closest('button') || target.closest('[role="menu"]')) {
+            return;
+        }
+
         timerRef.current = setTimeout(() => {
             if (navigator.vibrate) navigator.vibrate(50);
             if (!isSelectionMode) {
@@ -80,9 +98,39 @@ export default function Reports() {
         if (timerRef.current) clearTimeout(timerRef.current);
     };
 
+
+    // Close menu when clicking outside (Global Listener)
     useEffect(() => {
-        fetchData();
-    }, [rangeType, startDate, endDate]);
+        const handleClickOutside = () => {
+            if (activeMenuId) setActiveMenuId(null);
+        };
+
+        if (activeMenuId) {
+            window.addEventListener('click', handleClickOutside);
+        }
+        return () => window.removeEventListener('click', handleClickOutside);
+    }, [activeMenuId]);
+
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape" && activeMenuId) {
+                setActiveMenuId(null);
+            }
+        };
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [activeMenuId]);
+
+    // Close menu on ESC key
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape" && activeMenuId) {
+                setActiveMenuId(null);
+            }
+        };
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [activeMenuId]);
 
     const getDateFilter = () => {
         const today = new Date();
@@ -98,7 +146,7 @@ export default function Reports() {
         return { start: startDate, end: endDate };
     };
 
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         const { start, end } = getDateFilter();
 
         const { data: transactions } = await supabase
@@ -146,7 +194,10 @@ export default function Reports() {
             const all = [...manual, ...cogs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
             setCombinedExpenses(all);
         }
-    };
+    }, [rangeType, startDate, endDate]);
+
+    // Real-time sync for transactions and expenses - auto-refreshes when data changes on any device
+    useRealtimeTables(['transactions', 'expenses'], fetchData, [rangeType, startDate, endDate]);
 
     const deleteTransaction = async (id: string, customerName?: string, productName?: string) => {
         // Find item locally for restoration
@@ -338,6 +389,96 @@ export default function Reports() {
         }
     };
 
+    // --- Export Logic ---
+    const handleExport = async (type: 'sales' | 'customers' | 'products') => {
+        setIsExporting(true);
+        try {
+            const todayStr = new Date().toISOString().split('T')[0];
+            let dataToExport: any[] = [];
+            let fileName = "";
+
+            if (type === 'sales') {
+                fileName = `vishnu_sales_export_${todayStr}.csv`;
+                // Re-fetch to ensure we have dataset matching current filters or all? 
+                // Requirement says "Sales Activity", implying current view logic or complete. 
+                // "Unified Export Experience" -> "Export UI follows the same interaction pattern (date range if applicable)"
+                // We'll use the *current filtered data* for sales as that makes the most sense.
+
+                const exportData = data.transactions.map((t: any) => ({
+                    "Date": new Date(t.date).toLocaleDateString(),
+                    "Customer Name": t.customers?.name || 'Unknown',
+                    "Product Name": t.products?.name || 'Unknown',
+                    "Quantity": t.quantity,
+                    "Unit": t.products?.unit || '',
+                    "Sell Price": t.sell_price,
+                    "Buy Price": t.buy_price,
+                    "Total Amount": t.quantity * t.sell_price,
+                    "Profit": (t.quantity * t.sell_price) - (t.quantity * t.buy_price),
+                    "Is Deleted": t.deleted_at ? "true" : "false"
+                }));
+                dataToExport = exportData;
+            }
+            else if (type === 'customers') {
+                fileName = `vishnu_customers_export_${todayStr}.csv`;
+                const { data: customers } = await supabase
+                    .from('customers')
+                    .select('*')
+                    .order('name');
+
+                if (customers) {
+                    dataToExport = customers.map(c => ({
+                        'Customer Name': c.name,
+                        'Phone': c.phone || '',
+                        'Created Date': new Date(c.created_at).toLocaleDateString(),
+                        'Status': c.deleted_at ? 'Deleted' : 'Active'
+                    }));
+                }
+            }
+            else if (type === 'products') {
+                fileName = `vishnu_products_export_${todayStr}.csv`;
+                const { data: products } = await supabase
+                    .from('products')
+                    .select('*')
+                    .order('name');
+
+                if (products) {
+                    dataToExport = products.map(p => ({
+                        'Product Name': p.name,
+                        'Unit': p.unit,
+                        'Category': p.category || 'General',
+                        'Created Date': new Date(p.created_at).toLocaleDateString(),
+                        'Status': p.deleted_at ? 'Deleted' : 'Active'
+                    }));
+                }
+            }
+
+            if (dataToExport.length > 0) {
+                const csv = Papa.unparse(dataToExport);
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                if (link.download !== undefined) {
+                    const url = URL.createObjectURL(blob);
+                    link.setAttribute('href', url);
+                    link.setAttribute('download', fileName);
+                    link.style.visibility = 'hidden';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    toast("Export successful", "success");
+                }
+            } else {
+                toast("No data to export", "error");
+            }
+
+        } catch (error) {
+            console.error(error);
+            toast("Export failed", "error");
+        } finally {
+            setIsExporting(false);
+            setShowExportModal(false);
+        }
+    };
+
     // --- Calculations ---
 
     // 1. Financials
@@ -417,18 +558,29 @@ export default function Reports() {
                         </div>
                     </div>
 
-                    {/* Filter Trigger */}
-                    <button
-                        onClick={() => setShowFilters(!showFilters)}
-                        className={cn(
-                            "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold border interactive transition-all",
-                            showFilters ? "bg-primary text-primary-foreground border-primary" : "bg-card text-muted-foreground border-border"
-                        )}
-                    >
-                        <Calendar size={14} />
-                        {ranges.find(r => r.key === rangeType)?.label}
-                        <ChevronDown size={14} className={cn("transition-transform", showFilters && "rotate-180")} />
-                    </button>
+                    <div className="flex items-center gap-2">
+                        {/* Export Trigger */}
+                        <button
+                            onClick={() => setShowExportModal(true)}
+                            className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold bg-card text-muted-foreground border border-border hover:bg-accent hover:text-foreground transition-all"
+                        >
+                            <Download size={14} />
+                            <span className="hidden sm:inline">Export</span>
+                        </button>
+
+                        {/* Filter Trigger */}
+                        <button
+                            onClick={() => setShowFilters(!showFilters)}
+                            className={cn(
+                                "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold border interactive transition-all",
+                                showFilters ? "bg-primary text-primary-foreground border-primary" : "bg-card text-muted-foreground border-border"
+                            )}
+                        >
+                            <Calendar size={14} />
+                            {ranges.find(r => r.key === rangeType)?.label}
+                            <ChevronDown size={14} className={cn("transition-transform", showFilters && "rotate-180")} />
+                        </button>
+                    </div>
                 </div>
 
                 {/* Filter Panel */}
@@ -819,7 +971,7 @@ export default function Reports() {
                                 )}
 
                                 {data.transactions.map((t: any) => (
-                                    <div key={t.id} className={cn("bg-card p-4 rounded-xl shadow-sm border border-border/60 transition-all", isSelectionMode && selectedTransactionIds.has(t.id) && "ring-2 ring-primary bg-primary/5")}>
+                                    <div key={t.id} className={cn("bg-card p-4 rounded-xl shadow-sm border border-border/60 transition-all relative", isSelectionMode && selectedTransactionIds.has(t.id) && "ring-2 ring-primary bg-primary/5", activeMenuId === t.id && "z-[150]")}>
                                         {isSelectionMode ? (
                                             <div className="flex items-center cursor-pointer" onClick={() => toggleTransactionSelection(t.id)}>
                                                 <div className="mr-4">
@@ -885,9 +1037,9 @@ export default function Reports() {
                                                 >
                                                     <div
                                                         className="flex-1 min-w-0 select-none cursor-pointer"
-                                                        onTouchStart={() => handleTransactionTouchStart(t.id, selectedTransactionIds.has(t.id))}
+                                                        onTouchStart={(e) => handleTransactionTouchStart(e, t.id, selectedTransactionIds.has(t.id))}
                                                         onTouchEnd={handleTouchEnd}
-                                                        onMouseDown={() => handleTransactionTouchStart(t.id, selectedTransactionIds.has(t.id))}
+                                                        onMouseDown={(e) => handleTransactionTouchStart(e, t.id, selectedTransactionIds.has(t.id))}
                                                         onMouseUp={handleTouchEnd}
                                                         onMouseLeave={handleTouchEnd}
                                                     >
@@ -913,7 +1065,8 @@ export default function Reports() {
 
                                                             {activeMenuId === t.id && (
                                                                 <div
-                                                                    className="absolute right-0 top-full mt-1 w-36 bg-card dark:bg-zinc-900 border border-border rounded-xl shadow-2xl z-[200] overflow-hidden animate-in fade-in zoom-in-95 ring-1 ring-black/5"
+                                                                    role="menu"
+                                                                    className="absolute right-0 top-full mt-1 w-36 bg-card dark:bg-zinc-900 border border-border rounded-xl shadow-2xl z-[200] overflow-hidden animate-in fade-in zoom-in-95 ring-1 ring-black/5 pointer-events-auto"
                                                                     onClick={(e) => e.stopPropagation()}
                                                                     onMouseDown={(e) => e.stopPropagation()}
                                                                     onTouchStart={(e) => e.stopPropagation()}
@@ -974,9 +1127,9 @@ export default function Reports() {
                             <div className="space-y-3">
                                 {combinedExpenses.map((e: any) => (
                                     <div key={e.id} className={cn(
-                                        "bg-card p-4 rounded-xl shadow-sm border border-border/60 hover:shadow-md transition-all",
+                                        "bg-card p-4 rounded-xl shadow-sm border border-border/60 hover:shadow-md transition-all relative",
                                         isSelectionMode && selectedExpenseIds.has(e.id) && "ring-2 ring-primary bg-primary/5",
-                                        activeMenuId === e.id ? "z-50 relative" : ""
+                                        activeMenuId === e.id && "z-[150]"
                                     )}>
                                         {isSelectionMode && e.type === 'manual' ? (
                                             <div className="flex items-center cursor-pointer" onClick={() => toggleExpenseSelection(e.id)}>
@@ -1038,9 +1191,9 @@ export default function Reports() {
                                                     >
                                                         <div
                                                             className="flex-1 cursor-pointer"
-                                                            onTouchStart={() => handleExpenseTouchStart(e.id, selectedExpenseIds.has(e.id))}
+                                                            onTouchStart={(evt) => handleExpenseTouchStart(evt, e.id, selectedExpenseIds.has(e.id))}
                                                             onTouchEnd={handleTouchEnd}
-                                                            onMouseDown={() => handleExpenseTouchStart(e.id, selectedExpenseIds.has(e.id))}
+                                                            onMouseDown={(evt) => handleExpenseTouchStart(evt, e.id, selectedExpenseIds.has(e.id))}
                                                             onMouseUp={handleTouchEnd}
                                                             onMouseLeave={handleTouchEnd}
                                                         >
@@ -1079,10 +1232,11 @@ export default function Reports() {
 
                                                                     {activeMenuId === e.id && (
                                                                         <div
-                                                                            className="absolute right-0 top-full mt-1 w-36 bg-card dark:bg-zinc-900 border border-border rounded-xl shadow-2xl z-[200] overflow-hidden animate-in fade-in zoom-in-95 ring-1 ring-black/5"
-                                                                            onClick={(evt) => evt.stopPropagation()}
-                                                                            onMouseDown={(evt) => evt.stopPropagation()}
-                                                                            onTouchStart={(evt) => evt.stopPropagation()}
+                                                                            role="menu"
+                                                                            className="absolute right-0 top-full mt-1 w-36 bg-card dark:bg-zinc-900 border border-border rounded-xl shadow-2xl z-[200] overflow-hidden animate-in fade-in zoom-in-95 ring-1 ring-black/5 pointer-events-auto"
+                                                                            onClick={(e) => e.stopPropagation()}
+                                                                            onMouseDown={(e) => e.stopPropagation()}
+                                                                            onTouchStart={(e) => e.stopPropagation()}
                                                                         >
                                                                             <div className="flex flex-col p-1">
                                                                                 <button
@@ -1201,12 +1355,91 @@ export default function Reports() {
                     })()
                 }
             </Modal>
-            {/* Backdrop for Menu */}
+            {/* EXPORT MODAL */}
+            <Modal
+                isOpen={showExportModal}
+                onClose={() => setShowExportModal(false)}
+                className="bg-card border-border max-w-sm"
+            >
+                <div className="p-5">
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className="p-2.5 bg-primary/10 rounded-xl text-primary">
+                            <Download size={24} />
+                        </div>
+                        <div>
+                            <h3 className="font-bold text-lg text-foreground">Export Data</h3>
+                            <p className="text-xs text-muted-foreground">Select data to download as CSV</p>
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <button
+                            disabled={isExporting}
+                            onClick={() => handleExport('sales')}
+                            className="w-full p-3 bg-accent/50 hover:bg-accent border border-border rounded-xl flex items-center justify-between transition-all group disabled:opacity-50"
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-emerald-500/10 rounded-lg text-emerald-600">
+                                    <ShoppingBag size={18} />
+                                </div>
+                                <div className="text-left">
+                                    <p className="font-bold text-sm text-foreground">Sales Activity</p>
+                                    <p className="text-[10px] text-muted-foreground">Current Range ({ranges.find(r => r.key === rangeType)?.label})</p>
+                                </div>
+                            </div>
+                            <Download size={16} className="text-muted-foreground group-hover:text-primary transition-colors" />
+                        </button>
+
+                        <button
+                            disabled={isExporting}
+                            onClick={() => handleExport('customers')}
+                            className="w-full p-3 bg-accent/50 hover:bg-accent border border-border rounded-xl flex items-center justify-between transition-all group disabled:opacity-50"
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-blue-500/10 rounded-lg text-blue-600">
+                                    <User size={18} />
+                                </div>
+                                <div className="text-left">
+                                    <p className="font-bold text-sm text-foreground">Customer List</p>
+                                    <p className="text-[10px] text-muted-foreground">Complete Database</p>
+                                </div>
+                            </div>
+                            <Download size={16} className="text-muted-foreground group-hover:text-primary transition-colors" />
+                        </button>
+
+                        <button
+                            disabled={isExporting}
+                            onClick={() => handleExport('products')}
+                            className="w-full p-3 bg-accent/50 hover:bg-accent border border-border rounded-xl flex items-center justify-between transition-all group disabled:opacity-50"
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-purple-500/10 rounded-lg text-purple-600">
+                                    <Wallet size={18} />
+                                </div>
+                                <div className="text-left">
+                                    <p className="font-bold text-sm text-foreground">Product List</p>
+                                    <p className="text-[10px] text-muted-foreground">Complete Inventory</p>
+                                </div>
+                            </div>
+                            <Download size={16} className="text-muted-foreground group-hover:text-primary transition-colors" />
+                        </button>
+                    </div>
+
+                    <button
+                        onClick={() => setShowExportModal(false)}
+                        className="w-full mt-4 py-2.5 text-xs font-bold text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                        Cancel
+                    </button>
+                </div>
+            </Modal>
+
+            {/* Backdrop for Menu (Visual Only) */}
             {
                 activeMenuId && (
                     <div
-                        className="fixed inset-0 z-[40]"
-                        onClick={() => setActiveMenuId(null)}
+                        className="fixed inset-0 z-[90] bg-black/5 pointer-events-none"
+                        style={{ WebkitTapHighlightColor: 'transparent' }}
                     />
                 )
             }

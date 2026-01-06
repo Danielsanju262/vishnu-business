@@ -205,6 +205,7 @@ export default function Settings() {
 
         let successCount = 0;
         let failCount = 0;
+        let skippedCount = 0;
         let newCustomers = 0;
         let newProducts = 0;
         const totalRows = rows.length;
@@ -265,7 +266,29 @@ export default function Settings() {
                     newProducts++;
                 }
 
-                // Transaction
+                // Check for Exact Duplicate
+                // Criteria: Date, Customer, Product, Quantity, Sell Price, Status (Active/Deleted)
+                let duplicateQuery = supabase.from('transactions').select('id')
+                    .eq('date', date)
+                    .eq('customer_id', customerId)
+                    .eq('product_id', productId)
+                    .eq('quantity', qty)
+                    .eq('sell_price', sellPrice);
+
+                if (isDeleted) {
+                    duplicateQuery = duplicateQuery.not('deleted_at', 'is', null);
+                } else {
+                    duplicateQuery = duplicateQuery.is('deleted_at', null);
+                }
+
+                const { data: existing } = await duplicateQuery.maybeSingle();
+
+                if (existing) {
+                    skippedCount++;
+                    continue;
+                }
+
+                // Transaction Insert
                 const { error: tErr } = await supabase.from('transactions').insert({
                     date,
                     customer_id: customerId,
@@ -285,7 +308,7 @@ export default function Settings() {
             }
         }
 
-        toast(`Imported: ${successCount}, Failed: ${failCount}, New Customers: ${newCustomers}, New Products: ${newProducts}`, "success");
+        toast(`Imported: ${successCount}, Skipped (Duplicate): ${skippedCount}, Failed: ${failCount}`, "info");
     };
 
     const handleSetupSuperAdmin = async (e: React.FormEvent) => {
@@ -420,107 +443,116 @@ export default function Settings() {
     };
 
     return (
-        <div className="min-h-screen bg-background p-4 animate-in fade-in">
-            {/* Header */}
-            <div className="flex items-center gap-4 mb-8">
-                <Link to="/" className="p-2 -ml-2 rounded-full hover:bg-accent active:bg-accent text-muted-foreground transition">
-                    <ArrowLeft />
+        <div className="min-h-screen bg-background p-4 pb-8 animate-in fade-in">
+            {/* Header - Enhanced with better spacing and hover states */}
+            <div className="flex items-center gap-3 mb-6">
+                <Link
+                    to="/"
+                    className="p-2.5 -ml-2 rounded-xl bg-white/5 dark:bg-white/5 hover:bg-white/10 dark:hover:bg-white/10 active:bg-white/15 dark:active:bg-white/15 text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-all duration-200 border border-transparent hover:border-white/10 dark:hover:border-white/10"
+                >
+                    <ArrowLeft size={22} strokeWidth={2.5} />
                 </Link>
-                <div>
-                    {/* Breadcrumb */}
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-0.5">
-                        <Link to="/" className="hover:text-primary transition">Home</Link>
-                        <span>/</span>
-                        <span className="text-primary font-semibold">Settings</span>
+                <div className="flex-1">
+                    {/* Breadcrumb - Improved spacing and contrast */}
+                    <div className="flex items-center gap-2 text-xs text-neutral-500 dark:text-neutral-500 mb-1 tracking-wide">
+                        <Link to="/" className="hover:text-neutral-700 dark:hover:text-white transition-colors duration-150">Home</Link>
+                        <span className="text-neutral-400 dark:text-neutral-600">/</span>
+                        <span className="text-neutral-900 dark:text-white font-semibold">Settings</span>
                     </div>
-                    <h1 className="text-xl font-bold text-foreground">Settings</h1>
+                    <h1 className="text-2xl font-bold text-neutral-900 dark:text-white tracking-tight">Settings</h1>
                 </div>
             </div>
 
             <div className="space-y-4">
-                {/* App Info Card */}
-                <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
-                    <h2 className="font-bold text-foreground mb-4 flex items-center gap-2">
-                        <Shield size={18} className="text-emerald-500" />
+                {/* App Info Card - Enhanced with better contrast and spacing */}
+                <div className="bg-white dark:bg-neutral-900/80 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-5 shadow-sm">
+                    <h2 className="font-bold text-neutral-900 dark:text-white mb-5 flex items-center gap-2.5 text-base">
+                        <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center">
+                            <Shield size={16} className="text-blue-600 dark:text-blue-400" />
+                        </div>
                         Application
                     </h2>
-                    <div className="space-y-4">
-                        <div className="flex justify-between items-center py-2 border-b border-border">
-                            <span className="text-sm text-muted-foreground">Version</span>
-                            <span className="text-sm font-medium text-foreground">v1.4.0</span>
+                    <div className="space-y-0">
+                        <div className="flex justify-between items-center py-3.5 border-b border-neutral-100 dark:border-neutral-800">
+                            <span className="text-sm text-neutral-500 dark:text-neutral-400 font-medium">Version</span>
+                            <span className="text-sm font-semibold text-neutral-900 dark:text-white bg-neutral-100 dark:bg-neutral-800 px-2.5 py-1 rounded-md">v1.4.0</span>
                         </div>
 
-                        <div className="py-2 border-b border-border">
-                            <span className="text-sm text-muted-foreground mb-3 block">Theme</span>
-                            <div className="grid grid-cols-3 gap-2">
+                        <div className="py-4 border-b border-neutral-100 dark:border-neutral-800">
+                            <span className="text-sm text-neutral-500 dark:text-neutral-400 font-medium mb-4 block">Theme</span>
+                            <div className="grid grid-cols-3 gap-3">
                                 <button
                                     onClick={() => setTheme("light")}
                                     className={cn(
-                                        "flex flex-col items-center gap-2 p-3 rounded-xl border transition-all",
+                                        "flex flex-col items-center gap-2.5 p-4 rounded-xl border-2 transition-all duration-200",
                                         theme === "light"
-                                            ? "bg-primary/10 border-primary text-primary"
-                                            : "bg-accent/50 border-transparent text-muted-foreground hover:bg-accent"
+                                            ? "bg-neutral-900 dark:bg-white border-neutral-900 dark:border-white text-white dark:text-neutral-900 shadow-lg"
+                                            : "bg-neutral-50 dark:bg-neutral-800/50 border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-600"
                                     )}
                                 >
-                                    <Sun size={20} />
-                                    <span className="text-xs font-bold">Light</span>
+                                    <Sun size={22} strokeWidth={2} />
+                                    <span className="text-xs font-bold tracking-wide">Light</span>
                                 </button>
                                 <button
                                     onClick={() => setTheme("dark")}
                                     className={cn(
-                                        "flex flex-col items-center gap-2 p-3 rounded-xl border transition-all",
+                                        "flex flex-col items-center gap-2.5 p-4 rounded-xl border-2 transition-all duration-200",
                                         theme === "dark"
-                                            ? "bg-primary/10 border-primary text-primary"
-                                            : "bg-accent/50 border-transparent text-muted-foreground hover:bg-accent"
+                                            ? "bg-neutral-900 dark:bg-white border-neutral-900 dark:border-white text-white dark:text-neutral-900 shadow-lg"
+                                            : "bg-neutral-50 dark:bg-neutral-800/50 border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-600"
                                     )}
                                 >
-                                    <Moon size={20} />
-                                    <span className="text-xs font-bold">Dark</span>
+                                    <Moon size={22} strokeWidth={2} />
+                                    <span className="text-xs font-bold tracking-wide">Dark</span>
                                 </button>
                                 <button
                                     onClick={() => setTheme("system")}
                                     className={cn(
-                                        "flex flex-col items-center gap-2 p-3 rounded-xl border transition-all",
+                                        "flex flex-col items-center gap-2.5 p-4 rounded-xl border-2 transition-all duration-200",
                                         theme === "system"
-                                            ? "bg-primary/10 border-primary text-primary"
-                                            : "bg-accent/50 border-transparent text-muted-foreground hover:bg-accent"
+                                            ? "bg-neutral-900 dark:bg-white border-neutral-900 dark:border-white text-white dark:text-neutral-900 shadow-lg"
+                                            : "bg-neutral-50 dark:bg-neutral-800/50 border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-600"
                                     )}
                                 >
-                                    <Laptop size={20} />
-                                    <span className="text-xs font-bold">Auto</span>
+                                    <Laptop size={22} strokeWidth={2} />
+                                    <span className="text-xs font-bold tracking-wide">Auto</span>
                                 </button>
                             </div>
                         </div>
 
-                        <div className="flex justify-between items-center pt-2">
-                            <span className="text-sm text-muted-foreground">Build</span>
-                            <span className="text-sm font-medium text-foreground">Production</span>
+                        <div className="flex justify-between items-center py-3.5">
+                            <span className="text-sm text-neutral-500 dark:text-neutral-400 font-medium">Build</span>
+                            <span className="text-sm font-semibold text-neutral-900 dark:text-white bg-neutral-100 dark:bg-neutral-800 px-2.5 py-1 rounded-md">Production</span>
                         </div>
                     </div>
                 </div>
 
-                {/* Security Section */}
-                <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-6">
+                {/* Security Section - Enhanced with improved contrast and hierarchy */}
+                <div className="bg-white dark:bg-neutral-900/80 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-5 shadow-sm space-y-6">
                     <div>
-                        <h2 className="font-bold text-foreground mb-4 flex items-center gap-2">
-                            <Lock size={18} className="text-rose-500" />
+                        <h2 className="font-bold text-neutral-900 dark:text-white mb-5 flex items-center gap-2.5 text-base">
+                            <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center">
+                                <Lock size={16} className="text-amber-600 dark:text-amber-400" />
+                            </div>
                             Security
                         </h2>
 
-                        <h3 className="text-sm font-semibold mb-2">Biometrics</h3>
-                        <p className="text-xs text-muted-foreground mb-3">
+                        <h3 className="text-sm font-semibold text-neutral-800 dark:text-neutral-200 mb-2">Biometrics</h3>
+                        <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-4 leading-relaxed">
                             Enable FaceID or Fingerprint for quick access.
                         </p>
 
                         {hasBiometrics ? (
                             <div className="space-y-3">
-                                <div className="text-xs p-3 rounded-lg border font-medium flex items-center gap-2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20">
-                                    <Check size={14} />
+                                <div className="text-xs p-3.5 rounded-xl border font-semibold flex items-center gap-2.5 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/30">
+                                    <div className="w-5 h-5 rounded-full bg-emerald-500 dark:bg-emerald-500 flex items-center justify-center">
+                                        <Check size={12} className="text-white" strokeWidth={3} />
+                                    </div>
                                     Biometrics Active
                                 </div>
                                 <Button
                                     variant="outline"
-                                    className="w-full"
+                                    className="w-full h-12 border-neutral-200 dark:border-neutral-700 bg-transparent hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 font-medium transition-all duration-200"
                                     onClick={disableBiometrics}
                                 >
                                     Disable Biometrics
@@ -529,18 +561,19 @@ export default function Settings() {
                         ) : (
                             <div className="space-y-3">
                                 {!canEnableBiometrics && (
-                                    <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
-                                        <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 mb-1">
-                                            ⚠️ Fingerprint Unavailable
+                                    <div className="p-4 rounded-xl bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700">
+                                        <p className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1 flex items-center gap-1.5">
+                                            <AlertTriangle size={14} className="text-neutral-500 dark:text-neutral-400" />
+                                            Fingerprint Unavailable
                                         </p>
-                                        <p className="text-xs text-muted-foreground">
+                                        <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed">
                                             You must verify the Master PIN on this device before enabling fingerprint authentication.
                                         </p>
                                     </div>
                                 )}
                                 <Button
                                     variant="outline"
-                                    className="w-full"
+                                    className="w-full h-12 border-neutral-200 dark:border-neutral-700 bg-transparent hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200"
                                     onClick={registerBiometrics}
                                     disabled={!canEnableBiometrics}
                                 >
@@ -553,17 +586,20 @@ export default function Settings() {
 
                     {/* Super Admin Setup (if not configured) */}
                     {!hasSuperAdminSetup && (
-                        <div className="pt-4 border-t border-border">
-                            <div className="p-4 rounded-xl bg-gradient-to-br from-amber-500/10 to-rose-500/10 border border-amber-500/30">
+                        <div className="pt-5 border-t border-neutral-100 dark:border-neutral-800">
+                            <div className="p-4 rounded-xl bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700">
                                 <div className="flex items-start gap-3">
-                                    <ShieldCheck size={20} className="text-amber-500 shrink-0 mt-0.5" />
-                                    <div>
-                                        <h3 className="text-sm font-bold text-foreground mb-1">Setup Super Admin</h3>
-                                        <p className="text-xs text-muted-foreground mb-3">
+                                    <div className="w-10 h-10 rounded-xl bg-neutral-200 dark:bg-neutral-700 flex items-center justify-center shrink-0">
+                                        <ShieldCheck size={20} className="text-neutral-600 dark:text-neutral-300" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <h3 className="text-sm font-bold text-neutral-900 dark:text-white mb-1">Setup Super Admin</h3>
+                                        <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-3 leading-relaxed">
                                             Super Admin PIN is required for critical security operations like changing the Master PIN or revoking device access.
                                         </p>
                                         <Button
                                             size="sm"
+                                            className="bg-neutral-900 dark:bg-white hover:bg-neutral-800 dark:hover:bg-neutral-100 text-white dark:text-neutral-900 font-semibold h-10 px-4 transition-all duration-200"
                                             onClick={() => setIsSetupSuperAdminOpen(true)}
                                         >
                                             <ShieldCheck size={16} className="mr-2" />
@@ -575,13 +611,13 @@ export default function Settings() {
                         </div>
                     )}
 
-                    <div className="pt-4 border-t border-border">
-                        <h3 className="text-sm font-semibold mb-2">Master PIN</h3>
-                        <p className="text-xs text-muted-foreground mb-3">
-                            Change the main PIN used to access this app. <span className="font-semibold text-amber-600 dark:text-amber-400">Requires Super Admin PIN.</span>
+                    <div className="pt-5 border-t border-neutral-100 dark:border-neutral-800">
+                        <h3 className="text-sm font-semibold text-neutral-800 dark:text-neutral-200 mb-2">Master PIN</h3>
+                        <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-4 leading-relaxed">
+                            Change the main PIN used to access this app. <span className="font-semibold text-neutral-700 dark:text-neutral-300">Requires Super Admin PIN.</span>
                         </p>
                         <Button
-                            className="w-full"
+                            className="w-full h-12 bg-neutral-900 dark:bg-white hover:bg-neutral-800 dark:hover:bg-neutral-100 text-white dark:text-neutral-900 font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200"
                             onClick={() => setIsChangePinOpen(true)}
                             disabled={!hasSuperAdminSetup}
                         >
@@ -589,21 +625,23 @@ export default function Settings() {
                             Change Master PIN
                         </Button>
                         {!hasSuperAdminSetup && (
-                            <p className="text-xs text-amber-600 dark:text-amber-400 mt-2 text-center">
+                            <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-3 text-center font-medium">
                                 Please configure Super Admin first
                             </p>
                         )}
                     </div>
                 </div>
 
-                {/* Authorized Devices */}
-                <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
-                    <h2 className="font-bold text-foreground mb-4 flex items-center gap-2">
-                        <Smartphone size={18} className="text-blue-500" />
+                {/* Authorized Devices - Enhanced with improved card design */}
+                <div className="bg-white dark:bg-neutral-900/80 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-5 shadow-sm">
+                    <h2 className="font-bold text-neutral-900 dark:text-white mb-3 flex items-center gap-2.5 text-base">
+                        <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-500/20 flex items-center justify-center">
+                            <Smartphone size={16} className="text-purple-600 dark:text-purple-400" />
+                        </div>
                         Authorized Devices
                     </h2>
-                    <p className="text-xs text-muted-foreground mb-4">
-                        Devices with fingerprint access. <span className="font-semibold text-amber-600 dark:text-amber-400">Only Super Admin can revoke access.</span>
+                    <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-5 leading-relaxed">
+                        Devices with fingerprint access. <span className="font-semibold text-neutral-700 dark:text-neutral-300">Only Super Admin can revoke access.</span>
                     </p>
 
                     {authorizedDevices.length > 0 ? (
@@ -612,38 +650,41 @@ export default function Settings() {
                                 <div
                                     key={device.id}
                                     className={cn(
-                                        "p-4 rounded-xl border transition-all",
+                                        "p-4 rounded-xl border-2 transition-all duration-200",
                                         device.device_id === currentDeviceId
-                                            ? "bg-primary/5 border-primary/30"
-                                            : "bg-accent/50 border-border"
+                                            ? "bg-neutral-100 dark:bg-neutral-800 border-neutral-300 dark:border-neutral-600"
+                                            : "bg-neutral-50 dark:bg-neutral-800/50 border-neutral-200 dark:border-neutral-700 hover:border-neutral-300 dark:hover:border-neutral-600"
                                     )}
                                 >
-                                    <div className="flex items-start justify-between">
-                                        <div className="flex items-start gap-3">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="flex items-start gap-3 flex-1 min-w-0">
                                             <div className={cn(
-                                                "w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
-                                                device.fingerprint_enabled ? "bg-emerald-500/20 text-emerald-500" : "bg-muted text-muted-foreground"
+                                                "w-11 h-11 rounded-xl flex items-center justify-center shrink-0 border",
+                                                device.fingerprint_enabled
+                                                    ? "bg-neutral-100 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-200 border-neutral-200 dark:border-neutral-600"
+                                                    : "bg-neutral-100 dark:bg-neutral-800 text-neutral-400 dark:text-neutral-500 border-neutral-200 dark:border-neutral-700"
                                             )}>
-                                                <Fingerprint size={20} />
+                                                <Fingerprint size={22} strokeWidth={1.5} />
                                             </div>
-                                            <div className="min-w-0">
-                                                <div className="flex items-center gap-2">
-                                                    <p className="text-sm font-semibold truncate">{device.device_name}</p>
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <p className="text-sm font-semibold text-neutral-900 dark:text-white truncate">{device.device_name}</p>
                                                     {device.device_id === currentDeviceId && (
-                                                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-primary/20 text-primary shrink-0">
+                                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 shrink-0 tracking-wide">
                                                             THIS DEVICE
                                                         </span>
                                                     )}
                                                 </div>
-                                                <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                                                <div className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400 mt-1.5">
                                                     <Clock size={12} />
                                                     <span>Last active: {formatRelativeTime(device.last_active_at)}</span>
                                                 </div>
                                                 <p className={cn(
-                                                    "text-xs mt-1 font-medium",
-                                                    device.fingerprint_enabled ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
+                                                    "text-xs mt-1.5 font-medium flex items-center gap-1.5",
+                                                    device.fingerprint_enabled ? "text-neutral-700 dark:text-neutral-300" : "text-neutral-500 dark:text-neutral-500"
                                                 )}>
-                                                    {device.fingerprint_enabled ? "✓ Fingerprint enabled" : "PIN only"}
+                                                    {device.fingerprint_enabled && <Check size={12} strokeWidth={3} />}
+                                                    {device.fingerprint_enabled ? "Fingerprint enabled" : "PIN only"}
                                                 </p>
                                             </div>
                                         </div>
@@ -651,10 +692,10 @@ export default function Settings() {
                                             <Button
                                                 variant="outline"
                                                 size="sm"
-                                                className="text-rose-500 border-rose-500/30 hover:bg-rose-500/10 shrink-0"
+                                                className="text-neutral-500 dark:text-neutral-400 border-neutral-300 dark:border-neutral-600 hover:bg-neutral-200 dark:hover:bg-neutral-700 hover:text-neutral-700 dark:hover:text-neutral-200 shrink-0 h-9 w-9 p-0 transition-all duration-200"
                                                 onClick={() => handleOpenRevokeModal(device.device_id)}
                                             >
-                                                <Trash2 size={14} />
+                                                <Trash2 size={16} />
                                             </Button>
                                         )}
                                     </div>
@@ -662,41 +703,45 @@ export default function Settings() {
                             ))}
                         </div>
                     ) : (
-                        <div className="text-center py-8 text-muted-foreground">
-                            <Smartphone size={32} className="mx-auto mb-2 opacity-50" />
-                            <p className="text-sm">No authorized devices yet</p>
+                        <div className="text-center py-10 text-neutral-400 dark:text-neutral-500">
+                            <div className="w-16 h-16 rounded-2xl bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center mx-auto mb-3">
+                                <Smartphone size={28} strokeWidth={1.5} />
+                            </div>
+                            <p className="text-sm font-medium">No authorized devices yet</p>
                         </div>
                     )}
                 </div>
 
-                {/* Data Card */}
-                <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
-                    <h2 className="font-bold text-foreground mb-4 flex items-center gap-2">
-                        <Database size={18} className="text-blue-500" />
+                {/* Data Card - Enhanced with improved styling */}
+                <div className="bg-white dark:bg-neutral-900/80 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-5 shadow-sm">
+                    <h2 className="font-bold text-neutral-900 dark:text-white mb-3 flex items-center gap-2.5 text-base">
+                        <div className="w-8 h-8 rounded-lg bg-cyan-100 dark:bg-cyan-500/20 flex items-center justify-center">
+                            <Database size={16} className="text-cyan-600 dark:text-cyan-400" />
+                        </div>
                         Data
                     </h2>
 
-                    <p className="text-xs text-muted-foreground mb-4">
-                        Manage your data. You can export sales activity for backup or import data from CSV. <span className="font-semibold text-amber-600 dark:text-amber-400">Warning: Importing will append records and may create duplicates.</span>
+                    <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-5 leading-relaxed">
+                        Manage your data. You can export sales activity for backup or import data from CSV. <span className="font-semibold text-neutral-700 dark:text-neutral-300">Warning: Importing will append records and may create duplicates.</span>
                     </p>
                     <div className="flex gap-3">
                         <Button
                             variant="outline"
-                            className="flex-1"
+                            className="flex-1 h-12 border-neutral-200 dark:border-neutral-700 bg-transparent hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200"
                             onClick={() => setIsExportModalOpen(true)}
                             disabled={isImporting || isExporting}
                         >
-                            <Download size={16} className="mr-2" />
-                            {isExporting ? <Loader2 className="animate-spin" size={16} /> : "Export Data"}
+                            {isExporting ? <Loader2 className="animate-spin mr-2" size={16} /> : <Download size={16} className="mr-2" />}
+                            {isExporting ? "Exporting..." : "Export"}
                         </Button>
                         <Button
                             variant="outline"
-                            className="flex-1"
+                            className="flex-1 h-12 border-neutral-200 dark:border-neutral-700 bg-transparent hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200"
                             onClick={handleImportClick}
                             disabled={isImporting || isExporting}
                         >
-                            <Upload size={16} className="mr-2" />
-                            {isImporting ? <Loader2 className="animate-spin" size={16} /> : "Import Data"}
+                            {isImporting ? <Loader2 className="animate-spin mr-2" size={16} /> : <Upload size={16} className="mr-2" />}
+                            {isImporting ? "Importing..." : "Import"}
                         </Button>
                         <input
                             type="file"
@@ -708,18 +753,20 @@ export default function Settings() {
                     </div>
                 </div>
 
-                {/* Device Deauthorize */}
-                <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
-                    <h2 className="font-bold text-foreground mb-4 flex items-center gap-2">
-                        <LogOut size={18} className="text-rose-500" />
+                {/* Device Deauthorize - Enhanced with improved styling */}
+                <div className="bg-white dark:bg-neutral-900/80 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-5 shadow-sm">
+                    <h2 className="font-bold text-neutral-900 dark:text-white mb-3 flex items-center gap-2.5 text-base">
+                        <div className="w-8 h-8 rounded-lg bg-rose-100 dark:bg-rose-500/20 flex items-center justify-center">
+                            <LogOut size={16} className="text-rose-600 dark:text-rose-400" />
+                        </div>
                         Device
                     </h2>
-                    <p className="text-xs text-muted-foreground mb-4">
+                    <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-5 leading-relaxed">
                         Remove this device's authorization. You'll need your Master PIN again.
                     </p>
                     <Button
                         variant="outline"
-                        className="w-full border-rose-500/30 text-rose-500 hover:bg-rose-500/10"
+                        className="w-full h-12 border-neutral-300 dark:border-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 font-medium transition-all duration-200"
                         onClick={() => {
                             localStorage.removeItem('device_authorized');
                             localStorage.removeItem('bio_credential_id');

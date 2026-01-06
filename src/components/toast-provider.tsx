@@ -119,7 +119,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
             {/* Confirm Modal */}
             {confirmState && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in">
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
                     <div className="bg-card border border-border rounded-2xl p-6 shadow-2xl max-w-sm mx-4 animate-in zoom-in-95 w-full">
                         <div className="flex items-start gap-4 mb-6">
                             <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-full">
