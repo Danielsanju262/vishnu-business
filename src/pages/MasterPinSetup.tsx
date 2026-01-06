@@ -83,6 +83,8 @@ export default function MasterPinSetup({ onSuccess }: { onSuccess: () => void })
 
             if (data?.master_pin === pin) {
                 localStorage.setItem('device_authorized', 'true');
+                // Set verified_pin_version to enable fingerprint enrollment
+                localStorage.setItem('verified_pin_version', '1');
                 toast("Device authorized!", "success");
                 onSuccess();
             } else {

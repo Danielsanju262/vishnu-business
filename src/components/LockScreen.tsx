@@ -1,26 +1,40 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Fingerprint, Lock, KeyRound, Loader2 } from 'lucide-react';
+import { Fingerprint, Lock, KeyRound, Loader2, AlertTriangle } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 
 export default function LockScreen() {
-    const { authenticate, authenticateMasterPin, hasBiometrics } = useAuth();
+    const {
+        authenticate,
+        authenticateMasterPin,
+        hasBiometrics,
+        currentPinVersion,
+        devicePinVersion
+    } = useAuth();
     const [isAnimating, setIsAnimating] = useState(false);
     const [showPin, setShowPin] = useState(false);
     const [pin, setPin] = useState("");
     const [error, setError] = useState(false);
     const [loading, setLoading] = useState(false);
 
+    // Check if PIN was updated and biometrics are temporarily disabled
+    const pinWasUpdated = devicePinVersion > 0 && devicePinVersion < currentPinVersion;
+    const canUseBiometrics = hasBiometrics && !pinWasUpdated;
+
     useEffect(() => {
-        // Auto-prompt biometrics on mount if available
-        if (hasBiometrics && !showPin) {
+        // Auto-prompt biometrics on mount if available and PIN is current
+        if (canUseBiometrics && !showPin) {
             const t = setTimeout(() => {
                 handleUnlock();
             }, 500);
             return () => clearTimeout(t);
         }
-    }, [hasBiometrics]);
+        // If PIN was updated, force PIN entry
+        if (pinWasUpdated) {
+            setShowPin(true);
+        }
+    }, [canUseBiometrics, pinWasUpdated]);
 
     const handleUnlock = async () => {
         setIsAnimating(true);
@@ -42,7 +56,7 @@ export default function LockScreen() {
     };
 
     return (
-        <div className="fixed inset-0 z-[100] bg-background/95 backdrop-blur-xl flex flex-col items-center justify-center p-6 animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[100] bg-background backdrop-blur-xl flex flex-col items-center justify-center p-6">
             <div className="flex flex-col items-center gap-8 max-w-sm w-full text-center">
 
                 {/* Lock Icon Circle */}
@@ -63,6 +77,21 @@ export default function LockScreen() {
                     <h1 className="text-2xl font-black text-foreground tracking-tight">App Locked</h1>
                     <p className="text-muted-foreground font-medium">Verify it's you to continue.</p>
                 </div>
+
+                {/* PIN Updated Warning */}
+                {pinWasUpdated && (
+                    <div className="w-full p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-3">
+                        <AlertTriangle size={20} className="text-amber-500 shrink-0 mt-0.5" />
+                        <div className="text-left">
+                            <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">
+                                Master PIN Updated
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                                Please enter the new Master PIN to re-enable fingerprint access on this device.
+                            </p>
+                        </div>
+                    </div>
+                )}
 
                 {showPin ? (
                     <form onSubmit={handlePinUnlock} className="w-full space-y-4 animate-in slide-in-from-bottom-4">
@@ -85,7 +114,7 @@ export default function LockScreen() {
                         >
                             {loading ? <Loader2 className="animate-spin" size={20} /> : "Unlock"}
                         </Button>
-                        {hasBiometrics && (
+                        {canUseBiometrics && (
                             <button
                                 type="button"
                                 onClick={() => setShowPin(false)}
@@ -97,7 +126,7 @@ export default function LockScreen() {
                     </form>
                 ) : (
                     <div className="w-full space-y-3">
-                        {hasBiometrics && (
+                        {canUseBiometrics && (
                             <Button
                                 size="lg"
                                 onClick={handleUnlock}

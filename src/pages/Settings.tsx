@@ -232,11 +232,16 @@ export default function Settings() {
                                 </Button>
                             </div>
                         ) : (
-                            <div className="space-y-2">
+                            <div className="space-y-3">
                                 {!canEnableBiometrics && (
-                                    <p className="text-xs p-2 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                                        Please verify Master PIN first to enable biometrics.
-                                    </p>
+                                    <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
+                                        <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 mb-1">
+                                            ⚠️ Fingerprint Unavailable
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                            You must verify the Master PIN on this device before enabling fingerprint authentication.
+                                        </p>
+                                    </div>
                                 )}
                                 <Button
                                     variant="outline"
