@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Database, Shield, Moon, Sun, Laptop, Lock, Check, Fingerprint, LogOut, KeyRound, X, Loader2 } from "lucide-react";
+import { ArrowLeft, Database, Shield, Moon, Sun, Laptop, Lock, Check, Fingerprint, LogOut, KeyRound, X, Loader2, Smartphone, Trash2 } from "lucide-react";
 import { useTheme } from "../components/theme-provider";
 import { useAuth } from "../context/AuthContext";
 import { cn } from "../lib/utils";
@@ -11,8 +11,20 @@ import { useToast } from "../components/toast-provider";
 
 export default function Settings() {
     const { theme, setTheme } = useTheme();
-    const { hasBiometrics, registerBiometrics, disableBiometrics } = useAuth();
+    const {
+        hasBiometrics,
+        registerBiometrics,
+        disableBiometrics,
+        canEnableBiometrics,
+        authorizedDevices,
+        revokeDeviceFingerprint,
+        refreshDevices
+    } = useAuth();
     const { toast } = useToast();
+
+    useEffect(() => {
+        refreshDevices();
+    }, [refreshDevices]);
 
     // PIN Change State
     const [isChangePinOpen, setIsChangePinOpen] = useState(false);
@@ -41,16 +53,17 @@ export default function Settings() {
                 .eq('id', 1)
                 .single();
 
-            if (error) throw error;
+            if (error && error.code !== 'PGRST116') throw error;
 
             if (data?.master_pin === currentPin) {
                 setPinStep('new');
             } else {
+                console.log('Mismatch:', { input: currentPin, stored: data?.master_pin });
                 toast("Incorrect PIN", "error");
                 setCurrentPin('');
             }
         } catch (error) {
-            console.error(error);
+            console.error("Auth check failed:", error);
             toast("Verification failed", "error");
         } finally {
             setIsLoading(false);
@@ -68,19 +81,48 @@ export default function Settings() {
             return;
         }
 
+        // Check against last 2 used PINs (stored in localStorage)
+        const pinHistoryStr = localStorage.getItem('pin_history');
+        const pinHistory: string[] = pinHistoryStr ? JSON.parse(pinHistoryStr) : [];
+
+        if (pinHistory.includes(newPin)) {
+            toast("Try a new PIN - this matches one of the last 2 PINs", "error");
+            return;
+        }
+
         setIsLoading(true);
         try {
+            // First get current pin_version
+            const { data: currentSettings } = await supabase
+                .from('app_settings')
+                .select('pin_version')
+                .eq('id', 1)
+                .single();
+
+            const newVersion = (currentSettings?.pin_version || 1) + 1;
+
+            // Update PIN and increment version (forces all devices to re-auth)
             const { error } = await supabase
                 .from('app_settings')
-                .update({ master_pin: newPin })
+                .update({
+                    master_pin: newPin,
+                    pin_version: newVersion
+                })
                 .eq('id', 1);
 
             if (error) throw error;
 
-            toast("Master PIN updated!", "success");
+            // Update PIN history in localStorage (keep last 2)
+            const updatedHistory = [...pinHistory, currentPin].slice(-2);
+            localStorage.setItem('pin_history', JSON.stringify(updatedHistory));
+
+            // Update this device's verified version
+            localStorage.setItem('verified_pin_version', newVersion.toString());
+
+            toast("Master PIN updated! All devices must re-authenticate.", "success");
             resetPinState();
         } catch (error) {
-            console.error(error);
+            console.error("Update failed:", error);
             toast("Failed to update PIN", "error");
         } finally {
             setIsLoading(false);
@@ -190,14 +232,22 @@ export default function Settings() {
                                 </Button>
                             </div>
                         ) : (
-                            <Button
-                                variant="outline"
-                                className="w-full"
-                                onClick={registerBiometrics}
-                            >
-                                <Fingerprint size={18} className="mr-2" />
-                                Enable Biometrics
-                            </Button>
+                            <div className="space-y-2">
+                                {!canEnableBiometrics && (
+                                    <p className="text-xs p-2 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                                        Please verify Master PIN first to enable biometrics.
+                                    </p>
+                                )}
+                                <Button
+                                    variant="outline"
+                                    className="w-full"
+                                    onClick={registerBiometrics}
+                                    disabled={!canEnableBiometrics}
+                                >
+                                    <Fingerprint size={18} className="mr-2" />
+                                    Enable Biometrics
+                                </Button>
+                            </div>
                         )}
                     </div>
 
@@ -215,6 +265,52 @@ export default function Settings() {
                         </Button>
                     </div>
                 </div>
+
+                {/* Authorized Devices */}
+                {authorizedDevices.length > 0 && (
+                    <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
+                        <h2 className="font-bold text-foreground mb-4 flex items-center gap-2">
+                            <Smartphone size={18} className="text-blue-500" />
+                            Authorized Devices
+                        </h2>
+                        <p className="text-xs text-muted-foreground mb-4">
+                            Devices with fingerprint access. You can revoke access anytime.
+                        </p>
+                        <div className="space-y-2">
+                            {authorizedDevices.map((device) => (
+                                <div
+                                    key={device.id}
+                                    className="flex items-center justify-between p-3 rounded-lg bg-accent/50 border border-border"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className={cn(
+                                            "w-8 h-8 rounded-full flex items-center justify-center",
+                                            device.fingerprint_enabled ? "bg-emerald-500/20 text-emerald-500" : "bg-muted text-muted-foreground"
+                                        )}>
+                                            <Fingerprint size={16} />
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-medium">{device.device_name}</p>
+                                            <p className="text-xs text-muted-foreground">
+                                                {device.fingerprint_enabled ? "Fingerprint enabled" : "PIN only"}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    {device.fingerprint_enabled && (
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="text-rose-500 border-rose-500/30 hover:bg-rose-500/10"
+                                            onClick={() => revokeDeviceFingerprint(device.device_id)}
+                                        >
+                                            <Trash2 size={14} />
+                                        </Button>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 {/* Data Card */}
                 <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
@@ -263,8 +359,8 @@ export default function Settings() {
             {/* Change PIN Modal */}
             {
                 isChangePinOpen && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                        <div className="w-full max-w-sm bg-card border border-border rounded-2xl shadow-xl p-6 space-y-6 animate-in zoom-in-95 duration-200 relative">
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                        <div className="w-full max-w-sm bg-popover border border-border rounded-2xl shadow-2xl p-6 space-y-6 animate-in zoom-in-95 duration-200 relative">
                             <button
                                 onClick={resetPinState}
                                 className="absolute right-4 top-4 p-2 text-muted-foreground hover:bg-accent rounded-full transition"
@@ -292,10 +388,10 @@ export default function Settings() {
                                         value={currentPin}
                                         onChange={(e) => setCurrentPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
                                         placeholder="Current PIN"
-                                        className="text-center text-2xl tracking-[0.5em] font-bold h-14"
+                                        className="text-center text-lg font-semibold tracking-widest h-14 bg-accent/50 focus:bg-background transition-colors placeholder:text-muted-foreground/50 placeholder:font-normal placeholder:tracking-normal"
                                         autoFocus
                                     />
-                                    <Button type="submit" className="w-full h-12" disabled={isLoading || currentPin.length < 4}>
+                                    <Button type="submit" className="w-full h-12 text-white font-bold shadow-lg shadow-primary/25">
                                         {isLoading ? <Loader2 className="animate-spin" /> : "Verify & Continue"}
                                     </Button>
                                 </form>
@@ -311,12 +407,12 @@ export default function Settings() {
                                                 value={newPin}
                                                 onChange={(e) => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
                                                 placeholder="New PIN"
-                                                className="text-center text-2xl tracking-[0.5em] font-bold h-14"
+                                                className="text-center text-lg font-semibold tracking-widest h-14 bg-accent/50 focus:bg-background transition-colors placeholder:text-muted-foreground/50 placeholder:font-normal placeholder:tracking-normal"
                                                 autoFocus
                                             />
                                             <Button
                                                 type="button"
-                                                className="w-full h-12"
+                                                className="w-full h-12 text-white font-bold shadow-lg shadow-primary/25"
                                                 disabled={newPin.length < 4}
                                                 onClick={() => setPinStep('confirm')}
                                             >
@@ -331,14 +427,14 @@ export default function Settings() {
                                                 value={confirmNewPin}
                                                 onChange={(e) => setConfirmNewPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
                                                 placeholder="Confirm PIN"
-                                                className="text-center text-2xl tracking-[0.5em] font-bold h-14"
+                                                className="text-center text-lg font-semibold tracking-widest h-14 bg-accent/50 focus:bg-background transition-colors placeholder:text-muted-foreground/50 placeholder:font-normal placeholder:tracking-normal"
                                                 autoFocus
                                             />
                                             <div className="grid grid-cols-2 gap-3">
-                                                <Button type="button" variant="outline" className="h-12" onClick={() => setPinStep('new')}>
+                                                <Button type="button" variant="outline" className="h-12 border-border hover:bg-accent hover:text-foreground" onClick={() => setPinStep('new')}>
                                                     Back
                                                 </Button>
-                                                <Button type="submit" className="h-12" disabled={isLoading || confirmNewPin.length < 4}>
+                                                <Button type="submit" className="h-12 text-white font-bold shadow-lg shadow-primary/25" disabled={isLoading || confirmNewPin.length < 4}>
                                                     {isLoading ? <Loader2 className="animate-spin" /> : "Save New PIN"}
                                                 </Button>
                                             </div>
