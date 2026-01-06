@@ -29,6 +29,7 @@ export default function PaymentReminders() {
     const [reminders, setReminders] = useState<PaymentReminder[]>([]);
     const [customers, setCustomers] = useState<Customer[]>([]);
     const [loading, setLoading] = useState(true);
+    const [setupRequired, setSetupRequired] = useState(false);
 
     // UI State
     const [isAdding, setIsAdding] = useState(false);
@@ -94,7 +95,18 @@ export default function PaymentReminders() {
 
         if (error) {
             console.error("Error loading reminders:", error);
-            toast("Failed to load reminders", "error");
+            if (error.code === '42P01' || error.message.includes('relation "payment_reminders" does not exist')) {
+                setSetupRequired(true);
+                setLoading(false);
+                return;
+            } else {
+                toast(`Error: ${error.message} (${error.code})`, "error");
+                // Retry once silently after 2s
+                setTimeout(async () => {
+                    const { data } = await supabase.from("payment_reminders").select("*");
+                    if (data) setReminders(data);
+                }, 2000);
+            }
         } else if (remindersData) {
             setReminders(remindersData);
         }
@@ -328,9 +340,45 @@ export default function PaymentReminders() {
         };
     };
 
+    if (setupRequired) {
+        return (
+            <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center animate-in fade-in">
+                <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/30 text-amber-600 rounded-full flex items-center justify-center mb-6">
+                    <WifiOff size={32} />
+                </div>
+                <h1 className="text-2xl font-black text-foreground mb-2">Setup Required</h1>
+                <p className="text-muted-foreground mb-6 max-w-xs mx-auto">
+                    The payment reminders table needs to be created in Supabase first.
+                </p>
+                <div className="bg-card p-4 rounded-xl border border-border text-left w-full max-w-md mb-6 overflow-hidden">
+                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">Run this SQL in Supabase:</p>
+                    <code className="text-[10px] block bg-zinc-950 text-zinc-300 p-3 rounded-lg overflow-x-auto font-mono">
+                        create table payment_reminders (<br />
+                        &nbsp;&nbsp;id uuid default uuid_generate_v4() primary key,<br />
+                        &nbsp;&nbsp;customer_id uuid references customers(id),<br />
+                        &nbsp;&nbsp;amount numeric not null,<br />
+                        &nbsp;&nbsp;due_date date not null,<br />
+                        &nbsp;&nbsp;note text,<br />
+                        &nbsp;&nbsp;status text default 'pending',<br />
+                        &nbsp;&nbsp;recorded_at timestamptz default now()<br />
+                        );<br />
+                        alter table payment_reminders enable row level security;<br />
+                        create policy "Enable all" on payment_reminders for all using (true) with check (true);
+                    </code>
+                </div>
+                <Button onClick={() => { setSetupRequired(false); loadData(); }} className="font-bold">
+                    I've Run the SQL, Retry
+                </Button>
+                <Link to="/" className="mt-4 text-sm font-semibold text-muted-foreground hover:text-foreground">
+                    Go Back Home
+                </Link>
+            </div>
+        );
+    }
+
     return (
         <>
-            <div className="min-h-screen bg-background text-foreground px-4 pb-32 animate-in fade-in max-w-lg mx-auto selection:bg-primary/20">
+            <div className={cn("min-h-screen bg-background text-foreground px-4 pb-32 animate-in fade-in max-w-lg mx-auto selection:bg-primary/20", setupRequired ? "hidden" : "")}>
                 {/* Header - Fixed on Top */}
                 <div className={cn(
                     "fixed top-0 left-0 right-0 z-50 border-b px-4 py-4 flex items-center justify-between transition-all duration-300 max-w-lg mx-auto backdrop-blur-xl",

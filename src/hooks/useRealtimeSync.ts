@@ -23,7 +23,8 @@ interface UseRealtimeSyncOptions {
  */
 export function useRealtimeSync({ tables, onDataChange }: UseRealtimeSyncOptions) {
     const channelRef = useRef<RealtimeChannel | null>(null);
-    const [isConnected, setIsConnected] = useState(false);
+    // Initialize connected state based on mode to enable "Always Online" feel
+    const [isConnected, setIsConnected] = useState(!USE_REALTIME);
     const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
     const setupRealtimeSubscription = useCallback(() => {
