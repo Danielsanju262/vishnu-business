@@ -95,7 +95,7 @@ export default function PaymentReminders() {
 
         if (error) {
             console.error("Error loading reminders:", error);
-            if (error.code === '42P01' || error.message.includes('relation "payment_reminders" does not exist')) {
+            if (error.code === '42P01' || error.code === 'PGRST205' || error.message.includes('relation "payment_reminders" does not exist')) {
                 setSetupRequired(true);
                 setLoading(false);
                 return;
