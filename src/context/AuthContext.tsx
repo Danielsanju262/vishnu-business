@@ -96,7 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Check PIN version and biometrics status
     const checkAuthStatus = useCallback(async () => {
         try {
-            // Get current PIN version and super admin status from server
+            // Get current App Settings (PIN version, etc)
             let serverPinVersion = 1;
             let hasSuperAdmin = false;
             try {
@@ -107,18 +107,57 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     .single();
                 serverPinVersion = settings?.pin_version || 1;
                 hasSuperAdmin = !!settings?.super_admin_pin;
+
+                // CRITICAL: If server PIN version is newer than what we know, update state immediately
+                if (serverPinVersion > currentPinVersion) {
+                    setCurrentPinVersion(serverPinVersion);
+                }
             } catch {
-                // columns might not exist yet, use defaults
                 serverPinVersion = 1;
             }
+            // Update state purely for UI consistency
             setCurrentPinVersion(serverPinVersion);
             setHasSuperAdminSetup(hasSuperAdmin);
 
-            // Get device's verified PIN version from localStorage
+            // Get device's locally verified PIN version
             const localPinVersion = parseInt(localStorage.getItem('verified_pin_version') || '0');
             setDevicePinVersion(localPinVersion);
 
-            // Check if biometrics are set up on this device
+            // IMMEDIATE SECURITY ENFORCEMENT
+            // If the server PIN version is higher than our local version, we MUST consider this session invalid
+            if (serverPinVersion > localPinVersion) {
+                // Force Lock if not already locked
+                if (!isLocked) {
+                    setIsLocked(true);
+                    // Don't toast if we are just loading, only if we were unlocked
+                    if (localStorage.getItem('app_locked') !== 'true') {
+                        toast("Security Update: Master PIN changed. Please sign in again.", "info");
+                    }
+                }
+            }
+
+            // Check device specific revocation
+            if (deviceId) {
+                const { data: deviceData } = await supabase
+                    .from('authorized_devices')
+                    .select('fingerprint_enabled')
+                    .eq('device_id', deviceId)
+                    .single();
+
+                // If fingerprint was revoked remotely but we think we have it, disable it locally
+                if (deviceData && !deviceData.fingerprint_enabled && hasBiometrics) {
+                    setHasBiometrics(false);
+                    if (!isLocked) {
+                        // Optional: Lock on revocation? The user story says "Biometric tokens ... invalidated", "Biometric login ... blocked"
+                        // It doesn't explicitly say "Lock app immediately on revocation", but "active session... terminated" suggests it.
+                        // Let's enforce security:
+                        setIsLocked(true);
+                        toast("Access revoked by administrator.", "error");
+                    }
+                }
+            }
+
+            // Check if biometrics are set up on this device locally
             const savedCredId = localStorage.getItem('bio_credential_id');
             const wasLocked = localStorage.getItem('app_locked') === 'true';
 
@@ -138,7 +177,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } catch (error) {
             console.error('Auth status check failed:', error);
         }
-    }, []);
+    }, [currentPinVersion, deviceId, hasBiometrics, isLocked, toast]);
 
     // Refresh authorized devices list
     const refreshDevices = useCallback(async () => {
@@ -264,11 +303,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return false;
     };
 
+    // Verify if this device is still authorized on the server
+    const verifyDeviceStatus = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('authorized_devices')
+                .select('fingerprint_enabled, verified_pin_version')
+                .eq('device_id', deviceId)
+                .single();
+
+            if (error || !data) {
+                // Device record missing or error
+                return false;
+            }
+
+            // Check if fingerprint is explicitly disabled
+            if (!data.fingerprint_enabled) {
+                return false;
+            }
+
+            return true;
+        } catch {
+            return false;
+        }
+    };
+
     const authenticate = async () => {
-        // Check PIN version before allowing biometric auth
+        // 1. First Check: PIN Version Integrity
         const localPinVersion = parseInt(localStorage.getItem('verified_pin_version') || '0');
         if (localPinVersion < currentPinVersion) {
-            toast("PIN updated. Please enter new PIN.", "info");
+            toast("Security Update: Please log in using Master PIN", "info");
             return false;
         }
 
@@ -276,6 +340,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const savedId = localStorage.getItem('bio_credential_id');
             if (!savedId) return false;
 
+            // 2. Perform Biometric Challenge
             const credential = await navigator.credentials.get({
                 publicKey: {
                     challenge: getChallenge(),
@@ -290,6 +355,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             });
 
             if (credential) {
+                // 3. FINAL CRITICAL CHECK: Validate Server Authorization
+                // Even if biometrics passed, we MUST check if the admin revoked access
+                const isAuthorized = await verifyDeviceStatus();
+
+                if (!isAuthorized) {
+                    // Revoke local credentials immediately
+                    await disableBiometrics();
+                    toast("Biometric access has been revoked by the Super Admin. Please log in using Master PIN.", "error");
+                    return false;
+                }
+
                 localStorage.removeItem('app_locked');
                 setIsLocked(false);
 
