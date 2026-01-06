@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../lib/supabase";
 import { Button } from "../components/ui/Button";
 import { ArrowLeft, Plus, Trash2, CheckCircle2, Search, IndianRupee, Calendar, Receipt, X, Check, XCircle, Wifi, WifiOff } from "lucide-react";
@@ -40,6 +40,7 @@ export default function PaymentReminders() {
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
+    const isFirstLoad = useRef(true);
 
     // Form State
     const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
@@ -82,7 +83,8 @@ export default function PaymentReminders() {
     }, []);
 
     const loadData = useCallback(async () => {
-        setLoading(true);
+        // Only show loading spinner on initial load, not during background syncs
+        if (isFirstLoad.current) setLoading(true);
 
         // Check and migrate localStorage data
         await migrateLocalStorageToSupabase();
@@ -120,6 +122,7 @@ export default function PaymentReminders() {
         if (customersData) setCustomers(customersData);
 
         setLoading(false);
+        isFirstLoad.current = false;
     }, [migrateLocalStorageToSupabase, toast]);
 
     // Setup real-time subscription for payment_reminders table
