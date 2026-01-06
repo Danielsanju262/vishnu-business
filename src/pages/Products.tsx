@@ -82,7 +82,7 @@ export default function Products() {
             }
         } else {
             const { error } = await supabase.from("products").insert([
-                { name: newName, unit: newUnit, category: newCategory }
+                { name: newName, unit: newUnit, category: newCategory, is_active: true }
             ]);
 
             if (!error) {

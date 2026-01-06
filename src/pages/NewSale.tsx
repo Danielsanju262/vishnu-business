@@ -92,7 +92,7 @@ export default function NewSale() {
 
     const handleAddCustomer = async () => {
         if (!newItemName) return;
-        const { data, error } = await supabase.from("customers").insert([{ name: newItemName }]).select().single();
+        const { data, error } = await supabase.from("customers").insert([{ name: newItemName, is_active: true }]).select().single();
         if (data && !error) {
             setCustomers(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
             setSelectedCust(data);
@@ -107,7 +107,7 @@ export default function NewSale() {
 
     const handleAddProduct = async () => {
         if (!newItemName) return;
-        const { data, error } = await supabase.from("products").insert([{ name: newItemName, unit: newItemUnit, category: 'general' }]).select().single();
+        const { data, error } = await supabase.from("products").insert([{ name: newItemName, unit: newItemUnit, category: 'general', is_active: true }]).select().single();
         if (data && !error) {
             setProducts(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
             setTempProd(data);

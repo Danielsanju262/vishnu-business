@@ -59,7 +59,7 @@ export default function Customers() {
             const res = await supabase.from("customers").update({ name: newName }).eq('id', editingId);
             error = res.error;
         } else {
-            const res = await supabase.from("customers").insert([{ name: newName }]);
+            const res = await supabase.from("customers").insert([{ name: newName, is_active: true }]);
             error = res.error;
         }
 
