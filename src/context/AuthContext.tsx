@@ -91,9 +91,17 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { toast } = useToast();
-    // Initialize state strictly from localStorage to avoid "flash of unlocked content"
+    // Initialize state strictly based on SessionStorage (cleared on app close)
+    // AND LocalStorage (persisted manual lock)
     const [isLocked, setIsLocked] = useState(() => {
-        return localStorage.getItem('app_locked') === 'true';
+        // 1. If globally locked (manual lock from any tab), enforce it
+        if (localStorage.getItem('app_locked') === 'true') return true;
+
+        // 2. If session is active (app backgrounded/minimized but not closed), allow access
+        if (sessionStorage.getItem('vb_session_active') === 'true') return false;
+
+        // 3. Default: Locked (App was killed/swiped away or new tab)
+        return true;
     });
 
     const [devicePinVersion, setDevicePinVersion] = useState(() => {
@@ -112,6 +120,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Force immediate local revocation and lock
     const revokeLocalBiometrics = useCallback((message: string = "Access revoked.") => {
         clearLocalAuth();
+        sessionStorage.removeItem('vb_session_active'); // Clear session
         setHasBiometrics(false);
         setCanEnableBiometrics(false);
         setDevicePinVersion(0);
@@ -304,7 +313,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, [checkAuthStatus, refreshDevices, updateDeviceActivity, deviceId, currentPinVersion, revokeLocalBiometrics]);
 
     const lockApp = () => {
-        localStorage.setItem('app_locked', 'true');
+        sessionStorage.removeItem('vb_session_active'); // Kill session
+        localStorage.setItem('app_locked', 'true');     // Sync other tabs
         setIsLocked(true);
         toast("App Locked", "success");
     };
@@ -451,7 +461,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     return false;
                 }
 
-                localStorage.removeItem('app_locked');
+                // SUCCESS: Mark Session as Active
+                sessionStorage.setItem('vb_session_active', 'true');
+                localStorage.setItem('app_locked', 'false'); // Sync other tabs
+
                 setIsLocked(false);
 
                 // Update device activity
@@ -487,7 +500,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 setDevicePinVersion(serverPinVersion);
                 setCanEnableBiometrics(true);
 
-                localStorage.removeItem('app_locked');
+                // SUCCESS: Mark Session as Active
+                sessionStorage.setItem('vb_session_active', 'true');
+                localStorage.setItem('app_locked', 'false'); // Sync other tabs
+
                 setIsLocked(false);
 
                 // Register/update device
@@ -599,7 +615,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const disableBiometrics = async () => {
         localStorage.removeItem('bio_credential_id');
-        localStorage.removeItem('app_locked');
+        localStorage.removeItem('app_locked'); // Don't force lock, just clear
+        // Don't kill session here, just removing biometrics
         setHasBiometrics(false);
         setIsLocked(false);
 
