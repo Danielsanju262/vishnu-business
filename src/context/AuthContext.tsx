@@ -48,13 +48,15 @@ const getDeviceName = () => {
     return 'Unknown Device';
 };
 
-interface AuthorizedDevice {
+export interface AuthorizedDevice {
     id: string;
     device_id: string;
     device_name: string;
     fingerprint_enabled: boolean;
     verified_pin_version: number;
     created_at: string;
+    last_active_at?: string;
+    last_pin_verified_at?: string;
 }
 
 interface AuthContextType {
@@ -65,12 +67,16 @@ interface AuthContextType {
     registerBiometrics: () => Promise<boolean>;
     authenticate: () => Promise<boolean>;
     authenticateMasterPin: (pin: string) => Promise<boolean>;
+    validateSuperAdminPin: (pin: string) => Promise<boolean>;
     disableBiometrics: () => void;
-    revokeDeviceFingerprint: (deviceId: string) => Promise<boolean>;
+    revokeDeviceFingerprint: (deviceId: string, superAdminPin: string) => Promise<{ success: boolean; error?: string }>;
+    changeMasterPin: (newPin: string, superAdminPin: string) => Promise<{ success: boolean; error?: string }>;
     lockApp: () => void;
     refreshDevices: () => Promise<void>;
     currentPinVersion: number;
     devicePinVersion: number;
+    hasSuperAdminSetup: boolean;
+    currentDeviceId: string;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -83,26 +89,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [authorizedDevices, setAuthorizedDevices] = useState<AuthorizedDevice[]>([]);
     const [currentPinVersion, setCurrentPinVersion] = useState(1);
     const [devicePinVersion, setDevicePinVersion] = useState(0);
+    const [hasSuperAdminSetup, setHasSuperAdminSetup] = useState(false);
 
     const deviceId = getDeviceId();
 
     // Check PIN version and biometrics status
     const checkAuthStatus = useCallback(async () => {
         try {
-            // Get current PIN version from server (handle if column doesn't exist)
+            // Get current PIN version and super admin status from server
             let serverPinVersion = 1;
+            let hasSuperAdmin = false;
             try {
                 const { data: settings } = await supabase
                     .from('app_settings')
-                    .select('pin_version')
+                    .select('pin_version, super_admin_pin')
                     .eq('id', 1)
                     .single();
                 serverPinVersion = settings?.pin_version || 1;
+                hasSuperAdmin = !!settings?.super_admin_pin;
             } catch {
-                // pin_version column might not exist yet, use default
+                // columns might not exist yet, use defaults
                 serverPinVersion = 1;
             }
             setCurrentPinVersion(serverPinVersion);
+            setHasSuperAdminSetup(hasSuperAdmin);
 
             // Get device's verified PIN version from localStorage
             const localPinVersion = parseInt(localStorage.getItem('verified_pin_version') || '0');
@@ -136,7 +146,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const { data } = await supabase
                 .from('authorized_devices')
                 .select('*')
-                .order('created_at', { ascending: false });
+                .order('last_active_at', { ascending: false });
 
             if (data) {
                 setAuthorizedDevices(data);
@@ -146,10 +156,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
     }, []);
 
+    // Update device last active time
+    const updateDeviceActivity = useCallback(async () => {
+        try {
+            await supabase
+                .from('authorized_devices')
+                .update({ last_active_at: new Date().toISOString() })
+                .eq('device_id', deviceId);
+        } catch (error) {
+            console.error('Failed to update device activity:', error);
+        }
+    }, [deviceId]);
+
     useEffect(() => {
         checkAuthStatus();
         refreshDevices();
-    }, [checkAuthStatus, refreshDevices]);
+
+        // Update activity on load
+        const isAuthorized = localStorage.getItem('device_authorized') === 'true';
+        if (isAuthorized) {
+            updateDeviceActivity();
+        }
+    }, [checkAuthStatus, refreshDevices, updateDeviceActivity]);
 
     const lockApp = () => {
         localStorage.setItem('app_locked', 'true');
@@ -167,7 +195,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     device_name: getDeviceName(),
                     fingerprint_enabled: fingerprintEnabled,
                     verified_pin_version: pinVersion,
-                    last_pin_verified_at: new Date().toISOString()
+                    last_pin_verified_at: new Date().toISOString(),
+                    last_active_at: new Date().toISOString()
                 }, { onConflict: 'device_id' });
 
             await refreshDevices();
@@ -263,6 +292,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (credential) {
                 localStorage.removeItem('app_locked');
                 setIsLocked(false);
+
+                // Update device activity
+                await updateDeviceActivity();
+
                 toast("Unlocked!", "success");
                 return true;
             }
@@ -318,6 +351,91 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
+    // Validate Super Admin PIN
+    const validateSuperAdminPin = async (pin: string): Promise<boolean> => {
+        try {
+            const { data, error } = await supabase
+                .from('app_settings')
+                .select('super_admin_pin')
+                .eq('id', 1)
+                .single();
+
+            if (error && error.code !== 'PGRST116') throw error;
+
+            return data?.super_admin_pin === pin;
+        } catch (error) {
+            console.error('Super Admin PIN validation error:', error);
+            return false;
+        }
+    };
+
+    // Change Master PIN (requires Super Admin PIN)
+    const changeMasterPin = async (newPin: string, superAdminPin: string): Promise<{ success: boolean; error?: string }> => {
+        try {
+            // First validate Super Admin PIN
+            const isValidSuperAdmin = await validateSuperAdminPin(superAdminPin);
+            if (!isValidSuperAdmin) {
+                return { success: false, error: 'Invalid Super Admin PIN. Contact Super Admin for the correct PIN.' };
+            }
+
+            // Check against last 2 used PINs
+            const pinHistoryStr = localStorage.getItem('pin_history');
+            const pinHistory: string[] = pinHistoryStr ? JSON.parse(pinHistoryStr) : [];
+
+            // Get current master PIN to add to history
+            const { data: currentSettings } = await supabase
+                .from('app_settings')
+                .select('master_pin, pin_version')
+                .eq('id', 1)
+                .single();
+
+            if (pinHistory.includes(newPin) || currentSettings?.master_pin === newPin) {
+                return { success: false, error: 'Cannot reuse recent PINs. Please choose a different PIN.' };
+            }
+
+            const newVersion = (currentSettings?.pin_version || 1) + 1;
+
+            // Update PIN and increment version (forces all devices to re-auth)
+            const { error } = await supabase
+                .from('app_settings')
+                .update({
+                    master_pin: newPin,
+                    pin_version: newVersion
+                })
+                .eq('id', 1);
+
+            if (error) throw error;
+
+            // Invalidate all device fingerprints by resetting their verified_pin_version
+            await supabase
+                .from('authorized_devices')
+                .update({
+                    fingerprint_enabled: false,
+                    verified_pin_version: 0
+                })
+                .neq('device_id', 'none'); // Update all devices
+
+            // Update PIN history in localStorage (keep last 2)
+            const updatedHistory = [...pinHistory, currentSettings?.master_pin].filter(Boolean).slice(-2);
+            localStorage.setItem('pin_history', JSON.stringify(updatedHistory));
+
+            // Update this device's verified version
+            localStorage.setItem('verified_pin_version', newVersion.toString());
+            setCurrentPinVersion(newVersion);
+
+            // Disable biometrics on current device too
+            localStorage.removeItem('bio_credential_id');
+            setHasBiometrics(false);
+
+            await refreshDevices();
+
+            return { success: true };
+        } catch (error) {
+            console.error('Master PIN change failed:', error);
+            return { success: false, error: 'Failed to update Master PIN. Please try again.' };
+        }
+    };
+
     const disableBiometrics = async () => {
         localStorage.removeItem('bio_credential_id');
         localStorage.removeItem('app_locked');
@@ -330,9 +448,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         toast("Biometrics Disabled", "success");
     };
 
-    // Revoke fingerprint access for a specific device
-    const revokeDeviceFingerprint = async (targetDeviceId: string) => {
+    // Revoke fingerprint access for a specific device (requires Super Admin PIN)
+    const revokeDeviceFingerprint = async (targetDeviceId: string, superAdminPin: string): Promise<{ success: boolean; error?: string }> => {
         try {
+            // First validate Super Admin PIN
+            const isValidSuperAdmin = await validateSuperAdminPin(superAdminPin);
+            if (!isValidSuperAdmin) {
+                return { success: false, error: 'Invalid Super Admin PIN. Only Super Admin can remove device access.' };
+            }
+
             await supabase
                 .from('authorized_devices')
                 .update({
@@ -351,12 +475,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
 
             await refreshDevices();
-            toast("Fingerprint access revoked", "success");
-            return true;
+            return { success: true };
         } catch (error) {
             console.error('Failed to revoke fingerprint:', error);
-            toast("Failed to revoke access", "error");
-            return false;
+            return { success: false, error: 'Failed to revoke device access. Please try again.' };
         }
     };
 
@@ -369,12 +491,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             registerBiometrics,
             authenticate,
             authenticateMasterPin,
+            validateSuperAdminPin,
             disableBiometrics,
             revokeDeviceFingerprint,
+            changeMasterPin,
             lockApp,
             refreshDevices,
             currentPinVersion,
-            devicePinVersion
+            devicePinVersion,
+            hasSuperAdminSetup,
+            currentDeviceId: deviceId
         }}>
             {children}
         </AuthContext.Provider>

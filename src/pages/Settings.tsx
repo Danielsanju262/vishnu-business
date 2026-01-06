@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Database, Shield, Moon, Sun, Laptop, Lock, Check, Fingerprint, LogOut, KeyRound, X, Loader2, Smartphone, Trash2 } from "lucide-react";
+import { ArrowLeft, Database, Shield, Moon, Sun, Laptop, Lock, Check, Fingerprint, LogOut, KeyRound, X, Loader2, Smartphone, Trash2, AlertTriangle, ShieldCheck, Clock, Mail } from "lucide-react";
 import { useTheme } from "../components/theme-provider";
 import { useAuth } from "../context/AuthContext";
 import { cn } from "../lib/utils";
@@ -8,6 +8,23 @@ import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
 import { supabase } from "../lib/supabase";
 import { useToast } from "../components/toast-provider";
+
+// Format relative time
+const formatRelativeTime = (dateString?: string) => {
+    if (!dateString) return 'Never';
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
+};
 
 export default function Settings() {
     const { theme, setTheme } = useTheme();
@@ -18,7 +35,10 @@ export default function Settings() {
         canEnableBiometrics,
         authorizedDevices,
         revokeDeviceFingerprint,
-        refreshDevices
+        changeMasterPin,
+        refreshDevices,
+        hasSuperAdminSetup,
+        currentDeviceId
     } = useAuth();
     const { toast } = useToast();
 
@@ -26,45 +46,135 @@ export default function Settings() {
         refreshDevices();
     }, [refreshDevices]);
 
+    // Super Admin Setup State
+    const [isSetupSuperAdminOpen, setIsSetupSuperAdminOpen] = useState(false);
+    const [superAdminEmail, setSuperAdminEmail] = useState('');
+    const [superAdminPin, setSuperAdminPin] = useState('');
+    const [confirmSuperAdminPin, setConfirmSuperAdminPin] = useState('');
+    const [isSettingUpSuperAdmin, setIsSettingUpSuperAdmin] = useState(false);
+
     // PIN Change State
     const [isChangePinOpen, setIsChangePinOpen] = useState(false);
-    const [pinStep, setPinStep] = useState<'verify' | 'new' | 'confirm'>('verify');
-    const [currentPin, setCurrentPin] = useState('');
+    const [pinStep, setPinStep] = useState<'super_admin' | 'new' | 'confirm'>('super_admin');
+    const [superAdminPinInput, setSuperAdminPinInput] = useState('');
     const [newPin, setNewPin] = useState('');
     const [confirmNewPin, setConfirmNewPin] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [pinError, setPinError] = useState('');
+
+    // Device Revoke State
+    const [isRevokeModalOpen, setIsRevokeModalOpen] = useState(false);
+    const [deviceToRevoke, setDeviceToRevoke] = useState<string | null>(null);
+    const [revokeSuperAdminPin, setRevokeSuperAdminPin] = useState('');
+    const [isRevoking, setIsRevoking] = useState(false);
+    const [revokeError, setRevokeError] = useState('');
 
     const resetPinState = () => {
         setIsChangePinOpen(false);
-        setPinStep('verify');
-        setCurrentPin('');
+        setPinStep('super_admin');
+        setSuperAdminPinInput('');
         setNewPin('');
         setConfirmNewPin('');
         setIsLoading(false);
+        setPinError('');
     };
 
-    const handleVerifyCurrentPin = async (e: React.FormEvent) => {
+    const resetRevokeState = () => {
+        setIsRevokeModalOpen(false);
+        setDeviceToRevoke(null);
+        setRevokeSuperAdminPin('');
+        setIsRevoking(false);
+        setRevokeError('');
+    };
+
+    const resetSuperAdminSetup = () => {
+        setIsSetupSuperAdminOpen(false);
+        setSuperAdminEmail('');
+        setSuperAdminPin('');
+        setConfirmSuperAdminPin('');
+        setIsSettingUpSuperAdmin(false);
+    };
+
+    // Setup Super Admin
+    // State for showing migration instructions
+    const [showMigrationHelp, setShowMigrationHelp] = useState(false);
+
+    const handleSetupSuperAdmin = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (superAdminPin.length < 6) {
+            toast("Super Admin PIN must be at least 6 digits", "error");
+            return;
+        }
+
+        if (superAdminPin !== confirmSuperAdminPin) {
+            toast("PINs don't match", "error");
+            return;
+        }
+
+        if (!superAdminEmail.includes('@')) {
+            toast("Please enter a valid email", "error");
+            return;
+        }
+
+        setIsSettingUpSuperAdmin(true);
+        try {
+            const { error } = await supabase
+                .from('app_settings')
+                .update({
+                    super_admin_pin: superAdminPin,
+                    super_admin_email: superAdminEmail
+                })
+                .eq('id', 1);
+
+            if (error) {
+                // Check if it's a column doesn't exist error
+                if (error.message?.includes('column') || error.code === '42703') {
+                    setShowMigrationHelp(true);
+                    toast("Database migration needed. See instructions below.", "error");
+                    return;
+                }
+                throw error;
+            }
+
+            toast("Super Admin configured! PIN has been set.", "success");
+            resetSuperAdminSetup();
+            // Refresh to update hasSuperAdminSetup
+            window.location.reload();
+        } catch (error: any) {
+            console.error("Super Admin setup failed:", error);
+            // Show migration help for any error as it's likely a schema issue
+            setShowMigrationHelp(true);
+            toast("Database needs to be updated. See instructions.", "error");
+        } finally {
+            setIsSettingUpSuperAdmin(false);
+        }
+    };
+
+    // Change Master PIN - Now requires Super Admin PIN
+    const handleVerifySuperAdminPin = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setPinError('');
         setIsLoading(true);
+
         try {
             const { data, error } = await supabase
                 .from('app_settings')
-                .select('master_pin')
+                .select('super_admin_pin')
                 .eq('id', 1)
                 .single();
 
             if (error && error.code !== 'PGRST116') throw error;
 
-            if (data?.master_pin === currentPin) {
+            if (data?.super_admin_pin === superAdminPinInput) {
                 setPinStep('new');
             } else {
-                console.log('Mismatch:', { input: currentPin, stored: data?.master_pin });
-                toast("Incorrect PIN", "error");
-                setCurrentPin('');
+                setPinError('Invalid Super Admin PIN');
+                setSuperAdminPinInput('');
             }
         } catch (error) {
             console.error("Auth check failed:", error);
-            toast("Verification failed", "error");
+            setPinError('Verification failed');
         } finally {
             setIsLoading(false);
         }
@@ -72,61 +182,52 @@ export default function Settings() {
 
     const handleUpdatePin = async (e: React.FormEvent) => {
         e.preventDefault();
+        setPinError('');
+
         if (newPin !== confirmNewPin) {
-            toast("PINs don't match", "error");
+            setPinError("New PINs don't match");
             return;
         }
         if (newPin.length < 4) {
-            toast("PIN must be at least 4 digits", "error");
-            return;
-        }
-
-        // Check against last 2 used PINs (stored in localStorage)
-        const pinHistoryStr = localStorage.getItem('pin_history');
-        const pinHistory: string[] = pinHistoryStr ? JSON.parse(pinHistoryStr) : [];
-
-        if (pinHistory.includes(newPin)) {
-            toast("Try a new PIN - this matches one of the last 2 PINs", "error");
+            setPinError("PIN must be at least 4 digits");
             return;
         }
 
         setIsLoading(true);
-        try {
-            // First get current pin_version
-            const { data: currentSettings } = await supabase
-                .from('app_settings')
-                .select('pin_version')
-                .eq('id', 1)
-                .single();
+        const result = await changeMasterPin(newPin, superAdminPinInput);
+        setIsLoading(false);
 
-            const newVersion = (currentSettings?.pin_version || 1) + 1;
-
-            // Update PIN and increment version (forces all devices to re-auth)
-            const { error } = await supabase
-                .from('app_settings')
-                .update({
-                    master_pin: newPin,
-                    pin_version: newVersion
-                })
-                .eq('id', 1);
-
-            if (error) throw error;
-
-            // Update PIN history in localStorage (keep last 2)
-            const updatedHistory = [...pinHistory, currentPin].slice(-2);
-            localStorage.setItem('pin_history', JSON.stringify(updatedHistory));
-
-            // Update this device's verified version
-            localStorage.setItem('verified_pin_version', newVersion.toString());
-
-            toast("Master PIN updated! All devices must re-authenticate.", "success");
+        if (result.success) {
+            toast("Master PIN updated! All devices have been logged out and must re-authenticate.", "success");
             resetPinState();
-        } catch (error) {
-            console.error("Update failed:", error);
-            toast("Failed to update PIN", "error");
-        } finally {
-            setIsLoading(false);
+        } else {
+            setPinError(result.error || 'Failed to update PIN');
         }
+    };
+
+    // Revoke Device Fingerprint
+    const handleOpenRevokeModal = (deviceId: string) => {
+        setDeviceToRevoke(deviceId);
+        setIsRevokeModalOpen(true);
+    };
+
+    const handleRevokeDevice = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!deviceToRevoke) return;
+
+        setRevokeError('');
+        setIsRevoking(true);
+
+        const result = await revokeDeviceFingerprint(deviceToRevoke, revokeSuperAdminPin);
+
+        if (result.success) {
+            toast("Device fingerprint access revoked. Device must re-authenticate with Master PIN.", "success");
+            resetRevokeState();
+        } else {
+            setRevokeError(result.error || 'Failed to revoke access');
+        }
+
+        setIsRevoking(false);
     };
 
     return (
@@ -152,7 +253,7 @@ export default function Settings() {
                     <div className="space-y-4">
                         <div className="flex justify-between items-center py-2 border-b border-border">
                             <span className="text-sm text-muted-foreground">Version</span>
-                            <span className="text-sm font-medium text-foreground">v1.3.0</span>
+                            <span className="text-sm font-medium text-foreground">v1.4.0</span>
                         </div>
 
                         <div className="py-2 border-b border-border">
@@ -256,66 +357,123 @@ export default function Settings() {
                         )}
                     </div>
 
+                    {/* Super Admin Setup (if not configured) */}
+                    {!hasSuperAdminSetup && (
+                        <div className="pt-4 border-t border-border">
+                            <div className="p-4 rounded-xl bg-gradient-to-br from-amber-500/10 to-rose-500/10 border border-amber-500/30">
+                                <div className="flex items-start gap-3">
+                                    <ShieldCheck size={20} className="text-amber-500 shrink-0 mt-0.5" />
+                                    <div>
+                                        <h3 className="text-sm font-bold text-foreground mb-1">Setup Super Admin</h3>
+                                        <p className="text-xs text-muted-foreground mb-3">
+                                            Super Admin PIN is required for critical security operations like changing the Master PIN or revoking device access.
+                                        </p>
+                                        <Button
+                                            size="sm"
+                                            onClick={() => setIsSetupSuperAdminOpen(true)}
+                                        >
+                                            <ShieldCheck size={16} className="mr-2" />
+                                            Configure Super Admin
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="pt-4 border-t border-border">
                         <h3 className="text-sm font-semibold mb-2">Master PIN</h3>
                         <p className="text-xs text-muted-foreground mb-3">
-                            Change the main PIN used to access this device.
+                            Change the main PIN used to access this app. <span className="font-semibold text-amber-600 dark:text-amber-400">Requires Super Admin PIN.</span>
                         </p>
                         <Button
                             className="w-full"
                             onClick={() => setIsChangePinOpen(true)}
+                            disabled={!hasSuperAdminSetup}
                         >
                             <KeyRound size={18} className="mr-2" />
                             Change Master PIN
                         </Button>
+                        {!hasSuperAdminSetup && (
+                            <p className="text-xs text-amber-600 dark:text-amber-400 mt-2 text-center">
+                                Please configure Super Admin first
+                            </p>
+                        )}
                     </div>
                 </div>
 
                 {/* Authorized Devices */}
-                {authorizedDevices.length > 0 && (
-                    <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
-                        <h2 className="font-bold text-foreground mb-4 flex items-center gap-2">
-                            <Smartphone size={18} className="text-blue-500" />
-                            Authorized Devices
-                        </h2>
-                        <p className="text-xs text-muted-foreground mb-4">
-                            Devices with fingerprint access. You can revoke access anytime.
-                        </p>
-                        <div className="space-y-2">
+                <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
+                    <h2 className="font-bold text-foreground mb-4 flex items-center gap-2">
+                        <Smartphone size={18} className="text-blue-500" />
+                        Authorized Devices
+                    </h2>
+                    <p className="text-xs text-muted-foreground mb-4">
+                        Devices with fingerprint access. <span className="font-semibold text-amber-600 dark:text-amber-400">Only Super Admin can revoke access.</span>
+                    </p>
+
+                    {authorizedDevices.length > 0 ? (
+                        <div className="space-y-3">
                             {authorizedDevices.map((device) => (
                                 <div
                                     key={device.id}
-                                    className="flex items-center justify-between p-3 rounded-lg bg-accent/50 border border-border"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div className={cn(
-                                            "w-8 h-8 rounded-full flex items-center justify-center",
-                                            device.fingerprint_enabled ? "bg-emerald-500/20 text-emerald-500" : "bg-muted text-muted-foreground"
-                                        )}>
-                                            <Fingerprint size={16} />
-                                        </div>
-                                        <div>
-                                            <p className="text-sm font-medium">{device.device_name}</p>
-                                            <p className="text-xs text-muted-foreground">
-                                                {device.fingerprint_enabled ? "Fingerprint enabled" : "PIN only"}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    {device.fingerprint_enabled && (
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            className="text-rose-500 border-rose-500/30 hover:bg-rose-500/10"
-                                            onClick={() => revokeDeviceFingerprint(device.device_id)}
-                                        >
-                                            <Trash2 size={14} />
-                                        </Button>
+                                    className={cn(
+                                        "p-4 rounded-xl border transition-all",
+                                        device.device_id === currentDeviceId
+                                            ? "bg-primary/5 border-primary/30"
+                                            : "bg-accent/50 border-border"
                                     )}
+                                >
+                                    <div className="flex items-start justify-between">
+                                        <div className="flex items-start gap-3">
+                                            <div className={cn(
+                                                "w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
+                                                device.fingerprint_enabled ? "bg-emerald-500/20 text-emerald-500" : "bg-muted text-muted-foreground"
+                                            )}>
+                                                <Fingerprint size={20} />
+                                            </div>
+                                            <div className="min-w-0">
+                                                <div className="flex items-center gap-2">
+                                                    <p className="text-sm font-semibold truncate">{device.device_name}</p>
+                                                    {device.device_id === currentDeviceId && (
+                                                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-primary/20 text-primary shrink-0">
+                                                            THIS DEVICE
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                                                    <Clock size={12} />
+                                                    <span>Last active: {formatRelativeTime(device.last_active_at)}</span>
+                                                </div>
+                                                <p className={cn(
+                                                    "text-xs mt-1 font-medium",
+                                                    device.fingerprint_enabled ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
+                                                )}>
+                                                    {device.fingerprint_enabled ? "✓ Fingerprint enabled" : "PIN only"}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        {device.fingerprint_enabled && hasSuperAdminSetup && (
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="text-rose-500 border-rose-500/30 hover:bg-rose-500/10 shrink-0"
+                                                onClick={() => handleOpenRevokeModal(device.device_id)}
+                                            >
+                                                <Trash2 size={14} />
+                                            </Button>
+                                        )}
+                                    </div>
                                 </div>
                             ))}
                         </div>
-                    </div>
-                )}
+                    ) : (
+                        <div className="text-center py-8 text-muted-foreground">
+                            <Smartphone size={32} className="mx-auto mb-2 opacity-50" />
+                            <p className="text-sm">No authorized devices yet</p>
+                        </div>
+                    )}
+                </div>
 
                 {/* Data Card */}
                 <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
@@ -347,6 +505,7 @@ export default function Settings() {
                             localStorage.removeItem('device_authorized');
                             localStorage.removeItem('bio_credential_id');
                             localStorage.removeItem('app_locked');
+                            localStorage.removeItem('verified_pin_version');
                             window.location.reload();
                         }}
                     >
@@ -361,96 +520,282 @@ export default function Settings() {
                 </div>
             </div>
 
-            {/* Change PIN Modal */}
-            {
-                isChangePinOpen && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                        <div className="w-full max-w-sm bg-popover border border-border rounded-2xl shadow-2xl p-6 space-y-6 animate-in zoom-in-95 duration-200 relative">
-                            <button
-                                onClick={resetPinState}
-                                className="absolute right-4 top-4 p-2 text-muted-foreground hover:bg-accent rounded-full transition"
-                            >
-                                <X size={20} />
-                            </button>
+            {/* Super Admin Setup Modal */}
+            {isSetupSuperAdminOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className="w-full max-w-sm bg-popover border border-border rounded-2xl shadow-2xl p-6 space-y-6 animate-in zoom-in-95 duration-200 relative">
+                        <button
+                            onClick={resetSuperAdminSetup}
+                            className="absolute right-4 top-4 p-2 text-muted-foreground hover:bg-accent rounded-full transition"
+                        >
+                            <X size={20} />
+                        </button>
 
-                            <div className="text-center space-y-2">
-                                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto text-primary">
-                                    <KeyRound size={24} />
-                                </div>
-                                <h2 className="text-xl font-bold">Change Master PIN</h2>
-                                <p className="text-sm text-muted-foreground">
-                                    {pinStep === 'verify' && "Enter your current PIN to continue"}
-                                    {pinStep === 'new' && "Enter your new Master PIN"}
-                                    {pinStep === 'confirm' && "Confirm your new Master PIN"}
+                        <div className="text-center space-y-2">
+                            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500/20 to-rose-500/20 flex items-center justify-center mx-auto">
+                                <ShieldCheck size={28} className="text-amber-500" />
+                            </div>
+                            <h2 className="text-xl font-bold">Setup Super Admin</h2>
+                            <p className="text-sm text-muted-foreground">
+                                This PIN is required for critical security operations
+                            </p>
+                        </div>
+
+                        <form onSubmit={handleSetupSuperAdmin} className="space-y-4">
+                            <div className="space-y-2">
+                                <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
+                                    <Mail size={12} />
+                                    Super Admin Email
+                                </label>
+                                <Input
+                                    type="email"
+                                    value={superAdminEmail}
+                                    onChange={(e) => setSuperAdminEmail(e.target.value)}
+                                    placeholder="admin@example.com"
+                                    className="h-12"
+                                    required
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-xs font-semibold text-muted-foreground">
+                                    Super Admin PIN (min 6 digits)
+                                </label>
+                                <Input
+                                    type="password"
+                                    inputMode="numeric"
+                                    value={superAdminPin}
+                                    onChange={(e) => setSuperAdminPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                                    placeholder="Enter Super Admin PIN"
+                                    className="text-center text-lg font-semibold tracking-widest h-14"
+                                    required
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-xs font-semibold text-muted-foreground">
+                                    Confirm Super Admin PIN
+                                </label>
+                                <Input
+                                    type="password"
+                                    inputMode="numeric"
+                                    value={confirmSuperAdminPin}
+                                    onChange={(e) => setConfirmSuperAdminPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                                    placeholder="Confirm PIN"
+                                    className="text-center text-lg font-semibold tracking-widest h-14"
+                                    required
+                                />
+                            </div>
+
+                            <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
+                                <p className="text-xs text-amber-600 dark:text-amber-400">
+                                    <strong>Important:</strong> Store this PIN securely. It's required for changing Master PIN and revoking device access.
                                 </p>
                             </div>
 
-                            {pinStep === 'verify' && (
-                                <form onSubmit={handleVerifyCurrentPin} className="space-y-4">
-                                    <Input
-                                        type="password"
-                                        inputMode="numeric"
-                                        value={currentPin}
-                                        onChange={(e) => setCurrentPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                                        placeholder="Current PIN"
-                                        className="text-center text-lg font-semibold tracking-widest h-14 bg-accent/50 focus:bg-background transition-colors placeholder:text-muted-foreground/50 placeholder:font-normal placeholder:tracking-normal"
-                                        autoFocus
-                                    />
-                                    <Button type="submit" className="w-full h-12 text-white font-bold shadow-lg shadow-primary/25">
-                                        {isLoading ? <Loader2 className="animate-spin" /> : "Verify & Continue"}
-                                    </Button>
-                                </form>
+                            {showMigrationHelp && (
+                                <div className="p-4 rounded-lg bg-rose-500/10 border border-rose-500/30 space-y-3">
+                                    <div className="flex items-start gap-2">
+                                        <AlertTriangle size={16} className="text-rose-500 shrink-0 mt-0.5" />
+                                        <div>
+                                            <p className="text-sm font-semibold text-rose-500">Database Migration Required</p>
+                                            <p className="text-xs text-muted-foreground mt-1">
+                                                Please run the following SQL in your Supabase Dashboard → SQL Editor:
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <pre className="text-[10px] bg-black/50 p-2 rounded overflow-x-auto text-emerald-400 font-mono">
+                                        {`ALTER TABLE app_settings 
+ADD COLUMN IF NOT EXISTS super_admin_pin TEXT;
+
+ALTER TABLE app_settings 
+ADD COLUMN IF NOT EXISTS super_admin_email TEXT;`}
+                                    </pre>
+                                    <p className="text-xs text-muted-foreground">After running the SQL, try again.</p>
+                                </div>
                             )}
 
-                            {(pinStep === 'new' || pinStep === 'confirm') && (
-                                <form onSubmit={handleUpdatePin} className="space-y-4">
-                                    {pinStep === 'new' ? (
-                                        <div className="space-y-4">
-                                            <Input
-                                                type="password"
-                                                inputMode="numeric"
-                                                value={newPin}
-                                                onChange={(e) => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                                                placeholder="New PIN"
-                                                className="text-center text-lg font-semibold tracking-widest h-14 bg-accent/50 focus:bg-background transition-colors placeholder:text-muted-foreground/50 placeholder:font-normal placeholder:tracking-normal"
-                                                autoFocus
-                                            />
-                                            <Button
-                                                type="button"
-                                                className="w-full h-12 text-white font-bold shadow-lg shadow-primary/25"
-                                                disabled={newPin.length < 4}
-                                                onClick={() => setPinStep('confirm')}
-                                            >
-                                                Continue
+                            <Button
+                                type="submit"
+                                className="w-full h-12 text-white font-bold shadow-lg shadow-primary/25"
+                                disabled={isSettingUpSuperAdmin || superAdminPin.length < 6}
+                            >
+                                {isSettingUpSuperAdmin ? <Loader2 className="animate-spin" /> : "Setup Super Admin"}
+                            </Button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Change Master PIN Modal */}
+            {isChangePinOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className="w-full max-w-sm bg-popover border border-border rounded-2xl shadow-2xl p-6 space-y-6 animate-in zoom-in-95 duration-200 relative">
+                        <button
+                            onClick={resetPinState}
+                            className="absolute right-4 top-4 p-2 text-muted-foreground hover:bg-accent rounded-full transition"
+                        >
+                            <X size={20} />
+                        </button>
+
+                        <div className="text-center space-y-2">
+                            <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto text-primary">
+                                <KeyRound size={28} />
+                            </div>
+                            <h2 className="text-xl font-bold">Change Master PIN</h2>
+                            <p className="text-sm text-muted-foreground">
+                                {pinStep === 'super_admin' && "Enter Super Admin PIN to continue"}
+                                {pinStep === 'new' && "Enter your new Master PIN"}
+                                {pinStep === 'confirm' && "Confirm your new Master PIN"}
+                            </p>
+                        </div>
+
+                        {pinError && (
+                            <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 flex items-start gap-2">
+                                <AlertTriangle size={16} className="text-rose-500 shrink-0 mt-0.5" />
+                                <p className="text-xs font-medium text-rose-500">{pinError}</p>
+                            </div>
+                        )}
+
+                        {pinStep === 'super_admin' && (
+                            <form onSubmit={handleVerifySuperAdminPin} className="space-y-4">
+                                <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
+                                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                                        <strong>Super Admin Required:</strong> Only Super Admin can change the Master PIN to protect against unauthorized access.
+                                    </p>
+                                </div>
+                                <Input
+                                    type="password"
+                                    inputMode="numeric"
+                                    value={superAdminPinInput}
+                                    onChange={(e) => setSuperAdminPinInput(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                                    placeholder="Enter Super Admin PIN"
+                                    className="text-center text-lg font-semibold tracking-widest h-14 bg-accent/50 focus:bg-background transition-colors placeholder:text-muted-foreground/50 placeholder:font-normal placeholder:tracking-normal"
+                                    autoFocus
+                                />
+                                <Button type="submit" className="w-full h-12 text-white font-bold shadow-lg shadow-primary/25" disabled={isLoading || superAdminPinInput.length < 6}>
+                                    {isLoading ? <Loader2 className="animate-spin" /> : "Verify & Continue"}
+                                </Button>
+                            </form>
+                        )}
+
+                        {(pinStep === 'new' || pinStep === 'confirm') && (
+                            <form onSubmit={handleUpdatePin} className="space-y-4">
+                                {pinStep === 'new' ? (
+                                    <div className="space-y-4">
+                                        <Input
+                                            type="password"
+                                            inputMode="numeric"
+                                            value={newPin}
+                                            onChange={(e) => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                            placeholder="New Master PIN"
+                                            className="text-center text-lg font-semibold tracking-widest h-14 bg-accent/50 focus:bg-background transition-colors placeholder:text-muted-foreground/50 placeholder:font-normal placeholder:tracking-normal"
+                                            autoFocus
+                                        />
+                                        <Button
+                                            type="button"
+                                            className="w-full h-12 text-white font-bold shadow-lg shadow-primary/25"
+                                            disabled={newPin.length < 4}
+                                            onClick={() => setPinStep('confirm')}
+                                        >
+                                            Continue
+                                        </Button>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-4">
+                                        <Input
+                                            type="password"
+                                            inputMode="numeric"
+                                            value={confirmNewPin}
+                                            onChange={(e) => setConfirmNewPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                            placeholder="Confirm New PIN"
+                                            className="text-center text-lg font-semibold tracking-widest h-14 bg-accent/50 focus:bg-background transition-colors placeholder:text-muted-foreground/50 placeholder:font-normal placeholder:tracking-normal"
+                                            autoFocus
+                                        />
+
+                                        <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/30">
+                                            <p className="text-xs text-rose-600 dark:text-rose-400">
+                                                <strong>Warning:</strong> Changing the Master PIN will immediately log out ALL devices and disable ALL fingerprint access.
+                                            </p>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <Button type="button" variant="outline" className="h-12 border-border hover:bg-accent hover:text-foreground" onClick={() => setPinStep('new')}>
+                                                Back
+                                            </Button>
+                                            <Button type="submit" className="h-12 text-white font-bold shadow-lg shadow-primary/25" disabled={isLoading || confirmNewPin.length < 4}>
+                                                {isLoading ? <Loader2 className="animate-spin" /> : "Save New PIN"}
                                             </Button>
                                         </div>
-                                    ) : (
-                                        <div className="space-y-4">
-                                            <Input
-                                                type="password"
-                                                inputMode="numeric"
-                                                value={confirmNewPin}
-                                                onChange={(e) => setConfirmNewPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                                                placeholder="Confirm PIN"
-                                                className="text-center text-lg font-semibold tracking-widest h-14 bg-accent/50 focus:bg-background transition-colors placeholder:text-muted-foreground/50 placeholder:font-normal placeholder:tracking-normal"
-                                                autoFocus
-                                            />
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <Button type="button" variant="outline" className="h-12 border-border hover:bg-accent hover:text-foreground" onClick={() => setPinStep('new')}>
-                                                    Back
-                                                </Button>
-                                                <Button type="submit" className="h-12 text-white font-bold shadow-lg shadow-primary/25" disabled={isLoading || confirmNewPin.length < 4}>
-                                                    {isLoading ? <Loader2 className="animate-spin" /> : "Save New PIN"}
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    )}
-                                </form>
-                            )}
-                        </div>
+                                    </div>
+                                )}
+                            </form>
+                        )}
                     </div>
-                )
-            }
-        </div >
+                </div>
+            )}
+
+            {/* Revoke Device Modal */}
+            {isRevokeModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className="w-full max-w-sm bg-popover border border-border rounded-2xl shadow-2xl p-6 space-y-6 animate-in zoom-in-95 duration-200 relative">
+                        <button
+                            onClick={resetRevokeState}
+                            className="absolute right-4 top-4 p-2 text-muted-foreground hover:bg-accent rounded-full transition"
+                        >
+                            <X size={20} />
+                        </button>
+
+                        <div className="text-center space-y-2">
+                            <div className="w-14 h-14 rounded-2xl bg-rose-500/10 flex items-center justify-center mx-auto text-rose-500">
+                                <Trash2 size={28} />
+                            </div>
+                            <h2 className="text-xl font-bold">Remove Device Access</h2>
+                            <p className="text-sm text-muted-foreground">
+                                Enter Super Admin PIN to revoke fingerprint access
+                            </p>
+                        </div>
+
+                        {revokeError && (
+                            <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 flex items-start gap-2">
+                                <AlertTriangle size={16} className="text-rose-500 shrink-0 mt-0.5" />
+                                <p className="text-xs font-medium text-rose-500">{revokeError}</p>
+                            </div>
+                        )}
+
+                        <form onSubmit={handleRevokeDevice} className="space-y-4">
+                            <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
+                                <p className="text-xs text-amber-600 dark:text-amber-400">
+                                    This will immediately log out the device and disable its fingerprint access. The device will need to re-authenticate with the Master PIN.
+                                </p>
+                            </div>
+
+                            <Input
+                                type="password"
+                                inputMode="numeric"
+                                value={revokeSuperAdminPin}
+                                onChange={(e) => setRevokeSuperAdminPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                                placeholder="Enter Super Admin PIN"
+                                className="text-center text-lg font-semibold tracking-widest h-14 bg-accent/50 focus:bg-background transition-colors placeholder:text-muted-foreground/50 placeholder:font-normal placeholder:tracking-normal"
+                                autoFocus
+                            />
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <Button type="button" variant="outline" className="h-12" onClick={resetRevokeState}>
+                                    Cancel
+                                </Button>
+                                <Button
+                                    type="submit"
+                                    className="h-12 bg-rose-500 hover:bg-rose-600 text-white font-bold"
+                                    disabled={isRevoking || revokeSuperAdminPin.length < 6}
+                                >
+                                    {isRevoking ? <Loader2 className="animate-spin" /> : "Revoke Access"}
+                                </Button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+        </div>
     );
 }

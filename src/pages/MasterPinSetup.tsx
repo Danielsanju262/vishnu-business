@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useToast } from '../components/toast-provider';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Lock, Shield, Loader2, KeyRound } from 'lucide-react';
+import { Lock, Shield, Loader2, KeyRound, Fingerprint } from 'lucide-react';
 
 export default function MasterPinSetup({ onSuccess }: { onSuccess: () => void }) {
     const { toast } = useToast();
@@ -54,11 +54,12 @@ export default function MasterPinSetup({ onSuccess }: { onSuccess: () => void })
         try {
             const { error } = await supabase
                 .from('app_settings')
-                .upsert({ id: 1, master_pin: pin });
+                .upsert({ id: 1, master_pin: pin, pin_version: 1 });
 
             if (error) throw error;
 
             localStorage.setItem('device_authorized', 'true');
+            localStorage.setItem('verified_pin_version', '1');
             toast("Master PIN created!", "success");
             onSuccess();
         } catch (error: any) {
@@ -75,16 +76,41 @@ export default function MasterPinSetup({ onSuccess }: { onSuccess: () => void })
         try {
             const { data, error } = await supabase
                 .from('app_settings')
-                .select('master_pin')
+                .select('master_pin, pin_version')
                 .eq('id', 1)
                 .single();
 
             if (error) throw error;
 
             if (data?.master_pin === pin) {
+                const currentPinVersion = data?.pin_version || 1;
+
                 localStorage.setItem('device_authorized', 'true');
-                // Set verified_pin_version to enable fingerprint enrollment
-                localStorage.setItem('verified_pin_version', '1');
+                localStorage.setItem('verified_pin_version', currentPinVersion.toString());
+
+                // Register this device
+                const deviceId = localStorage.getItem('device_id') || crypto.randomUUID();
+                localStorage.setItem('device_id', deviceId);
+
+                const ua = navigator.userAgent;
+                let deviceName = 'Unknown Device';
+                if (ua.includes('iPhone')) deviceName = 'iPhone';
+                else if (ua.includes('iPad')) deviceName = 'iPad';
+                else if (ua.includes('Android')) deviceName = 'Android Device';
+                else if (ua.includes('Windows')) deviceName = 'Windows PC';
+                else if (ua.includes('Mac')) deviceName = 'Mac';
+
+                await supabase
+                    .from('authorized_devices')
+                    .upsert({
+                        device_id: deviceId,
+                        device_name: deviceName,
+                        fingerprint_enabled: false,
+                        verified_pin_version: currentPinVersion,
+                        last_pin_verified_at: new Date().toISOString(),
+                        last_active_at: new Date().toISOString()
+                    }, { onConflict: 'device_id' });
+
                 toast("Device authorized!", "success");
                 onSuccess();
             } else {
@@ -174,11 +200,22 @@ export default function MasterPinSetup({ onSuccess }: { onSuccess: () => void })
                 </form>
 
                 {/* Info */}
-                <p className="text-xs text-center text-muted-foreground">
-                    {hasExistingPin
-                        ? "Once authorized, you can set up fingerprint for quick access"
-                        : "Remember this PIN! You'll need it to access from new devices"}
-                </p>
+                <div className="space-y-3">
+                    <p className="text-xs text-center text-muted-foreground">
+                        {hasExistingPin
+                            ? "Once authorized, you can set up fingerprint for quick access"
+                            : "Remember this PIN! You'll need it to access from new devices"}
+                    </p>
+
+                    {hasExistingPin && (
+                        <div className="flex items-center justify-center gap-2 p-3 rounded-xl bg-primary/5 border border-primary/20">
+                            <Fingerprint size={18} className="text-primary" />
+                            <p className="text-xs text-primary font-medium">
+                                Fingerprint login available after PIN verification
+                            </p>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );

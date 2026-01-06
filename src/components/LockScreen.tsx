@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Fingerprint, Lock, KeyRound, Loader2, AlertTriangle } from 'lucide-react';
+import { Fingerprint, Lock, KeyRound, Loader2, AlertTriangle, ShieldAlert } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 
@@ -81,7 +81,7 @@ export default function LockScreen() {
                 {/* PIN Updated Warning */}
                 {pinWasUpdated && (
                     <div className="w-full p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-3">
-                        <AlertTriangle size={20} className="text-amber-500 shrink-0 mt-0.5" />
+                        <ShieldAlert size={20} className="text-amber-500 shrink-0 mt-0.5" />
                         <div className="text-left">
                             <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">
                                 Master PIN Updated
@@ -95,6 +95,12 @@ export default function LockScreen() {
 
                 {showPin ? (
                     <form onSubmit={handlePinUnlock} className="w-full space-y-4 animate-in slide-in-from-bottom-4">
+                        {/* Clear label for Master PIN */}
+                        <div className="flex items-center justify-center gap-2 mb-2">
+                            <KeyRound size={16} className="text-primary" />
+                            <span className="text-sm font-semibold text-foreground">Enter Master PIN</span>
+                        </div>
+
                         <div className="relative">
                             <Input
                                 type="password"
@@ -102,7 +108,7 @@ export default function LockScreen() {
                                 autoFocus
                                 value={pin}
                                 onChange={e => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                                placeholder="Master PIN"
+                                placeholder="••••••"
                                 className={`h-14 text-center text-2xl font-black tracking-[0.5em] rounded-2xl ${error ? 'border-rose-500 animate-shake' : ''}`}
                             />
                         </div>
@@ -120,7 +126,7 @@ export default function LockScreen() {
                                 onClick={() => setShowPin(false)}
                                 className="text-sm text-primary font-bold hover:underline py-2"
                             >
-                                Use Biometrics
+                                Use Biometrics Instead
                             </button>
                         )}
                     </form>
@@ -133,7 +139,7 @@ export default function LockScreen() {
                                 className="w-full h-14 rounded-2xl text-lg font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
                             >
                                 <Fingerprint className="mr-2" size={24} />
-                                Unlock with Biometrics
+                                Unlock with Fingerprint
                             </Button>
                         )}
 
@@ -148,6 +154,11 @@ export default function LockScreen() {
                         </Button>
                     </div>
                 )}
+
+                {/* Security note */}
+                <p className="text-xs text-muted-foreground mt-4">
+                    Your data is protected by device-level encryption
+                </p>
             </div>
         </div>
     );
