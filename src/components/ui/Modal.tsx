@@ -50,7 +50,7 @@ export function Modal({ isOpen, onClose, children, title, className, showCloseBu
         <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">
             {/* Backdrop */}
             <div
-                className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+                className="absolute inset-0 bg-black/90 backdrop-blur-sm"
                 onClick={onClose}
             />
 
@@ -58,6 +58,7 @@ export function Modal({ isOpen, onClose, children, title, className, showCloseBu
             <div
                 className={cn(
                     "relative w-full max-w-sm bg-popover border border-border rounded-2xl shadow-2xl p-6 transition-all animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto",
+                    "mx-auto my-auto", // Ensure visual centering
                     className
                 )}
                 role="dialog"

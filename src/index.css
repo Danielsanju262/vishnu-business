@@ -159,13 +159,10 @@ input[type=number] {
   user-select: none;
 }
 
-.interactive:hover {
+.interactive:hover,
+.interactive:active {
   transform: translateY(-2px);
   filter: brightness(1.05);
-}
-
-.interactive:active {
-  transform: scale(0.97);
 }
 
 button {
@@ -173,9 +170,7 @@ button {
   cursor: pointer;
 }
 
-button:active {
-  transform: scale(0.96);
-}
+
 
 /* Inputs */
 input,

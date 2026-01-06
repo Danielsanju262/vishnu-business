@@ -95,11 +95,11 @@ export default function Products() {
         }
     };
 
-    const handleDelete = async (id: string) => {
-        const itemToDelete = products.find(p => p.id === id);
-        if (!itemToDelete) return;
+    const handleDelete = async (id: string, name: string) => {
+        if (!await confirm(`Delete "${name}"?`)) return;
 
         // Optimistic Remove
+        const previousProducts = [...products];
         setProducts(prev => prev.filter(p => p.id !== id));
 
         const { error } = await supabase.from("products").update({ is_active: false }).eq("id", id);
@@ -107,15 +107,17 @@ export default function Products() {
             toast("Deleted product", "success", {
                 label: "Undo",
                 onClick: async () => {
+                    // Restore
+                    setProducts(previousProducts);
                     const { error: restoreError } = await supabase.from("products").update({ is_active: true }).eq("id", id);
                     if (!restoreError) {
                         toast("Restored", "success");
                         fetchProducts();
                     }
                 }
-            });
-            fetchProducts();
+            }, 10000); // 10s undo
         } else {
+            setProducts(previousProducts); // Revert
             toast("Failed to delete", "error");
             fetchProducts();
         }
@@ -197,8 +199,13 @@ export default function Products() {
                         <ArrowLeft size={20} />
                     </Link>
                     <div className="flex-1">
+                        {/* Breadcrumb */}
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
+                            <Link to="/" className="hover:text-primary transition">Home</Link>
+                            <span>/</span>
+                            <span className="text-primary font-semibold">Products</span>
+                        </div>
                         <h1 className="text-2xl font-black text-foreground tracking-tight">Products</h1>
-                        <p className="text-muted-foreground text-xs font-medium">Manage inventory items</p>
                     </div>
                     <Button
                         size="sm"
@@ -208,7 +215,7 @@ export default function Products() {
                             isAdding ? "bg-muted text-foreground hover:bg-muted/80" : "bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-primary/20"
                         )}
                     >
-                        {isAdding ? "Cancel" : <><Plus className="mr-2 h-4 w-4" strokeWidth={3} /> Add New</>}
+                        {isAdding ? "Cancel" : <><Plus className="mr-2 h-4 w-4" strokeWidth={3} />Add New</>}
                     </Button>
                 </div>
             )}
@@ -379,7 +386,7 @@ export default function Products() {
                                                         <Edit2 size={14} /> Edit
                                                     </button>
                                                     <button
-                                                        onClick={() => { setActiveMenuId(null); handleDelete(p.id); }}
+                                                        onClick={() => { setActiveMenuId(null); handleDelete(p.id, p.name); }}
                                                         className="flex items-center gap-2 px-3 py-2.5 text-sm font-bold text-rose-500 hover:bg-rose-500/10 rounded-lg text-left"
                                                     >
                                                         <Trash2 size={14} /> Delete

@@ -21,7 +21,7 @@ interface ConfirmOptions {
 }
 
 interface ToastContextType {
-    toast: (message: string, type?: ToastType, action?: { label: string, onClick: () => void }) => void;
+    toast: (message: string, type?: ToastType, action?: { label: string, onClick: () => void }, duration?: number) => void;
     confirm: (message: string, options?: ConfirmOptions) => Promise<boolean>;
 }
 
@@ -41,7 +41,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         resolve: (value: boolean) => void;
     } | null>(null);
 
-    const toast = (message: string, type: ToastType = "info", action?: { label: string, onClick: () => void }) => {
+    const toast = (message: string, type: ToastType = "info", action?: { label: string, onClick: () => void }, duration: number = 5000) => {
         const id = Date.now().toString();
 
         // Wrap onClick to dismiss toast
@@ -58,7 +58,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         // Auto dismiss
         setTimeout(() => {
             setToasts((prev) => prev.filter((t) => t.id !== id));
-        }, 5000);
+        }, duration);
     };
 
     const confirm = (message: string, options?: ConfirmOptions): Promise<boolean> => {

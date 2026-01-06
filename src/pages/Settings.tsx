@@ -423,12 +423,17 @@ export default function Settings() {
         <div className="min-h-screen bg-background p-4 animate-in fade-in">
             {/* Header */}
             <div className="flex items-center gap-4 mb-8">
-                <Link to="/" className="p-2 -ml-2 rounded-full hover:bg-accent text-muted-foreground transition">
+                <Link to="/" className="p-2 -ml-2 rounded-full hover:bg-accent active:bg-accent text-muted-foreground transition">
                     <ArrowLeft />
                 </Link>
                 <div>
+                    {/* Breadcrumb */}
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-0.5">
+                        <Link to="/" className="hover:text-primary transition">Home</Link>
+                        <span>/</span>
+                        <span className="text-primary font-semibold">Settings</span>
+                    </div>
                     <h1 className="text-xl font-bold text-foreground">Settings</h1>
-                    <p className="text-muted-foreground text-xs">App preferences</p>
                 </div>
             </div>
 

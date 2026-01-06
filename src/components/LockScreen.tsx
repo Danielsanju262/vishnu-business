@@ -132,7 +132,7 @@ export default function LockScreen() {
                             <button
                                 type="button"
                                 onClick={() => setShowPin(false)}
-                                className="text-sm text-primary font-bold hover:underline py-2"
+                                className="text-sm text-primary font-bold hover:underline active:underline py-2"
                             >
                                 Use Biometrics Instead
                             </button>
@@ -144,7 +144,7 @@ export default function LockScreen() {
                             <Button
                                 size="lg"
                                 onClick={handleUnlock}
-                                className="w-full h-14 rounded-2xl text-lg font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                                className="w-full h-14 rounded-2xl text-lg font-bold bg-primary hover:bg-primary/90 active:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[1.02]"
                             >
                                 <Fingerprint className="mr-2" size={24} />
                                 Unlock with Fingerprint
@@ -155,7 +155,7 @@ export default function LockScreen() {
                             variant="outline"
                             size="lg"
                             onClick={() => setShowPin(true)}
-                            className="w-full h-14 rounded-2xl text-base font-bold transition-all hover:bg-accent"
+                            className="w-full h-14 rounded-2xl text-base font-bold transition-all hover:bg-accent active:bg-accent"
                         >
                             <KeyRound className="mr-2" size={20} />
                             Use Master PIN

@@ -148,15 +148,17 @@ export default function Reports() {
         }
     };
 
-    const deleteTransaction = async (id: string) => {
+    const deleteTransaction = async (id: string, customerName?: string, productName?: string) => {
         // Find item locally for restoration
         const itemToDelete = data.transactions.find((t: any) => t.id === id);
         if (!itemToDelete) return;
 
-        // Optimistic UI update could be tricky with complex state, so we'll just wait for DB but provide undo.
-        // Actually, for "Undo" visual feedback, let's remove it and show toast.
+        const name = itemToDelete.products?.name || productName || "Transaction";
+        const customer = itemToDelete.customers?.name || customerName || "Customer";
+        if (!await confirm(`Delete sale of "${name}" to ${customer}?`)) return;
 
         // Optimistic Remove
+        const previousData = { ...data };
         setData(prev => ({
             ...prev,
             transactions: prev.transactions.filter((t: any) => t.id !== id)
@@ -168,17 +170,19 @@ export default function Reports() {
             toast("Transaction deleted", "success", {
                 label: "Undo",
                 onClick: async () => {
+                    // Restore
+                    setData(previousData);
                     const { error: restoreError } = await supabase.from('transactions').update({ deleted_at: null }).eq('id', id);
                     if (!restoreError) {
                         toast("Restored", "success");
                         fetchData();
                     }
                 }
-            });
-            fetchData();
+            }, 10000);
+            // No strict need to fetchData immediately if optimistic update works, but cleaner to sync eventually.
         } else {
+            setData(previousData);
             toast("Failed to delete", "error");
-            fetchData(); // Revert
         }
     };
 
@@ -186,19 +190,42 @@ export default function Reports() {
         const itemToDelete = combinedExpenses.find((e: any) => e.id === id);
         if (!itemToDelete || itemToDelete.type !== 'manual') return;
 
+        if (!await confirm(`Delete "${itemToDelete.title}"?`)) return;
+
+        // Optimistic remove
+        const previousExpenses = [...combinedExpenses];
+        const previousData = { ...data };
+
+        // Update local state quickly
+        setCombinedExpenses(prev => prev.filter(e => e.id !== id));
+        setData(prev => ({
+            ...prev,
+            expenses: prev.expenses.filter(e => e.id !== id)
+        }));
+
         const { error } = await supabase.from('expenses').update({ deleted_at: new Date().toISOString() }).eq('id', id);
+
         if (!error) {
-            toast("Deleted successfully", "success", {
+            toast("Expense deleted", "success", {
                 label: "Undo",
                 onClick: async () => {
+                    // Restore in UI
+                    setCombinedExpenses(previousExpenses);
+                    setData(previousData);
+
+                    // Restore in DB
                     const { error: restoreError } = await supabase.from('expenses').update({ deleted_at: null }).eq('id', id);
                     if (!restoreError) {
                         toast("Restored expense", "success");
                         fetchData();
                     }
                 }
-            });
-            fetchData();
+            }, 10000); // 10s
+        } else {
+            // Revert
+            setCombinedExpenses(previousExpenses);
+            setData(previousData);
+            toast("Failed to delete", "error");
         }
     };
 
@@ -379,7 +406,15 @@ export default function Reports() {
                         <Link to="/" className="p-2.5 -ml-2 rounded-full hover:bg-accent hover:text-foreground text-muted-foreground transition interactive active:scale-95">
                             <ArrowLeft size={20} />
                         </Link>
-                        <h1 className="text-2xl font-black text-foreground tracking-tight">Reports</h1>
+                        <div>
+                            {/* Breadcrumb */}
+                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-0.5">
+                                <Link to="/" className="hover:text-primary transition">Home</Link>
+                                <span>/</span>
+                                <span className="text-primary font-semibold">Reports</span>
+                            </div>
+                            <h1 className="text-2xl font-black text-foreground tracking-tight">Reports</h1>
+                        </div>
                     </div>
 
                     {/* Filter Trigger */}
@@ -847,13 +882,15 @@ export default function Reports() {
                                             ) : (
                                                 <div
                                                     className={cn("flex justify-between items-center group relative transition-all", activeMenuId === t.id ? "z-50" : "z-0")}
-                                                    onTouchStart={() => handleTransactionTouchStart(t.id, selectedTransactionIds.has(t.id))}
-                                                    onTouchEnd={handleTouchEnd}
-                                                    onMouseDown={() => handleTransactionTouchStart(t.id, selectedTransactionIds.has(t.id))}
-                                                    onMouseUp={handleTouchEnd}
-                                                    onMouseLeave={handleTouchEnd}
                                                 >
-                                                    <div className="flex-1 min-w-0 select-none">
+                                                    <div
+                                                        className="flex-1 min-w-0 select-none cursor-pointer"
+                                                        onTouchStart={() => handleTransactionTouchStart(t.id, selectedTransactionIds.has(t.id))}
+                                                        onTouchEnd={handleTouchEnd}
+                                                        onMouseDown={() => handleTransactionTouchStart(t.id, selectedTransactionIds.has(t.id))}
+                                                        onMouseUp={handleTouchEnd}
+                                                        onMouseLeave={handleTouchEnd}
+                                                    >
                                                         <div className="font-bold text-foreground truncate text-base">{t.customers?.name}</div>
                                                         <div className="text-xs text-muted-foreground flex items-center gap-1.5 mt-1 font-medium">
                                                             <span className="text-foreground/80">{t.products?.name}</span>
@@ -869,34 +906,37 @@ export default function Reports() {
                                                         <div className="relative">
                                                             <button
                                                                 onClick={(e) => { e.stopPropagation(); setActiveMenuId(activeMenuId === t.id ? null : t.id); }}
-                                                                className="p-1.5 text-muted-foreground hover:bg-accent rounded-lg transition"
+                                                                className="p-1.5 text-muted-foreground hover:bg-accent active:bg-accent rounded-lg transition"
                                                             >
                                                                 <MoreVertical size={16} />
                                                             </button>
 
                                                             {activeMenuId === t.id && (
-                                                                <div className="absolute right-0 top-full mt-1 w-36 bg-card dark:bg-zinc-900 border border-border rounded-xl shadow-2xl z-[100] overflow-hidden animate-in fade-in zoom-in-95 ring-1 ring-black/5">
+                                                                <div
+                                                                    className="absolute right-0 top-full mt-1 w-36 bg-card dark:bg-zinc-900 border border-border rounded-xl shadow-2xl z-[100] overflow-hidden animate-in fade-in zoom-in-95 ring-1 ring-black/5"
+                                                                >
                                                                     <div className="flex flex-col p-1">
                                                                         <button
-                                                                            onClick={() => { setActiveMenuId(null); startEdit(t); }}
-                                                                            className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-foreground hover:bg-accent rounded-lg text-left"
+                                                                            onClick={(e) => { e.stopPropagation(); setActiveMenuId(null); startEdit(t); }}
+                                                                            className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-foreground hover:bg-accent active:bg-accent rounded-lg text-left"
                                                                         >
                                                                             <Edit2 size={14} /> Edit
                                                                         </button>
                                                                         <button
-                                                                            onClick={() => { setActiveMenuId(null); deleteTransaction(t.id); }}
-                                                                            className="flex items-center gap-2 px-3 py-2.5 text-sm font-bold text-rose-500 hover:bg-rose-500/10 rounded-lg text-left"
+                                                                            onClick={(e) => { e.stopPropagation(); setActiveMenuId(null); deleteTransaction(t.id, t.customers?.name, t.products?.name); }}
+                                                                            className="flex items-center gap-2 px-3 py-2.5 text-sm font-bold text-rose-500 hover:bg-rose-500/10 active:bg-rose-500/10 rounded-lg text-left"
                                                                         >
                                                                             <Trash2 size={14} /> Delete
                                                                         </button>
                                                                         <div className="h-px bg-border/50 my-1" />
                                                                         <button
-                                                                            onClick={() => {
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
                                                                                 setActiveMenuId(null);
                                                                                 toggleSelectionMode();
                                                                                 toggleTransactionSelection(t.id);
                                                                             }}
-                                                                            className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-foreground hover:bg-accent rounded-lg text-left"
+                                                                            className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-foreground hover:bg-accent active:bg-accent rounded-lg text-left"
                                                                         >
                                                                             <CheckCircle2 size={14} /> Select
                                                                         </button>
@@ -992,13 +1032,15 @@ export default function Reports() {
                                                 ) : (
                                                     <div
                                                         className="flex justify-between items-center group select-none"
-                                                        onTouchStart={() => handleExpenseTouchStart(e.id, selectedExpenseIds.has(e.id))}
-                                                        onTouchEnd={handleTouchEnd}
-                                                        onMouseDown={() => handleExpenseTouchStart(e.id, selectedExpenseIds.has(e.id))}
-                                                        onMouseUp={handleTouchEnd}
-                                                        onMouseLeave={handleTouchEnd}
                                                     >
-                                                        <div className="flex-1">
+                                                        <div
+                                                            className="flex-1 cursor-pointer"
+                                                            onTouchStart={() => handleExpenseTouchStart(e.id, selectedExpenseIds.has(e.id))}
+                                                            onTouchEnd={handleTouchEnd}
+                                                            onMouseDown={() => handleExpenseTouchStart(e.id, selectedExpenseIds.has(e.id))}
+                                                            onMouseUp={handleTouchEnd}
+                                                            onMouseLeave={handleTouchEnd}
+                                                        >
                                                             <div className="font-bold text-foreground text-sm">{e.title}</div>
                                                             <div className="flex flex-wrap gap-2 mt-2">
                                                                 {e.type === 'cogs' && (
@@ -1024,34 +1066,40 @@ export default function Reports() {
                                                                 <div className="relative">
                                                                     <button
                                                                         onClick={(evt) => { evt.stopPropagation(); setActiveMenuId(activeMenuId === e.id ? null : e.id); }}
-                                                                        className="p-1.5 text-muted-foreground hover:bg-accent rounded-lg transition ml-2"
+                                                                        className={cn(
+                                                                            "p-1.5 text-muted-foreground hover:bg-accent active:bg-accent rounded-lg transition ml-2",
+                                                                            "opacity-100"
+                                                                        )}
                                                                     >
                                                                         <MoreVertical size={16} />
                                                                     </button>
 
                                                                     {activeMenuId === e.id && (
-                                                                        <div className="absolute right-0 top-full mt-1 w-36 bg-card dark:bg-zinc-900 border border-border rounded-xl shadow-2xl z-[100] overflow-hidden animate-in fade-in zoom-in-95 ring-1 ring-black/5">
+                                                                        <div
+                                                                            className="absolute right-0 top-full mt-1 w-36 bg-card dark:bg-zinc-900 border border-border rounded-xl shadow-2xl z-[100] overflow-hidden animate-in fade-in zoom-in-95 ring-1 ring-black/5"
+                                                                        >
                                                                             <div className="flex flex-col p-1">
                                                                                 <button
-                                                                                    onClick={() => { setActiveMenuId(null); startEditExpense(e); }}
-                                                                                    className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-foreground hover:bg-accent rounded-lg text-left"
+                                                                                    onClick={(evt) => { evt.stopPropagation(); setActiveMenuId(null); startEditExpense(e); }}
+                                                                                    className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-foreground hover:bg-accent active:bg-accent rounded-lg text-left"
                                                                                 >
                                                                                     <Edit2 size={14} /> Edit
                                                                                 </button>
                                                                                 <button
-                                                                                    onClick={() => { setActiveMenuId(null); deleteExpense(e.id); }}
-                                                                                    className="flex items-center gap-2 px-3 py-2.5 text-sm font-bold text-rose-500 hover:bg-rose-500/10 rounded-lg text-left"
+                                                                                    onClick={(evt) => { evt.stopPropagation(); setActiveMenuId(null); deleteExpense(e.id); }}
+                                                                                    className="flex items-center gap-2 px-3 py-2.5 text-sm font-bold text-rose-500 hover:bg-rose-500/10 active:bg-rose-500/10 rounded-lg text-left"
                                                                                 >
                                                                                     <Trash2 size={14} /> Delete
                                                                                 </button>
                                                                                 <div className="h-px bg-border/50 my-1" />
                                                                                 <button
-                                                                                    onClick={() => {
+                                                                                    onClick={(evt) => {
+                                                                                        evt.stopPropagation();
                                                                                         setActiveMenuId(null);
                                                                                         toggleSelectionMode();
                                                                                         toggleExpenseSelection(e.id);
                                                                                     }}
-                                                                                    className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-foreground hover:bg-accent rounded-lg text-left"
+                                                                                    className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-foreground hover:bg-accent active:bg-accent rounded-lg text-left"
                                                                                 >
                                                                                     <CheckCircle2 size={14} /> Select
                                                                                 </button>
@@ -1097,9 +1145,7 @@ export default function Reports() {
                                             <p className="text-xs text-neutral-500 font-bold uppercase tracking-wide">Transaction History</p>
                                         </div>
                                     </div>
-                                    <Button size="icon" variant="ghost" className="rounded-full h-8 w-8 hover:bg-neutral-800 text-neutral-400" onClick={() => setSelectedCustomer(null)}>
-                                        <X size={18} />
-                                    </Button>
+
                                 </div>
 
                                 <div className="overflow-y-auto p-4 space-y-3 bg-neutral-900">

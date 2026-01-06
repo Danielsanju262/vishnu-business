@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
-import { ArrowLeft, Check, Fuel, Utensils, Wrench, Sparkles, Plus, Trash2, Edit2, Settings2, MoreVertical, X, CheckCircle2, Circle } from "lucide-react";
+import { ArrowLeft, Check, Fuel, Utensils, Wrench, Sparkles, Plus, Trash2, Edit2, Settings2, X, CheckCircle2, Circle } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useToast } from "../components/toast-provider";
 
@@ -153,12 +153,33 @@ export default function NewExpense() {
 
     const deletePreset = async (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
-        if (!await confirm("Delete this quick expense option?")) return;
 
+        // Find preset to get label
+        const preset = presets.find(p => p.id === id);
+        if (!preset) return;
+
+        if (!await confirm(`Delete "${preset.label}"?`)) return;
+
+        // Optimistic update
+        const previousPresets = [...presets];
+        setPresets(presets.filter(p => p.id !== id));
+
+        // Soft delete
         const { error } = await supabase.from('expense_presets').update({ deleted_at: new Date().toISOString() }).eq('id', id);
+
         if (!error) {
-            fetchPresets();
-            toast("Preset deleted", "success");
+            toast("Preset deleted", "success", {
+                label: "Undo",
+                onClick: async () => {
+                    // Restore
+                    setPresets(previousPresets);
+                    await supabase.from('expense_presets').update({ deleted_at: null }).eq('id', id);
+                    toast("Deletion undone", "success");
+                }
+            }, 10000); // 10 seconds duration
+        } else {
+            setPresets(previousPresets); // Revert on error
+            toast(`Failed to delete: ${error.message}`, "error");
         }
     };
 
@@ -233,7 +254,7 @@ export default function NewExpense() {
                     </div>
                 </div>
             ) : (
-                <div className="sticky top-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border shadow-sm px-4 py-3 flex items-center justify-between transition-all">
+                <div className="sticky top-0 z-50 bg-background/95 backdrop-blur-xl border-b border-border shadow-sm px-4 py-3 flex items-center justify-between transition-all w-full">
                     {isManageMode ? (
                         <button onClick={() => setIsManageMode(false)} className="p-2.5 -ml-2 rounded-full hover:bg-accent hover:text-foreground text-muted-foreground transition interactive active:scale-95">
                             <ArrowLeft size={20} />
@@ -351,10 +372,7 @@ export default function NewExpense() {
                                             <div
                                                 key={item.id}
                                                 onClick={() => {
-                                                    // Only select if menu is not active (prevent selection on menu interaction)
-                                                    if (!activeMenuId) {
-                                                        setTitle(item.label);
-                                                    }
+                                                    setTitle(item.label);
                                                 }}
                                                 onTouchStart={() => handleTouchStart(item.id)}
                                                 onTouchEnd={handleTouchEnd}
@@ -372,43 +390,6 @@ export default function NewExpense() {
                                                     <Icon size={24} />
                                                 </div>
                                                 <span className="text-xs font-bold text-center leading-tight">{item.label}</span>
-
-                                                {/* 3-Dot Menu Button */}
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setActiveMenuId(activeMenuId === item.id ? null : item.id);
-                                                    }}
-                                                    className="absolute top-2 right-2 p-1.5 text-muted-foreground/50 hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10 rounded-full transition-all"
-                                                >
-                                                    <MoreVertical size={16} />
-                                                </button>
-
-                                                {/* The Menu Dropdown */}
-                                                {activeMenuId === item.id && (
-                                                    <div className="absolute right-2 top-8 w-32 bg-card dark:bg-zinc-900 border border-border rounded-xl shadow-xl z-[50] overflow-hidden animate-in fade-in zoom-in-95 ring-1 ring-black/5">
-                                                        <div className="flex flex-col p-1">
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    editPreset(item, e);
-                                                                    setActiveMenuId(null);
-                                                                }}
-                                                                className="flex items-center gap-2 px-3 py-2 text-xs font-bold text-foreground hover:bg-accent rounded-lg text-left"
-                                                            >
-                                                                <Edit2 size={12} /> Edit
-                                                            </button>
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    deletePreset(item.id, e);
-                                                                    setActiveMenuId(null);
-                                                                }}
-                                                                className="flex items-center gap-2 px-3 py-2 text-xs font-bold text-rose-500 hover:bg-rose-500/10 rounded-lg text-left"
-                                                            >
-                                                                <Trash2 size={12} /> Delete
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                )}
                                             </div>
                                         );
                                     })}

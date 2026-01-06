@@ -8,12 +8,12 @@ const buttonVariants = cva(
     {
         variants: {
             variant: {
-                default: "bg-blue-600 text-white hover:bg-blue-700",
-                destructive: "bg-red-500 text-white hover:bg-red-600",
-                outline: "border border-input bg-background hover:bg-slate-100 hover:text-accent-foreground",
-                secondary: "bg-slate-100 text-slate-900 hover:bg-slate-200",
-                ghost: "hover:bg-slate-100 hover:text-slate-900",
-                link: "text-primary underline-offset-4 hover:underline",
+                default: "bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-700",
+                destructive: "bg-red-500 text-white hover:bg-red-600 active:bg-red-600",
+                outline: "border border-input bg-background hover:bg-slate-100 hover:text-accent-foreground active:bg-slate-100 active:text-accent-foreground",
+                secondary: "bg-slate-100 text-slate-900 hover:bg-slate-200 active:bg-slate-200",
+                ghost: "hover:bg-slate-100 hover:text-slate-900 active:bg-slate-100 active:text-slate-900",
+                link: "text-primary underline-offset-4 hover:underline active:underline",
             },
             size: {
                 default: "h-12 px-4 py-2 text-base", // Mobile friendly larger size

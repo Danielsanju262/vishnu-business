@@ -81,11 +81,11 @@ export default function Customers() {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
-    const handleDelete = async (id: string) => {
-        const itemToDelete = customers.find(c => c.id === id);
-        if (!itemToDelete) return;
+    const handleDelete = async (id: string, name: string) => {
+        if (!await confirm(`Delete "${name}"?`)) return;
 
         // Optimistic Remove
+        const previousCustomers = [...customers];
         setCustomers(prev => prev.filter(c => c.id !== id));
 
         const { error } = await supabase.from("customers").update({ is_active: false }).eq("id", id);
@@ -93,15 +93,17 @@ export default function Customers() {
             toast("Customer deleted", "success", {
                 label: "Undo",
                 onClick: async () => {
+                    // Restore
+                    setCustomers(previousCustomers);
                     const { error: restoreError } = await supabase.from("customers").update({ is_active: true }).eq("id", id);
                     if (!restoreError) {
                         toast("Restored", "success");
                         fetchCustomers();
                     }
                 }
-            });
-            fetchCustomers();
+            }, 10000);
         } else {
+            setCustomers(previousCustomers);
             toast("Failed to delete", "error");
             fetchCustomers();
         }
@@ -182,8 +184,13 @@ export default function Customers() {
                         <ArrowLeft size={20} />
                     </Link>
                     <div className="flex-1">
+                        {/* Breadcrumb */}
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
+                            <Link to="/" className="hover:text-primary transition">Home</Link>
+                            <span>/</span>
+                            <span className="text-primary font-semibold">Customers</span>
+                        </div>
                         <h1 className="text-2xl font-black text-foreground tracking-tight">Customers</h1>
-                        <p className="text-muted-foreground text-xs font-medium">Manage your client list</p>
                     </div>
                     <Button
                         size="sm"
@@ -193,7 +200,7 @@ export default function Customers() {
                             isAdding ? "bg-muted text-foreground hover:bg-muted/80" : "bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-primary/20"
                         )}
                     >
-                        {isAdding ? "Cancel" : <><Plus className="mr-2 h-4 w-4" strokeWidth={3} /> Add New</>}
+                        {isAdding ? "Cancel" : <><Plus className="mr-2 h-4 w-4" strokeWidth={3} />Add New</>}
                     </Button>
                 </div>
             )}
@@ -311,7 +318,7 @@ export default function Customers() {
                                                         <Edit2 size={14} /> Edit
                                                     </button>
                                                     <button
-                                                        onClick={() => { setActiveMenuId(null); handleDelete(c.id); }}
+                                                        onClick={() => { setActiveMenuId(null); handleDelete(c.id, c.name); }}
                                                         className="flex items-center gap-2 px-3 py-2.5 text-sm font-bold text-rose-500 hover:bg-rose-500/10 rounded-lg text-left"
                                                     >
                                                         <Trash2 size={14} /> Delete
