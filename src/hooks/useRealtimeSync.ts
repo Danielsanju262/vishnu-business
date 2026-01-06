@@ -2,7 +2,7 @@ import { useEffect, useCallback, useRef } from 'react';
 // import { supabase } from '../lib/supabase';
 // import { RealtimeChannel } from '@supabase/supabase-js';
 
-type TableName = 'customers' | 'products' | 'transactions' | 'expenses' | 'expense_presets' | 'payment_reminders';
+type TableName = 'customers' | 'products' | 'transactions' | 'expenses' | 'expense_presets' | 'payment_reminders' | 'accounts_payable' | 'suppliers';
 
 // Configuration - set to true to use Supabase Realtime (requires paid plan or free tier limits)
 // Set to false to use polling (works on any plan, completely free)

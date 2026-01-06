@@ -194,7 +194,7 @@ export default function Products() {
                     </div>
                 </div>
             ) : (
-                <div className="relative bg-background -mx-4 px-4 py-4 mb-6 border-b border-border/50 flex items-center gap-4 transition-all">
+                <div className="relative z-10 bg-background -mx-4 px-4 py-4 mb-6 border-b border-border/50 flex items-center gap-4 transition-all">
                     <Link to="/" className="p-2.5 -ml-2 rounded-full hover:bg-accent hover:text-foreground text-muted-foreground transition interactive active:scale-95">
                         <ArrowLeft size={20} />
                     </Link>
@@ -209,7 +209,17 @@ export default function Products() {
                     </div>
                     <Button
                         size="sm"
-                        onClick={() => { setIsAdding(!isAdding); if (!isAdding) cleanForm(); }}
+                        onClick={() => {
+                            if (isAdding) {
+                                cleanForm();
+                            } else {
+                                setNewName("");
+                                setNewUnit("kg");
+                                setNewCategory("general");
+                                setEditingId(null);
+                                setIsAdding(true);
+                            }
+                        }}
                         className={cn(
                             "rounded-full px-5 font-bold shadow-lg transition-all interactive",
                             isAdding ? "bg-muted text-foreground hover:bg-muted/80" : "bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-primary/20"
@@ -264,6 +274,8 @@ export default function Products() {
                                     <option value="ltr">Liter (ltr)</option>
                                     <option value="pcs">Pieces (pcs)</option>
                                     <option value="box">Box</option>
+                                    <option value="bottle">Bottle</option>
+                                    <option value="packet">Packet</option>
                                 </select>
                             </div>
                         </div>

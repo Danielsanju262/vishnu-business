@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
-import { ArrowLeft, Check, Fuel, Utensils, Wrench, Sparkles, Plus, Trash2, Edit2, Settings2, X, CheckCircle2, Circle } from "lucide-react";
+import { ArrowLeft, Check, Fuel, Utensils, Wrench, Sparkles, Plus, Trash2, Edit2, Settings2, X, CheckCircle2, Circle, Search } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useToast } from "../components/toast-provider";
 
@@ -38,12 +38,36 @@ export default function NewExpense() {
     const [presetName, setPresetName] = useState("");
     const [editingPresetId, setEditingPresetId] = useState<string | null>(null);
 
+    // Payment Mode State
+    const [paymentMode, setPaymentMode] = useState<'cash' | 'credit'>('cash');
+    const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
+    const [supplierSearch, setSupplierSearch] = useState("");
+    const [selectedSupplierId, setSelectedSupplierId] = useState<string>("");
+    const [paymentDueDate, setPaymentDueDate] = useState("");
+    const [showSupplierList, setShowSupplierList] = useState(false);
+
     // Menu & Long Press
     const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
     const timerRef = useRef<any>(null);
 
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [isSelectionMode, setIsSelectionMode] = useState(false);
+
+    useEffect(() => {
+        const fetchSuppliers = async () => {
+            const { data } = await supabase
+                .from('suppliers')
+                .select('id, name')
+                .eq('is_active', true)
+                .order('name');
+            if (data) setSuppliers(data);
+        };
+        fetchSuppliers();
+    }, []);
+
+    const filteredSuppliers = suppliers.filter(s =>
+        s.name.toLowerCase().includes(supplierSearch.toLowerCase())
+    );
 
     const handleTouchStart = (id: string, currentSelected: boolean = false) => {
         timerRef.current = setTimeout(() => {
@@ -92,7 +116,13 @@ export default function NewExpense() {
             return;
         }
 
-        const { error } = await supabase
+        if (paymentMode === 'credit' && (!selectedSupplierId || !paymentDueDate)) {
+            toast("Please select a supplier and due date for credit expense", "warning");
+            return;
+        }
+
+        // 1. Create Expense
+        const { data: expenseData, error } = await supabase
             .from("expenses")
             .insert([{
                 title,
@@ -101,25 +131,49 @@ export default function NewExpense() {
             }])
             .select();
 
-        if (!error) {
-            // Check if this expense title is in our presets
-            const matchingPreset = presets.find(p => p.label.toLowerCase() === title.toLowerCase());
-            if (!matchingPreset && title.trim()) {
-                const shouldAdd = await confirm(`Add "${title}" to Quick Expenses?`, {
-                    confirmText: "Yes",
-                    cancelText: "No",
-                    variant: "default"
-                });
-                if (shouldAdd) {
-                    await supabase.from('expense_presets').insert([{ label: title }]);
-                    fetchPresets(); // Refresh presets
-                }
-            }
-            toast("Expense saved", "success");
-            navigate("/");
-        } else {
+        if (error) {
             toast(`Failed to save: ${error.message}`, "error");
+            return;
         }
+
+        // 2. Create Payable if Credit
+        if (paymentMode === 'credit' && expenseData) {
+            const { error: payableError } = await supabase
+                .from('accounts_payable')
+                .insert({
+                    supplier_id: selectedSupplierId,
+                    amount: parseFloat(amount),
+                    due_date: paymentDueDate,
+                    note: `Expense: ${title}`,
+                    status: 'pending',
+                    recorded_at: new Date().toISOString()
+                });
+
+            if (payableError) {
+                console.error("Failed to create payable:", payableError);
+                toast("Expense saved but failed to add to Payables", "warning");
+            } else {
+                toast("Expense & Payable saved", "success");
+            }
+        } else {
+            toast("Expense saved", "success");
+        }
+
+        // Check presets logic...
+        const matchingPreset = presets.find(p => p.label.toLowerCase() === title.toLowerCase());
+        if (!matchingPreset && title.trim()) {
+            const shouldAdd = await confirm(`Add "${title}" to Quick Expenses?`, {
+                confirmText: "Yes",
+                cancelText: "No",
+                variant: "default"
+            });
+            if (shouldAdd) {
+                await supabase.from('expense_presets').insert([{ label: title }]);
+                fetchPresets();
+            }
+        }
+
+        navigate("/");
     };
 
     // Preset Operations
@@ -472,13 +526,99 @@ export default function NewExpense() {
                                 </div>
                             </div>
 
+                            {/* Payment Mode Toggle */}
+                            <div className="bg-accent/30 p-1 rounded-xl flex">
+                                <button
+                                    className={cn(
+                                        "flex-1 py-2 rounded-lg text-xs font-bold transition-all duration-200",
+                                        paymentMode === 'cash'
+                                            ? "bg-background text-foreground shadow-sm ring-1 ring-border/50"
+                                            : "text-muted-foreground hover:text-foreground"
+                                    )}
+                                    onClick={() => setPaymentMode('cash')}
+                                >
+                                    Paid Now
+                                </button>
+                                <button
+                                    className={cn(
+                                        "flex-1 py-2 rounded-lg text-xs font-bold transition-all duration-200",
+                                        paymentMode === 'credit'
+                                            ? "bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 shadow-sm"
+                                            : "text-muted-foreground hover:text-foreground"
+                                    )}
+                                    onClick={() => setPaymentMode('credit')}
+                                >
+                                    Pay Later
+                                </button>
+                            </div>
+
+                            {/* Credit Fields */}
+                            {paymentMode === 'credit' && (
+                                <div className="space-y-4 animate-in slide-in-from-top-2 pt-2">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Select Supplier</label>
+                                        <div className="relative">
+                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
+                                            <input
+                                                type="text"
+                                                placeholder="Search supplier..."
+                                                className="w-full bg-accent/50 border border-border/50 rounded-xl pl-10 pr-4 h-11 text-sm font-bold outline-none focus:ring-2 focus:ring-primary focus:bg-background transition-all"
+                                                value={supplierSearch}
+                                                onChange={e => {
+                                                    setSupplierSearch(e.target.value);
+                                                    setShowSupplierList(true);
+                                                }}
+                                                onFocus={() => setShowSupplierList(true)}
+                                            />
+                                        </div>
+
+                                        {showSupplierList && (supplierSearch.trim() !== "") && (
+                                            <div className="max-h-40 overflow-y-auto border border-border/50 bg-background rounded-xl shadow-lg divide-y divide-border/30">
+                                                {filteredSuppliers.length > 0 ? (
+                                                    filteredSuppliers.map(s => (
+                                                        <button
+                                                            key={s.id}
+                                                            onClick={() => {
+                                                                setSelectedSupplierId(s.id);
+                                                                setSupplierSearch(s.name);
+                                                                setShowSupplierList(false);
+                                                            }}
+                                                            className={cn(
+                                                                "w-full text-left px-4 py-3 text-sm font-bold transition-colors hover:bg-accent",
+                                                                selectedSupplierId === s.id ? "bg-primary/5 text-primary" : "text-foreground"
+                                                            )}
+                                                        >
+                                                            {s.name}
+                                                        </button>
+                                                    ))
+                                                ) : (
+                                                    <div className="p-3 text-center">
+                                                        <p className="text-xs text-muted-foreground mb-2">No supplier found</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Payment Due Date</label>
+                                        <input
+                                            type="date"
+                                            className="w-full bg-accent/50 border border-border/50 rounded-xl px-4 h-11 text-sm font-bold outline-none focus:ring-2 focus:ring-primary focus:bg-background transition-all"
+                                            value={paymentDueDate}
+                                            onChange={e => setPaymentDueDate(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                            )}
+
                             <Button
                                 size="lg"
                                 className="w-full h-14 text-lg font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-xl shadow-rose-500/20 rounded-2xl transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
                                 onClick={handleSave}
                             >
                                 <Check className="mr-2" size={20} />
-                                Add Expense
+                                {paymentMode === 'credit' ? 'Record Expense & Payable' : 'Add Expense'}
                             </Button>
                         </div>
                     </div>

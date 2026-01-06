@@ -801,24 +801,24 @@ export default function Settings() {
                     <div className="space-y-2">
                         <label className="text-xs font-semibold text-muted-foreground">Start Date</label>
                         <div className="relative">
-                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
+                            <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none z-10" size={16} />
                             <Input
                                 type="date"
                                 value={exportStartDate}
                                 onChange={(e) => setExportStartDate(e.target.value)}
-                                className="pl-10 h-12"
+                                className="pl-12 h-12 bg-white dark:bg-zinc-900"
                             />
                         </div>
                     </div>
                     <div className="space-y-2">
                         <label className="text-xs font-semibold text-muted-foreground">End Date</label>
                         <div className="relative">
-                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
+                            <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none z-10" size={16} />
                             <Input
                                 type="date"
                                 value={exportEndDate}
                                 onChange={(e) => setExportEndDate(e.target.value)}
-                                className="pl-10 h-12"
+                                className="pl-12 h-12 bg-white dark:bg-zinc-900"
                             />
                         </div>
                     </div>

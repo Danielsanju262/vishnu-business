@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../lib/supabase";
-import { Plus, Minus, TrendingUp, Users, Package, FileText, ChevronRight, Edit3, Check, LogOut } from "lucide-react";
+import { Plus, Minus, TrendingUp, Users, Package, FileText, ChevronRight, Edit3, Check, LogOut, Truck } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { format, subDays } from "date-fns";
 import { Link } from "react-router-dom";
@@ -78,6 +78,7 @@ export default function Dashboard() {
     // Grayscale palette for dark mode icons
     const menuItems = [
         { title: "Customers", icon: Users, link: "/customers", color: "text-blue-600 dark:text-white", bg: "bg-blue-100 dark:bg-white/10" },
+        { title: "Suppliers", icon: Truck, link: "/suppliers", color: "text-sky-600 dark:text-white", bg: "bg-sky-100 dark:bg-white/10" },
         { title: "Products", icon: Package, link: "/products", color: "text-purple-600 dark:text-white", bg: "bg-purple-100 dark:bg-white/10" },
         { title: "Reports", icon: FileText, link: "/reports", color: "text-amber-600 dark:text-white", bg: "bg-amber-100 dark:bg-white/10" },
     ];

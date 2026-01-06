@@ -1,9 +1,11 @@
 import { Outlet, useLocation, Link } from "react-router-dom";
-import { LayoutDashboard, Settings, IndianRupee } from "lucide-react";
+import { LayoutDashboard, Settings, IndianRupee, Wallet } from "lucide-react";
 import { cn } from "../lib/utils";
+import { usePaymentNotifications } from "../hooks/usePaymentNotifications";
 
 export default function Layout() {
     const location = useLocation();
+    usePaymentNotifications();
 
     // Updated Navigation with more items for easier access
     const navItems = [
@@ -18,6 +20,12 @@ export default function Layout() {
             icon: IndianRupee,
             label: "Payments",
             isActive: (pathname: string) => pathname.startsWith("/payment-reminders")
+        },
+        {
+            path: "/accounts-payable",
+            icon: Wallet,
+            label: "Payables",
+            isActive: (pathname: string) => pathname.startsWith("/accounts-payable")
         },
         {
             path: "/settings",
@@ -36,7 +44,14 @@ export default function Layout() {
             {/* Premium Floating Bottom Navigation */}
             <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-[400px]">
                 <div className="bg-zinc-900/95 dark:bg-zinc-950/95 backdrop-blur-2xl border border-white/10 shadow-2xl shadow-black/40 rounded-full py-3 px-6 flex justify-around items-center ring-1 ring-white/5">
-                    {navItems.map((item) => {
+                    {navItems.filter(item => {
+                        // Check if we are on a "Core" page where we want full navigation
+                        const isCorePage = ["/", "/payment-reminders", "/accounts-payable", "/settings"].includes(location.pathname);
+                        if (isCorePage) return true;
+
+                        // Otherwise, ONLY show Dashboard/Home to allow going back
+                        return item.path === "/";
+                    }).map((item) => {
                         const isActive = item.isActive(location.pathname);
                         const Icon = item.icon;
                         return (

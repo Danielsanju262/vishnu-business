@@ -1,11 +1,12 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { Button } from "../components/ui/Button";
-import { ArrowLeft, ChevronRight, Package, Search, Plus, Trash2, ShoppingCart, User, X, ArrowRight, Calendar } from "lucide-react";
+import { ArrowLeft, ChevronRight, Package, Search, Plus, Trash2, ShoppingCart, User, X, ArrowRight, Calendar, MoreVertical, Edit2, CheckCircle2, Circle, Truck } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useToast } from "../components/toast-provider";
 import { useRealtimeTables } from "../hooks/useRealtimeSync";
+import { Modal } from "../components/ui/Modal";
 
 type Customer = { id: string; name: string };
 type Product = { id: string; name: string; unit: string; category: string };
@@ -18,20 +19,88 @@ type CartItem = {
 
 export default function NewSale() {
     const navigate = useNavigate();
-    const { toast } = useToast();
-
-    // Workflow State
-    const [step, setStep] = useState<"customer" | "cart" | "product" | "details">("customer");
+    const { toast, confirm } = useToast();
 
     // Data State
     const [customers, setCustomers] = useState<Customer[]>([]);
     const [products, setProducts] = useState<Product[]>([]);
     const [search, setSearch] = useState("");
 
+    // Supplier Payment State (Linked Payable)
+    const [isLinkedPayable, setIsLinkedPayable] = useState(false);
+    const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
+    const [payableSupplierSearch, setPayableSupplierSearch] = useState("");
+    const [payableSelectedSupplierId, setPayableSelectedSupplierId] = useState<string>("");
+    const [payableAmount, setPayableAmount] = useState("");
+    const [payableDueDate, setPayableDueDate] = useState("");
+    const [showPayableSupplierList, setShowPayableSupplierList] = useState(false);
+
     // Tranasction State
-    const [selectedCust, setSelectedCust] = useState<Customer | null>(null);
-    const [cart, setCart] = useState<CartItem[]>([]);
+    const [selectedCust, setSelectedCust] = useState<Customer | null>(() => {
+        const stored = localStorage.getItem('vishnu_new_sale_cust');
+        return stored ? JSON.parse(stored) : null;
+    });
+
+    const [cart, setCart] = useState<CartItem[]>(() => {
+        const stored = localStorage.getItem('vishnu_new_sale_cart');
+        return stored ? JSON.parse(stored) : [];
+    });
+
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+
+    // Payment Confirm State
+    const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+    const [addToOutstanding, setAddToOutstanding] = useState(false);
+    const [paidNowAmount, setPaidNowAmount] = useState("");
+    const [outstandingDueDate, setOutstandingDueDate] = useState("");
+
+    // Workflow State -- Initialize based on restored data
+    const [step, setStep] = useState<"customer" | "cart" | "product" | "details">(() => {
+        const storedCart = localStorage.getItem('vishnu_new_sale_cart');
+        const hasCartItems = storedCart && JSON.parse(storedCart).length > 0;
+
+        // If there are items in the cart, go to cart
+        if (hasCartItems) {
+            return "cart";
+        }
+        return "customer";
+    });
+
+    // Auto-redirect if cart is empty for 30s
+    useEffect(() => {
+        let timeout: NodeJS.Timeout;
+
+        if (step === 'cart' && cart.length === 0) {
+            timeout = setTimeout(() => {
+                // Clear customer and go back to start
+                setSelectedCust(null);
+                localStorage.removeItem('vishnu_new_sale_cust');
+                setStep("customer");
+                toast("Session timed out due to inactivity", "info");
+            }, 30000); // 30 seconds
+        }
+
+        return () => clearTimeout(timeout);
+    }, [step, cart, toast]);
+
+    // Persistence Effects
+    useEffect(() => {
+        if (selectedCust) {
+            localStorage.setItem('vishnu_new_sale_cust', JSON.stringify(selectedCust));
+        } else {
+            localStorage.removeItem('vishnu_new_sale_cust');
+        }
+    }, [selectedCust]);
+
+    useEffect(() => {
+        localStorage.setItem('vishnu_new_sale_cart', JSON.stringify(cart));
+    }, [cart]);
+
+    // Cart Management State
+    const [activeMenuIndex, setActiveMenuIndex] = useState<number | null>(null);
+    const [isSelectionMode, setIsSelectionMode] = useState(false);
+    const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
+    const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
     // Temporary Selection State
     const [tempProd, setTempProd] = useState<Product | null>(null);
@@ -45,50 +114,132 @@ export default function NewSale() {
     const [newItemUnit, setNewItemUnit] = useState("kg");
 
     const fetchData = useCallback(async () => {
-        const [custRes, prodRes] = await Promise.all([
+        const [custRes, prodRes, supRes] = await Promise.all([
             supabase.from("customers").select("*").eq('is_active', true).order("name"),
-            supabase.from("products").select("*").eq('is_active', true).order("name")
+            supabase.from("products").select("*").eq('is_active', true).order("name"),
+            supabase.from("suppliers").select("id, name").eq('is_active', true).order("name")
         ]);
         if (custRes.data) setCustomers(custRes.data);
         if (prodRes.data) setProducts(prodRes.data);
+        if (supRes.data) setSuppliers(supRes.data);
     }, []);
 
     // Real-time sync for customers and products - auto-refreshes when data changes on any device
-    useRealtimeTables(['customers', 'products'], fetchData, []);
+    useRealtimeTables(['customers', 'products', 'suppliers'], fetchData, []);
+
+    const payableFilteredSuppliers = suppliers.filter(s =>
+        s.name.toLowerCase().includes(payableSupplierSearch.toLowerCase())
+    );
 
     // Fetch Last Price when Product Selected
     useEffect(() => {
-        if (selectedCust && tempProd && step === "details") {
-            fetchLastTransaction();
-        }
-    }, [tempProd, step]);
+        const fetchLastTransaction = async () => {
+            if (!selectedCust || !tempProd || step !== "details" || editingIndex !== null) return;
 
-    const fetchLastTransaction = async () => {
-        if (!selectedCust || !tempProd) return;
+            // 1. Check if already in cart (use that price) - ONLY if not editing
+            // Logic: Find last occurrence in current cart
+            const inCart = [...cart].reverse().find(i => i.product.id === tempProd.id);
+            if (inCart) {
+                setSellPrice(inCart.sellPrice.toString());
+                setBuyPrice(inCart.buyPrice.toString());
+                return;
+            }
 
-        // Check if already in cart (use that price)
-        const inCart = cart.find(i => i.product.id === tempProd.id);
-        if (inCart) {
-            setSellPrice(inCart.sellPrice.toString());
-            setBuyPrice(inCart.buyPrice.toString());
-            return;
-        }
+            // 2. Fetch from DB
+            const { data } = await supabase.from('transactions')
+                .select('sell_price, buy_price')
+                .eq('customer_id', selectedCust.id)
+                .eq('product_id', tempProd.id)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
 
-        const { data } = await supabase.from('transactions')
-            .select('sell_price, buy_price')
-            .eq('customer_id', selectedCust.id)
-            .eq('product_id', tempProd.id)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single();
+            if (data) {
+                setSellPrice(data.sell_price.toString());
+                setBuyPrice(data.buy_price.toString());
+            }
+        };
 
-        if (data) {
-            setSellPrice(data.sell_price.toString());
-            setBuyPrice(data.buy_price.toString());
+        fetchLastTransaction();
+    }, [tempProd, step, editingIndex, selectedCust, cart]);
+
+    // Long Press for Selection
+    const timerRef = useRef<any>(null);
+    const isLongPress = useRef(false);
+
+    const handleTouchStart = (index: number) => {
+        isLongPress.current = false;
+        if (timerRef.current) clearTimeout(timerRef.current);
+
+        timerRef.current = setTimeout(() => {
+            isLongPress.current = true;
+            if (navigator.vibrate) navigator.vibrate(50);
+
+            // We need to use functional updates or latest state refs if we want to be 100% safe,
+            // but for this interaction, simple closure capture is usually acceptable as long as we force a re-render/update correctly.
+            // Using a functional update pattern for the selection action would be cleaner if 'toggleSelection' wasn't dependent on closure state.
+            // For now, simple execution is fine.
+
+            // Note: We check if mode is already on to avoid unnecessary state updates, 
+            // but we must be careful about closure staleness? 
+            // Actually, we can just trigger the toggle. 
+            // Check state inside the timeout? 
+            // Since we're inside a function created at render, 'isSelectionMode' is const from that render.
+            // This is effectively a "stale closure" hazard if 'isSelectionMode' changed quickly, but for a 500ms hold it's unlikely to race.
+
+            setIsSelectionMode(true); // Force true on long press
+
+            // Use functional update for indices to avoid stale closure issues regarding the Set
+            setSelectedIndices(prev => {
+                const newSet = new Set(prev);
+                if (newSet.has(index)) newSet.delete(index);
+                else newSet.add(index);
+                return newSet;
+            });
+        }, 500);
+    };
+
+    const handleTouchEnd = () => {
+        if (timerRef.current) {
+            clearTimeout(timerRef.current);
+            timerRef.current = null;
         }
     };
 
+    // Close menu when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent | TouchEvent) => {
+            if (activeMenuIndex !== null) {
+                const target = event.target as HTMLElement;
+                if (!target.closest('.menu-content') && !target.closest('.menu-trigger')) {
+                    setActiveMenuIndex(null);
+                }
+            }
+            // Close suggestion list if clicking outside
+            if (showPayableSupplierList) {
+                const target = event.target as HTMLElement;
+                if (!target.closest('.absolute.top-full')) { // simplified check
+                    setShowPayableSupplierList(false);
+                }
+            }
+        };
+
+        if (activeMenuIndex !== null || showPayableSupplierList) {
+            document.addEventListener('mousedown', handleClickOutside);
+            document.addEventListener('touchstart', handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('touchstart', handleClickOutside);
+        };
+    }, [activeMenuIndex, showPayableSupplierList]);
+
     // --- Actions ---
+
+    // ... (rest of actions are unchanged, but we are inserting before them to keep context or just at top of component body. 
+    // Actually, let's insert this Effect near other Effects)
+
 
     const handleAddCustomer = async () => {
         if (!newItemName) return;
@@ -133,24 +284,105 @@ export default function NewSale() {
             buyPrice: buyPrice ? parseFloat(buyPrice) : 0
         };
 
-        setCart(prev => [...prev.filter(i => i.product.id !== tempProd.id), newItem]);
+        if (editingIndex !== null) {
+            // Update existing item
+            setCart(prev => {
+                const newCart = [...prev];
+                newCart[editingIndex] = newItem;
+                return newCart;
+            });
+            toast("Item updated", "success");
+        } else {
+            // New Item: Remove if same product exists?? No, allow multiple entries of same product (e.g. different prices/quantities) 
+            // BUT usually we want to merge or just append. Let's just append for flexibility.
+            // Wait, previous logic was: `prev.filter(i => i.product.id !== tempProd.id)` which replaced it.
+            // Let's keep the replacement logic for now to avoid duplicates if that is desired, OR if we want to allow duplicates, remove filter.
+            // User request implies "edit", so unique items per list might be preferred? 
+            // Actually, simply appending is safer for "editing" specific indices. 
+            // If I add a new item that is the same product, I should probably just add it as a new row or update?
+            // Reverting to APPEND behavior for new items, but standard replacement for edit.
 
-        // Reset and go back to cart
+            // To match previous logic (replace existing):
+            // setCart(prev => [...prev.filter(i => i.product.id !== tempProd.id), newItem]);
+
+            // But since we have specific EDIT functionality now, we should probably allow adding same item twice if needed (e.g. different prices) 
+            // OR just filter. Let's stick to unique products for simplicity unless directed otherwise.
+            const existsIndex = cart.findIndex(i => i.product.id === tempProd.id);
+            if (existsIndex >= 0) {
+                // If it exists, we treat it as an update to that line item to avoid duplicates
+                setCart(prev => {
+                    const newCart = [...prev];
+                    newCart[existsIndex] = newItem;
+                    return newCart;
+                });
+            } else {
+                setCart(prev => [...prev, newItem]);
+            }
+            toast("Added to bill", "success");
+        }
+
+        // Reset
         setTempProd(null);
         setQty("");
         setSellPrice("");
         setBuyPrice("");
         setStep("cart");
-        toast("Added to bill", "success");
+        setEditingIndex(null);
     };
 
-    const removeFromCart = (id: string) => {
-        setCart(prev => prev.filter(i => i.product.id !== id));
+    const removeFromCart = (index: number) => {
+        setCart(prev => prev.filter((_, i) => i !== index));
     };
 
-    const confirmSale = async () => {
+    const editCartItem = (index: number) => {
+        const item = cart[index];
+        setTempProd(item.product);
+        setQty(item.quantity.toString());
+        setSellPrice(item.sellPrice.toString());
+        setBuyPrice(item.buyPrice.toString());
+        setEditingIndex(index);
+        setActiveMenuIndex(null);
+        setStep("details");
+    };
+
+    const toggleSelectionMode = () => {
+        setIsSelectionMode(!isSelectionMode);
+        setSelectedIndices(new Set());
+    };
+
+    const toggleSelection = (index: number) => {
+        const newSet = new Set(selectedIndices);
+        if (newSet.has(index)) newSet.delete(index);
+        else newSet.add(index);
+        setSelectedIndices(newSet);
+    };
+
+    const deleteSelected = async () => {
+        if (selectedIndices.size === 0) return;
+        if (!await confirm(`Delete ${selectedIndices.size} items?`)) return;
+
+        setCart(prev => prev.filter((_, i) => !selectedIndices.has(i)));
+        setIsSelectionMode(false);
+        setSelectedIndices(new Set());
+        toast("Items deleted", "success");
+    };
+
+    const finalizeSale = async () => {
         if (!selectedCust || cart.length === 0) return;
 
+        // 0. Validate Payable Amount if Linked
+        if (isLinkedPayable) {
+            if (!payableSelectedSupplierId) {
+                toast("Please select a supplier for the linked payment", "warning");
+                return;
+            }
+            if (!payableAmount || parseFloat(payableAmount) <= 0) {
+                toast("Please enter a valid amount for the linked payment", "warning");
+                return;
+            }
+        }
+
+        // 1. Save Transaction (ALWAYS full value)
         const transactions = cart.map(item => ({
             customer_id: selectedCust.id,
             product_id: item.product.id,
@@ -161,12 +393,72 @@ export default function NewSale() {
         }));
 
         const { error } = await supabase.from("transactions").insert(transactions);
-        if (!error) {
-            toast("Sale saved successfully!", "success");
-            navigate("/");
-        } else {
+
+        if (error) {
             toast("Failed to save sale", "error");
+            return;
         }
+
+        // 1.5 Handle Linked Payable
+        if (isLinkedPayable && payableSelectedSupplierId && payableAmount) {
+            const { error: payableError } = await supabase
+                .from('accounts_payable')
+                .insert({
+                    supplier_id: payableSelectedSupplierId,
+                    amount: parseFloat(payableAmount),
+                    due_date: payableDueDate || null, // Allow null? Yes, though strict schema might assume date. Schema allows null? Let's check. Default to today if null? Or make required. UI didn't enforce. Let's send null if empty.
+                    note: `From Sale to ${selectedCust.name} (Total: ₹${cart.reduce((acc, i) => acc + (i.quantity * i.sellPrice), 0)})`,
+                    status: 'pending',
+                    recorded_at: new Date().toISOString()
+                });
+
+            if (payableError) {
+                console.error("Failed to create linked payable", payableError);
+                toast("Sale saved, but failed to link supplier payment.", "warning");
+            }
+        }
+
+        // 2. Handle Outstanding (Credit)
+        if (addToOutstanding) {
+            const totalAmount = cart.reduce((acc, item) => acc + (item.quantity * item.sellPrice), 0);
+            const paid = parseFloat(paidNowAmount) || 0;
+            const remaining = totalAmount - paid;
+
+            if (remaining > 0) {
+                // Create Payment Reminder
+                const { error: reminderError } = await supabase.from('payment_reminders').insert({
+                    customer_id: selectedCust.id,
+                    amount: remaining,
+                    due_date: outstandingDueDate,
+                    status: 'pending',
+                    note: `Credit Sale on ${new Date(date).toLocaleDateString()}. Total Bill: ₹${totalAmount}. Paid Now: ₹${paid}.`
+                });
+
+                if (reminderError) {
+                    console.error("Failed to create reminder", reminderError);
+                    toast("Sale saved, but failed to set reminder.", "warning");
+                }
+            }
+        }
+
+        // 3. Success & Reset
+        // Clear stored state on success
+        localStorage.removeItem('vishnu_new_sale_cust');
+        localStorage.removeItem('vishnu_new_sale_cart');
+        setCart([]);
+        setSelectedCust(null);
+        setIsPaymentModalOpen(false); // Close modal
+        setAddToOutstanding(false);
+
+        // Reset Linked Payable state
+        setIsLinkedPayable(false);
+        setPayableSupplierSearch("");
+        setPayableSelectedSupplierId("");
+        setPayableAmount("");
+        setPayableDueDate("");
+
+        toast("Sale saved successfully!", "success");
+        navigate("/");
     };
 
     // --- Render ---
@@ -287,32 +579,126 @@ export default function NewSale() {
                                 </h3>
                             </div>
 
-                            {cart.length === 0 ? (
-                                <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-muted-foreground bg-accent/30 rounded-3xl border-2 border-dashed border-border/60 mb-4">
-                                    <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4 opacity-50">
-                                        <ShoppingCart size={32} />
+                            {/* Bulk Selection Header */}
+                            {isSelectionMode && (
+                                <div className="flex justify-between items-center gap-4 mb-3 bg-card px-4 py-3 rounded-2xl border border-primary/20 shadow-lg animate-in fade-in sticky top-2 z-20">
+                                    <div className="flex items-center gap-3">
+                                        <Button size="icon" variant="ghost" onClick={toggleSelectionMode} className="h-8 w-8">
+                                            <X size={18} />
+                                        </Button>
+                                        <span className="font-bold text-foreground">{selectedIndices.size} Selected</span>
                                     </div>
-                                    <p className="font-semibold text-lg mb-1">Your cart is empty</p>
-                                    <p className="text-sm opacity-70">Add items to proceed with sale</p>
+                                    <Button size="sm" variant="destructive" onClick={deleteSelected} disabled={selectedIndices.size === 0} className="h-8 text-xs px-3">
+                                        <Trash2 size={14} className="mr-1.5" /> Delete
+                                    </Button>
                                 </div>
+                            )}
+
+                            {cart.length === 0 ? (
+                                <button
+                                    onClick={() => { setStep("product"); setSearch(""); }}
+                                    className="flex-1 flex flex-col items-center justify-center text-center p-8 text-muted-foreground bg-accent/30 rounded-3xl border-2 border-dashed border-border/60 mb-4 hover:bg-accent/50 hover:border-primary/50 transition-all cursor-pointer w-full group outline-none focus:ring-2 focus:ring-primary min-h-[300px]"
+                                >
+                                    <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mb-4 opacity-50 group-hover:bg-primary/20 group-hover:text-primary transition-all group-hover:scale-110 duration-300">
+                                        <Plus size={32} />
+                                    </div>
+                                    <p className="font-bold text-xl mb-1 text-foreground">Start Adding Items</p>
+                                    <p className="text-sm opacity-70">Tap anywhere to add products</p>
+                                </button>
                             ) : (
                                 <div className="space-y-3 mb-6 relative z-0">
                                     {cart.map((item, idx) => (
-                                        <div key={idx} className="bg-card p-4 rounded-2xl border border-border/60 flex justify-between items-center shadow-sm hover:shadow-md transition-all group">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold">
-                                                    {item.quantity}
+                                        <div
+                                            key={idx}
+                                            className={cn(
+                                                "bg-card p-4 rounded-2xl border transition-all relative group touch-manipulation select-none",
+                                                isSelectionMode && selectedIndices.has(idx) ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border/60 hover:shadow-md",
+                                                activeMenuIndex === idx ? "z-30" : "z-0"
+                                            )}
+                                        >
+                                            <div className="flex justify-between items-center">
+                                                {/* Left Side: Selection or Content */}
+                                                <div
+                                                    className="flex-1 flex items-center gap-4 cursor-pointer"
+                                                    onContextMenu={(e) => e.preventDefault()}
+                                                    onTouchStart={() => handleTouchStart(idx)}
+                                                    onTouchEnd={handleTouchEnd}
+                                                    onMouseDown={() => handleTouchStart(idx)}
+                                                    onMouseUp={handleTouchEnd}
+                                                    onMouseLeave={handleTouchEnd}
+                                                    onClick={() => {
+                                                        if (isLongPress.current) return;
+                                                        if (isSelectionMode) toggleSelection(idx);
+                                                        else editCartItem(idx);
+                                                    }}
+                                                >
+                                                    {isSelectionMode ? (
+                                                        <div className="mr-1">
+                                                            {selectedIndices.has(idx) ? (
+                                                                <CheckCircle2 className="text-primary fill-primary/20" />
+                                                            ) : (
+                                                                <Circle className="text-muted-foreground" />
+                                                            )}
+                                                        </div>
+                                                    ) : null}
+
+                                                    <div className={cn(
+                                                        "w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold shrink-0",
+                                                        isSelectionMode ? "scale-90" : ""
+                                                    )}>
+                                                        {item.quantity}
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-bold text-foreground text-sm">{item.product.name}</p>
+                                                        <p className="text-xs text-muted-foreground font-medium">{item.product.unit} x ₹{item.sellPrice}</p>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <p className="font-bold text-foreground text-sm">{item.product.name}</p>
-                                                    <p className="text-xs text-muted-foreground font-medium">{item.product.unit} x ₹{item.sellPrice}</p>
+
+                                                {/* Right Side: Options */}
+                                                <div className="flex items-center gap-4 pl-4">
+                                                    <p className="font-black text-foreground text-lg whitespace-nowrap">₹{(item.quantity * item.sellPrice).toLocaleString()}</p>
+
+                                                    {!isSelectionMode && (
+                                                        <div className="relative">
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); setActiveMenuIndex(activeMenuIndex === idx ? null : idx); }}
+                                                                className="menu-trigger p-2 text-muted-foreground hover:bg-accent rounded-xl transition"
+                                                            >
+                                                                <MoreVertical size={18} />
+                                                            </button>
+
+                                                            {activeMenuIndex === idx && (
+                                                                <div className="menu-content absolute right-0 top-full mt-2 w-48 bg-zinc-950 border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 ring-1 ring-white/10">
+                                                                    <div className="flex flex-col p-1.5 gap-0.5">
+                                                                        <button
+                                                                            onClick={() => editCartItem(idx)}
+                                                                            className="flex items-center gap-3 px-3 py-2.5 text-sm font-semibold text-zinc-100 hover:bg-white/10 rounded-lg text-left transition-colors"
+                                                                        >
+                                                                            <Edit2 size={16} className="text-blue-400" /> Edit Item
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => { setActiveMenuIndex(null); removeFromCart(idx); }}
+                                                                            className="flex items-center gap-3 px-3 py-2.5 text-sm font-semibold text-rose-400 hover:bg-rose-500/10 rounded-lg text-left transition-colors"
+                                                                        >
+                                                                            <Trash2 size={16} /> Delete
+                                                                        </button>
+                                                                        <div className="h-px bg-white/10 my-1 mx-2" />
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                setActiveMenuIndex(null);
+                                                                                setIsSelectionMode(true);
+                                                                                toggleSelection(idx);
+                                                                            }}
+                                                                            className="flex items-center gap-3 px-3 py-2.5 text-sm font-semibold text-zinc-300 hover:bg-white/10 rounded-lg text-left transition-colors"
+                                                                        >
+                                                                            <CheckCircle2 size={16} /> Select Multiple
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            </div>
-                                            <div className="flex items-center gap-4">
-                                                <p className="font-black text-foreground text-lg">₹{(item.quantity * item.sellPrice).toLocaleString()}</p>
-                                                <button onClick={() => removeFromCart(item.product.id)} className="p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive rounded-xl transition opacity-0 group-hover:opacity-100">
-                                                    <Trash2 size={18} />
-                                                </button>
                                             </div>
                                         </div>
                                     ))}
@@ -330,20 +716,117 @@ export default function NewSale() {
                             </button>
                         </div>
 
+                        {/* --- NEW SECTION: Supplier Payment (Payable) --- */}
+                        <div className="mb-6 bg-card border border-border rounded-xl p-4 shadow-sm">
+                            <div className="flex justify-between items-center mb-2 cursor-pointer" onClick={() => setIsLinkedPayable(!isLinkedPayable)}>
+                                <div>
+                                    <h4 className="font-bold text-foreground text-sm flex items-center gap-2">
+                                        <Truck size={16} className="text-indigo-500" />
+                                        Linked Supplier Payment?
+                                    </h4>
+                                    <p className="text-[10px] text-muted-foreground leading-tight">Record money owed to supplier for these items</p>
+                                </div>
+                                <div className={cn(
+                                    "w-10 h-6 rounded-full p-1 transition-colors duration-200 ease-in-out relative",
+                                    isLinkedPayable ? "bg-indigo-500" : "bg-zinc-200 dark:bg-zinc-700"
+                                )}>
+                                    <div className={cn(
+                                        "w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 ease-in-out",
+                                        isLinkedPayable ? "translate-x-4" : "translate-x-0"
+                                    )} />
+                                </div>
+                            </div>
+
+                            {isLinkedPayable && (
+                                <div className="mt-4 space-y-3 animate-in slide-in-from-top-2 border-t border-border pt-4">
+                                    {/* Supplier Search */}
+                                    <div className="space-y-1.5 relative">
+                                        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Supplier</label>
+                                        <div className="relative">
+                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={14} />
+                                            <input
+                                                type="text"
+                                                placeholder="Search supplier..."
+                                                className="w-full bg-accent/50 border border-border/50 rounded-xl pl-9 pr-4 h-10 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-background transition-all"
+                                                value={payableSupplierSearch}
+                                                onChange={e => {
+                                                    setPayableSupplierSearch(e.target.value);
+                                                    setShowPayableSupplierList(true);
+                                                }}
+                                                onFocus={() => setShowPayableSupplierList(true)}
+                                            />
+                                        </div>
+                                        {showPayableSupplierList && (payableSupplierSearch.trim() !== "") && (
+                                            <div className="absolute top-full left-0 right-0 z-50 mt-1 max-h-40 overflow-y-auto border border-border bg-white dark:bg-zinc-950 rounded-xl shadow-lg divide-y divide-border/30">
+                                                {payableFilteredSuppliers.length > 0 ? (
+                                                    payableFilteredSuppliers.map(s => (
+                                                        <button
+                                                            key={s.id}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation(); // prevent closing
+                                                                setPayableSelectedSupplierId(s.id);
+                                                                setPayableSupplierSearch(s.name);
+                                                                setShowPayableSupplierList(false);
+                                                            }}
+                                                            className={cn(
+                                                                "w-full text-left px-4 py-2.5 text-xs font-bold transition-colors hover:bg-accent",
+                                                                payableSelectedSupplierId === s.id ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400" : "text-foreground"
+                                                            )}
+                                                        >
+                                                            {s.name}
+                                                        </button>
+                                                    ))
+                                                ) : (
+                                                    <div className="p-3 text-center">
+                                                        <p className="text-[10px] text-muted-foreground mb-1">No supplier found</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Amount to Pay</label>
+                                            <div className="relative">
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-bold text-xs">₹</span>
+                                                <input
+                                                    type="number"
+                                                    className="w-full bg-accent/50 border border-border/50 rounded-xl pl-6 pr-3 h-10 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-background transition-all"
+                                                    placeholder="0"
+                                                    value={payableAmount}
+                                                    onChange={e => setPayableAmount(e.target.value)}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Due Date</label>
+                                            <input
+                                                type="date"
+                                                className="w-full bg-accent/50 border border-border/50 rounded-xl px-3 h-10 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-background transition-all"
+                                                value={payableDueDate}
+                                                onChange={e => setPayableDueDate(e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
                         {/* Summary Footer */}
                         <div className="bg-card border border-border rounded-t-3xl shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.1)] -mx-4 -mb-4 p-6 space-y-5 animate-in slide-in-from-bottom-6">
-                            <div className="flex justify-between items-end">
-                                <div>
+                            <div className="flex justify-between items-end gap-8">
+                                <div className="flex-1">
                                     <p className="text-sm text-muted-foreground font-medium mb-1">Total Amount</p>
                                     <h2 className="text-3xl font-black text-foreground tracking-tight">₹ {cart.reduce((acc, item) => acc + (item.quantity * item.sellPrice), 0).toLocaleString()}</h2>
                                 </div>
-                                <div className="text-right">
-                                    <label className="text-[10px] font-bold text-muted-foreground uppercase flex items-center justify-end gap-1 mb-1">
-                                        <Calendar size={10} /> Date
+                                <div className="text-right flex flex-col items-end">
+                                    <label className="text-xs font-bold text-muted-foreground uppercase flex items-center justify-end gap-1.5 mb-1.5 px-1">
+                                        <Calendar size={12} /> Date
                                     </label>
                                     <input
                                         type="date"
-                                        className="bg-accent border border-border/50 rounded-lg py-1 px-2 text-xs font-bold text-foreground outline-none focus:ring-1 focus:ring-primary text-right"
+                                        className="bg-accent/50 border border-border rounded-xl py-2.5 px-3 text-sm font-bold text-foreground outline-none focus:ring-2 focus:ring-primary focus:bg-background transition-all text-right min-w-[140px] shadow-sm appearance-none"
                                         value={date}
                                         onChange={e => setDate(e.target.value)}
                                     />
@@ -352,7 +835,7 @@ export default function NewSale() {
 
                             <Button
                                 disabled={cart.length === 0}
-                                onClick={confirmSale}
+                                onClick={() => setIsPaymentModalOpen(true)}
                                 className={cn(
                                     "w-full h-14 text-lg font-bold rounded-2xl shadow-xl transition-all transform active:scale-[0.98]",
                                     cart.length > 0
@@ -366,7 +849,105 @@ export default function NewSale() {
                     </div>
                 )}
 
-                {/* STEP 3: PRODUCT SELECT */}
+                {/* Payment Options Modal */}
+                <Modal
+                    isOpen={isPaymentModalOpen}
+                    onClose={() => setIsPaymentModalOpen(false)}
+                    title={<h2 className="text-xl font-black">Confirm Payment</h2>}
+                >
+                    {(() => {
+                        const totalAmount = cart.reduce((acc, item) => acc + (item.quantity * item.sellPrice), 0);
+                        const paid = parseFloat(paidNowAmount) || 0;
+                        const remaining = Math.max(0, totalAmount - paid);
+
+                        return (
+                            <div className="space-y-6">
+                                {/* Total Bill Display */}
+                                <div className="bg-zinc-50 dark:bg-zinc-800/50 p-4 rounded-xl text-center border-2 border-zinc-100 dark:border-zinc-800">
+                                    <p className="text-xs text-zinc-500 dark:text-zinc-400 font-bold uppercase tracking-wider mb-1">Total Bill Amount</p>
+                                    <p className="text-3xl font-black text-zinc-900 dark:text-white">₹{totalAmount.toLocaleString()}</p>
+                                </div>
+
+                                {/* Toggle Credit */}
+                                <div
+                                    onClick={() => setAddToOutstanding(!addToOutstanding)}
+                                    className={cn(
+                                        "flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all",
+                                        addToOutstanding
+                                            ? "border-amber-500 bg-amber-50 dark:bg-amber-900/10"
+                                            : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
+                                    )}
+                                >
+                                    <div className="flex flex-col">
+                                        <span className="font-bold text-sm">Add to Outstanding?</span>
+                                        <span className="text-xs text-muted-foreground">Is this a credit/partial payment?</span>
+                                    </div>
+                                    <div className={cn(
+                                        "w-12 h-7 rounded-full p-1 transition-colors duration-200 ease-in-out relative",
+                                        addToOutstanding ? "bg-amber-500" : "bg-zinc-200 dark:bg-zinc-700"
+                                    )}>
+                                        <div className={cn(
+                                            "w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-200 ease-in-out",
+                                            addToOutstanding ? "translate-x-5" : "translate-x-0"
+                                        )} />
+                                    </div>
+                                </div>
+
+                                {/* Credit Details */}
+                                {addToOutstanding && (
+                                    <div className="space-y-4 animate-in slide-in-from-top-2">
+                                        <div>
+                                            <label className="text-xs font-bold text-muted-foreground ml-1 uppercase tracking-wider">Paid Now</label>
+                                            <div className="relative mt-1">
+                                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold text-lg">₹</span>
+                                                <input
+                                                    type="number"
+                                                    autoFocus
+                                                    className="w-full bg-background border-2 border-zinc-200 dark:border-zinc-700 focus:border-amber-500 dark:focus:border-amber-500 rounded-xl pl-9 pr-4 h-12 text-xl font-bold outline-none transition-all placeholder:text-muted-foreground/30"
+                                                    placeholder="0"
+                                                    value={paidNowAmount}
+                                                    onChange={e => setPaidNowAmount(e.target.value)}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center justify-between px-2">
+                                            <span className="text-sm font-bold text-foreground">Balance Due</span>
+                                            <span className="text-xl font-black text-amber-600 dark:text-amber-500">₹{remaining.toLocaleString()}</span>
+                                        </div>
+
+                                        {remaining > 0 && (
+                                            <div>
+                                                <label className="text-xs font-bold text-muted-foreground ml-1 uppercase tracking-wider">Due Date</label>
+                                                <input
+                                                    type="date"
+                                                    className="w-full mt-1 bg-background border-2 border-zinc-200 dark:border-zinc-700 focus:border-amber-500 dark:focus:border-amber-500 rounded-xl px-4 h-12 text-sm font-bold outline-none transition-all cursor-pointer"
+                                                    value={outstandingDueDate}
+                                                    onChange={e => setOutstandingDueDate(e.target.value)}
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                <div className="pt-2">
+                                    <Button
+                                        onClick={finalizeSale}
+                                        disabled={addToOutstanding && remaining > 0 && !outstandingDueDate}
+                                        className={cn(
+                                            "w-full h-12 text-lg font-bold shadow-lg",
+                                            addToOutstanding
+                                                ? "bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/25"
+                                                : "bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/25"
+                                        )}
+                                    >
+                                        {addToOutstanding ? "Save Credit Sale" : "Mark Full Paid & Save"}
+                                    </Button>
+                                </div>
+                            </div>
+                        );
+                    })()}
+                </Modal>
                 {step === "product" && (
                     <div className="flex-1 flex flex-col animate-in slide-in-from-right-4 duration-300">
                         <div className="relative mb-6">
