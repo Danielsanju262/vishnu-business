@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Fingerprint, Lock, KeyRound, Loader2, AlertTriangle, ShieldAlert } from 'lucide-react';
+import { Fingerprint, Lock, KeyRound, Loader2, ShieldAlert } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 
