@@ -111,7 +111,7 @@ export default function PaymentReminders() {
     }, [migrateLocalStorageToSupabase, toast]);
 
     // Setup real-time subscription for payment_reminders table
-    const { isConnected } = useRealtimeTable('payment_reminders', loadData, []);
+    const { isConnected, isPolling } = useRealtimeTable('payment_reminders', loadData, []);
 
     // Also subscribe to customers for real-time customer updates
     useEffect(() => {
@@ -380,7 +380,7 @@ export default function PaymentReminders() {
                                                 : "bg-amber-100 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400"
                                         )}>
                                             {isConnected ? <Wifi size={10} /> : <WifiOff size={10} />}
-                                            {isConnected ? "Live" : "Offline"}
+                                            {isConnected ? (isPolling ? "Sync" : "Live") : "Offline"}
                                         </div>
                                     </div>
                                 </div>

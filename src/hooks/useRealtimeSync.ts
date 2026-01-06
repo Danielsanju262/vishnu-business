@@ -4,23 +4,29 @@ import { RealtimeChannel } from '@supabase/supabase-js';
 
 type TableName = 'customers' | 'products' | 'transactions' | 'expenses' | 'expense_presets' | 'payment_reminders';
 
+// Configuration - set to true to use Supabase Realtime (requires paid plan or free tier limits)
+// Set to false to use polling (works on any plan, completely free)
+const USE_REALTIME = false;
+const POLLING_INTERVAL_MS = 5000; // Poll every 5 seconds when not using realtime
+
 interface UseRealtimeSyncOptions {
     tables: TableName[];
     onDataChange: (table: TableName, payload: any) => void;
 }
 
 /**
- * Custom hook for real-time synchronization across devices using Supabase Realtime
+ * Custom hook for real-time synchronization across devices
  * 
- * This hook subscribes to changes in specified database tables and triggers
- * callbacks when INSERT, UPDATE, or DELETE events occur, enabling live updates
- * across all connected devices without requiring page reload.
+ * This hook supports two modes:
+ * 1. Supabase Realtime (WebSocket) - instant updates, may require paid plan
+ * 2. Polling (free) - checks for updates every few seconds, works on any plan
  */
 export function useRealtimeSync({ tables, onDataChange }: UseRealtimeSyncOptions) {
     const channelRef = useRef<RealtimeChannel | null>(null);
     const [isConnected, setIsConnected] = useState(false);
+    const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-    const setupSubscription = useCallback(() => {
+    const setupRealtimeSubscription = useCallback(() => {
         // Create a unique channel name
         const channelName = `realtime-sync-${Date.now()}`;
 
@@ -76,20 +82,44 @@ export function useRealtimeSync({ tables, onDataChange }: UseRealtimeSyncOptions
         channelRef.current = channel;
     }, [tables, onDataChange]);
 
+    const setupPolling = useCallback(() => {
+        // Initial state - we're "connected" via polling
+        setIsConnected(true);
+
+        // Set up polling interval
+        pollingIntervalRef.current = setInterval(() => {
+            console.log(`[Polling] Checking for updates...`);
+            // Trigger a change event for each table to force refetch
+            tables.forEach(table => {
+                onDataChange(table, { event: 'POLL', polled: true });
+            });
+        }, POLLING_INTERVAL_MS);
+
+        console.log(`[Polling] Started with ${POLLING_INTERVAL_MS}ms interval`);
+    }, [tables, onDataChange]);
+
     useEffect(() => {
-        setupSubscription();
+        if (USE_REALTIME) {
+            setupRealtimeSubscription();
+        } else {
+            setupPolling();
+        }
 
         // Cleanup on unmount
         return () => {
             if (channelRef.current) {
                 supabase.removeChannel(channelRef.current);
                 channelRef.current = null;
-                setIsConnected(false);
             }
+            if (pollingIntervalRef.current) {
+                clearInterval(pollingIntervalRef.current);
+                pollingIntervalRef.current = null;
+            }
+            setIsConnected(false);
         };
-    }, [setupSubscription]);
+    }, [setupRealtimeSubscription, setupPolling]);
 
-    return { isConnected };
+    return { isConnected, isPolling: !USE_REALTIME };
 }
 
 /**
@@ -101,13 +131,22 @@ export function useRealtimeTable(
     deps: React.DependencyList = []
 ) {
     const isInitialMount = useRef(true);
+    const lastFetchTime = useRef(Date.now());
 
     const handleChange = useCallback(() => {
         // Skip refetch on initial mount since we already fetch data in useEffect
         if (isInitialMount.current) {
             return;
         }
-        console.log(`[Realtime] Refetching ${tableName} due to change...`);
+
+        // Throttle polling refetches to avoid too many requests
+        const now = Date.now();
+        if (now - lastFetchTime.current < 2000) {
+            return; // Skip if last fetch was less than 2 seconds ago
+        }
+
+        console.log(`[Sync] Refetching ${tableName} due to change...`);
+        lastFetchTime.current = now;
         fetchData();
     }, [tableName, fetchData]);
 
@@ -115,7 +154,7 @@ export function useRealtimeTable(
         isInitialMount.current = false;
     }, []);
 
-    const { isConnected } = useRealtimeSync({
+    const { isConnected, isPolling } = useRealtimeSync({
         tables: [tableName],
         onDataChange: handleChange,
     });
@@ -125,7 +164,7 @@ export function useRealtimeTable(
         fetchData();
     }, deps);
 
-    return { isConnected };
+    return { isConnected, isPolling };
 }
 
 /**
@@ -137,12 +176,21 @@ export function useRealtimeTables(
     deps: React.DependencyList = []
 ) {
     const isInitialMount = useRef(true);
+    const lastFetchTime = useRef(Date.now());
 
     const handleChange = useCallback((table: TableName) => {
         if (isInitialMount.current) {
             return;
         }
-        console.log(`[Realtime] Refetching data due to change in ${table}...`);
+
+        // Throttle polling refetches to avoid too many requests
+        const now = Date.now();
+        if (now - lastFetchTime.current < 2000) {
+            return; // Skip if last fetch was less than 2 seconds ago
+        }
+
+        console.log(`[Sync] Refetching data due to change in ${table}...`);
+        lastFetchTime.current = now;
         fetchData();
     }, [fetchData]);
 
@@ -150,7 +198,7 @@ export function useRealtimeTables(
         isInitialMount.current = false;
     }, []);
 
-    const { isConnected } = useRealtimeSync({
+    const { isConnected, isPolling } = useRealtimeSync({
         tables: tableNames,
         onDataChange: handleChange,
     });
@@ -160,5 +208,5 @@ export function useRealtimeTables(
         fetchData();
     }, deps);
 
-    return { isConnected };
+    return { isConnected, isPolling };
 }
