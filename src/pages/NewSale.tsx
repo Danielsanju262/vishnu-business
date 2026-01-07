@@ -656,21 +656,23 @@ export default function NewSale() {
                         </div>
 
                         {isAddingNew ? (
-                            <div className="bg-primary/5 p-5 rounded-3xl border border-primary/20 mb-4 animate-in zoom-in-95">
-                                <h3 className="font-bold text-sm text-foreground mb-4 flex items-center gap-2">
+                            <div className="bg-primary/5 p-4 md:p-5 rounded-3xl border border-primary/20 mb-4 animate-in zoom-in-95">
+                                <h3 className="font-bold text-sm text-foreground mb-3 flex items-center gap-2">
                                     <User size={16} className="text-primary" />
                                     Add New Customer
                                 </h3>
-                                <div className="flex gap-2">
+                                <div className="flex flex-col gap-2">
                                     <input
-                                        className="flex-1 bg-background border border-border/50 rounded-xl px-4 py-3.5 md:py-3 outline-none focus:border-primary font-medium h-14 md:h-auto"
+                                        className="w-full bg-background border border-border/50 rounded-xl px-4 py-3.5 md:py-3 outline-none focus:border-primary font-medium h-14 md:h-auto"
                                         placeholder="Enter Name"
                                         value={newItemName}
                                         onChange={e => setNewItemName(e.target.value)}
                                         autoFocus
                                     />
-                                    <Button size="sm" onClick={handleAddCustomer} className="bg-primary text-primary-foreground shadow-lg shadow-primary/25 rounded-xl font-bold px-6">Save</Button>
-                                    <Button size="sm" variant="ghost" onClick={() => setIsAddingNew(false)} className="rounded-xl px-3 hover:bg-destructive/10 hover:text-destructive"><X size={20} /></Button>
+                                    <div className="flex gap-2">
+                                        <Button size="sm" onClick={handleAddCustomer} className="flex-1 bg-primary text-primary-foreground shadow-lg shadow-primary/25 rounded-xl font-bold h-12 md:h-auto">Save</Button>
+                                        <Button size="sm" variant="ghost" onClick={() => setIsAddingNew(false)} className="rounded-xl px-4 hover:bg-destructive/10 hover:text-destructive h-12 md:h-auto"><X size={20} /></Button>
+                                    </div>
                                 </div>
                             </div>
                         ) : (

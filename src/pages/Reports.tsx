@@ -606,7 +606,7 @@ export default function Reports() {
 
                                 {rangeType === 'custom' && (
                                     <div className="bg-card p-4 rounded-xl border border-border shadow-sm flex flex-col gap-3">
-                                        <div className="flex gap-3">
+                                        <div className="flex flex-col md:flex-row gap-3">
                                             <div className="flex-1">
                                                 <label className="text-[10px] font-bold text-muted-foreground uppercase mb-1 block ml-1">Start Date</label>
                                                 <input
