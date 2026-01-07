@@ -5,6 +5,7 @@ import './index.css'
 import App from './App.tsx'
 import { ThemeProvider } from "./components/theme-provider"
 import { ToastProvider } from "./components/toast-provider"
+import { GoogleOAuthProvider } from '@react-oauth/google';
 
 // Prevent zooming on mobile devices
 document.addEventListener('gesturestart', (e) => {
@@ -28,10 +29,12 @@ const updateSW = registerSW({
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
-      <ToastProvider>
-        <App />
-      </ToastProvider>
-    </ThemeProvider>
+    <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID || ""}>
+      <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
+        <ToastProvider>
+          <App />
+        </ToastProvider>
+      </ThemeProvider>
+    </GoogleOAuthProvider>
   </StrictMode>,
 )

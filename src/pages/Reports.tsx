@@ -20,7 +20,8 @@ export default function Reports() {
     const [rangeType, setRangeType] = useState<DateRangeType>("today");
     const [showFilters, setShowFilters] = useState(false);
     const filterButtonRef = useRef<HTMLButtonElement>(null);
-    useDropdownClose(showFilters, () => setShowFilters(false), filterButtonRef);
+    const filterPanelRef = useRef<HTMLDivElement>(null);
+    useDropdownClose(showFilters, () => setShowFilters(false), filterButtonRef, filterPanelRef);
     const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
     const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
 
@@ -577,7 +578,7 @@ export default function Reports() {
 
                         {/* Filter Panel */}
                         {showFilters && (
-                            <div className="animate-in slide-in-from-top-2 space-y-3 p-1">
+                            <div ref={filterPanelRef} className="animate-in slide-in-from-top-2 space-y-3 p-1 relative z-50">
                                 <div className="flex flex-wrap gap-2">
                                     {ranges.map(r => (
                                         <button

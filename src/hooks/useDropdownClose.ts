@@ -8,11 +8,23 @@ import { useEffect, useCallback } from "react";
  * @param isOpen - Whether the dropdown is currently open
  * @param onClose - Function to close the dropdown
  */
-export function useDropdownClose<T extends HTMLElement>(isOpen: boolean, onClose: () => void, ignoreRef?: React.RefObject<T | null>) {
+export function useDropdownClose<T extends HTMLElement>(
+    isOpen: boolean,
+    onClose: () => void,
+    ignoreRef?: React.RefObject<T | null>,
+    additionalRefs: React.RefObject<HTMLElement | null>[] = []
+) {
     // Handle click/touch outside
     const handleClickOutside = useCallback((event: MouseEvent | TouchEvent) => {
+        const target = event.target as Node;
+
         // If an ignoreRef is provided, check if the click was inside it
-        if (ignoreRef?.current && ignoreRef.current.contains(event.target as Node)) {
+        if (ignoreRef?.current && ignoreRef.current.contains(target)) {
+            return;
+        }
+
+        // Check additional refs
+        if (additionalRefs.some(ref => ref.current && ref.current.contains(target))) {
             return;
         }
 
@@ -21,7 +33,7 @@ export function useDropdownClose<T extends HTMLElement>(isOpen: boolean, onClose
         if (isOpen) {
             onClose();
         }
-    }, [isOpen, onClose, ignoreRef]);
+    }, [isOpen, onClose, ignoreRef, additionalRefs]);
 
     // Handle ESC key
     const handleKeyDown = useCallback((event: KeyboardEvent) => {

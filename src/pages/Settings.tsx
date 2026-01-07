@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import Papa from "papaparse";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Database, Shield, Lock, Check, Fingerprint, LogOut, KeyRound, Loader2, Smartphone, Trash2, AlertTriangle, ShieldCheck, Clock, Mail, Download, Upload, ChevronDown } from "lucide-react";
+import { ArrowLeft, Database, Shield, Lock, Check, Fingerprint, LogOut, KeyRound, Loader2, Smartphone, Trash2, AlertTriangle, ShieldCheck, Clock, Mail, Download, Upload, ChevronDown, Cloud } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { cn } from "../lib/utils";
 import { Button } from "../components/ui/Button";
@@ -9,6 +9,7 @@ import { Input } from "../components/ui/Input";
 import { supabase } from "../lib/supabase";
 import { useToast } from "../components/toast-provider";
 import { Modal } from "../components/ui/Modal";
+import { GoogleDriveBackup } from "../components/GoogleDriveBackup";
 
 // Collapsible Section Component
 const CollapsibleSection = ({
@@ -730,9 +731,21 @@ export default function Settings() {
                     )}
                 </CollapsibleSection>
 
+                {/* Backup & Restore (Google Drive) */}
+                <CollapsibleSection
+                    title="Cloud Backup"
+                    icon={Cloud}
+                    headerClassName="bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400"
+                >
+                    <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-5 leading-relaxed">
+                        Securely backup your entire business data to Google Drive. Restoring from a backup will <span className="font-semibold text-rose-500">RESET</span> the app to that exact state (deleting newer data).
+                    </p>
+                    <GoogleDriveBackup />
+                </CollapsibleSection>
+
                 {/* Data Card - Enhanced with improved styling */}
                 <CollapsibleSection
-                    title="Data"
+                    title="Data Export (CSV)"
                     icon={Database}
                     headerClassName="bg-cyan-100 dark:bg-cyan-500/20 text-cyan-600 dark:text-cyan-400"
                 >

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { Button } from "../components/ui/Button";
-import { ArrowLeft, ChevronRight, Package, Search, Plus, Trash2, ShoppingCart, User, X, ArrowRight, Calendar, MoreVertical, Edit2, CheckCircle2, Circle, Truck } from "lucide-react";
+import { ArrowLeft, ChevronRight, Package, Plus, Trash2, ShoppingCart, User, X, ArrowRight, Calendar, MoreVertical, Edit2, CheckCircle2, Circle } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useToast } from "../components/toast-provider";
 import { useRealtimeTables } from "../hooks/useRealtimeSync";
@@ -948,7 +948,7 @@ export default function NewSale() {
                             >
                                 <div>
                                     <h4 className="font-bold text-foreground text-sm flex items-center gap-2">
-                                        <Truck size={16} className="text-indigo-500" />
+                                        <Package size={16} className="text-indigo-500" />
                                         Linked Supplier Payment?
                                     </h4>
                                     <p className="text-[10px] text-muted-foreground leading-tight">Record money owed to supplier for these items</p>
@@ -970,11 +970,10 @@ export default function NewSale() {
                                     <div className="space-y-1.5 relative">
                                         <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Supplier</label>
                                         <div className="relative">
-                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={14} />
                                             <input
                                                 type="text"
                                                 placeholder="Search supplier..."
-                                                className="w-full bg-accent/50 border border-border/50 rounded-xl pl-9 pr-4 h-12 text-xs md:text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-background transition-all"
+                                                className="w-full bg-accent/50 border border-border/50 rounded-xl px-4 h-12 text-xs md:text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-background transition-all"
                                                 value={payableSupplierSearch}
                                                 onChange={e => {
                                                     setPayableSupplierSearch(e.target.value);
@@ -1016,12 +1015,11 @@ export default function NewSale() {
                                         <div className="space-y-1.5">
                                             <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Amount to Pay</label>
                                             <div className="relative">
-                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-bold text-xs">₹</span>
                                                 <input
                                                     type="number"
                                                     min="0"
                                                     step="0.01"
-                                                    className="w-full bg-accent/50 border border-border/50 rounded-xl pl-6 pr-3 h-12 text-xs md:text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-background transition-all"
+                                                    className="w-full bg-accent/50 border border-border/50 rounded-xl px-3 h-12 text-xs md:text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-background transition-all"
                                                     placeholder="0"
                                                     value={payableAmount}
                                                     onChange={e => setPayableAmount(e.target.value)}
