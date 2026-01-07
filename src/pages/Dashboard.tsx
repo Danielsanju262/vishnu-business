@@ -1,19 +1,18 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../lib/supabase";
-import { Plus, Minus, TrendingUp, Users, Package, FileText, ChevronRight, Edit3, Check, LogOut, Truck } from "lucide-react";
+import { Plus, Minus, TrendingUp, Users, Package, FileText, ChevronRight, Edit3, Check, LogOut, Truck, Calendar, ChevronDown } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import { format, subDays } from "date-fns";
+import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 import { Link } from "react-router-dom";
 import { cn } from "../lib/utils";
 import { useRealtimeTables } from "../hooks/useRealtimeSync";
+import { Modal } from "../components/ui/Modal";
 
 export default function Dashboard() {
     const { lockApp } = useAuth();
     const [stats, setStats] = useState({
-        todayRevenue: 0,
-        todayProfit: 0,
-        yesterdayRevenue: 0,
-        yesterdayProfit: 0,
+        revenue: 0,
+        profit: 0,
     });
 
     const [userName, setUserName] = useState("Vishnu");
@@ -21,9 +20,28 @@ export default function Dashboard() {
     const [isLoadingStats, setIsLoadingStats] = useState(true);
     const [statsError, setStatsError] = useState<string | null>(null);
 
+    // Date Filter State
+    const [dateFilter, setDateFilter] = useState("today"); // 'today', 'yesterday', 'thisWeek', 'thisMonth', 'custom'
+    const [customDateRange, setCustomDateRange] = useState({
+        start: format(new Date(), 'yyyy-MM-dd'),
+        end: format(new Date(), 'yyyy-MM-dd')
+    });
+    const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+    const [showCustomDateModal, setShowCustomDateModal] = useState(false);
+    const dropdownRef = useRef<HTMLDivElement>(null);
+
     useEffect(() => {
         const storedName = localStorage.getItem("dashboard_username");
         if (storedName) setUserName(storedName);
+
+        // Click outside to close dropdown
+        const handleClickOutside = (event: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setShowFilterDropdown(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
     const calculateProfit = (transactions: any[], expenses: any[]) => {
@@ -52,39 +70,63 @@ export default function Dashboard() {
         return { revenue, netProfit };
     }
 
+    const getDateRange = useCallback(() => {
+        const now = new Date();
+        const todayStr = format(now, 'yyyy-MM-dd');
+
+        switch (dateFilter) {
+            case 'today':
+                return { start: todayStr, end: todayStr };
+            case 'yesterday':
+                const yest = format(subDays(now, 1), 'yyyy-MM-dd');
+                return { start: yest, end: yest };
+            case 'thisWeek':
+                return {
+                    start: format(startOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd'),
+                    end: format(endOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd')
+                };
+            case 'thisMonth':
+                return {
+                    start: format(startOfMonth(now), 'yyyy-MM-dd'),
+                    end: format(endOfMonth(now), 'yyyy-MM-dd')
+                };
+            case 'custom':
+                return customDateRange;
+            default:
+                return { start: todayStr, end: todayStr };
+        }
+    }, [dateFilter, customDateRange]);
+
     const fetchStats = useCallback(async () => {
         try {
             setIsLoadingStats(true);
             setStatsError(null);
 
-            const today = new Date().toISOString().split('T')[0];
-            const yesterday = subDays(new Date(), 1).toISOString().split('T')[0];
+            const { start, end } = getDateRange();
 
-            // Fetch Today
-            const { data: tToday, error: tTodayError } = await supabase.from('transactions').select('*').is('deleted_at', null).eq('date', today);
-            const { data: eToday, error: eTodayError } = await supabase.from('expenses').select('*').is('deleted_at', null).eq('date', today);
+            let tQuery = supabase.from('transactions').select('*').is('deleted_at', null);
+            let eQuery = supabase.from('expenses').select('*').is('deleted_at', null);
 
-            if (tTodayError || eTodayError) {
-                throw new Error('Failed to fetch today\'s data');
+            if (start === end) {
+                tQuery = tQuery.eq('date', start);
+                eQuery = eQuery.eq('date', start);
+            } else {
+                tQuery = tQuery.gte('date', start).lte('date', end);
+                eQuery = eQuery.gte('date', start).lte('date', end);
             }
 
-            const statToday = calculateProfit(tToday || [], eToday || []);
+            const { data: transactions, error: tError } = await tQuery;
+            const { data: expenses, error: eError } = await eQuery;
 
-            // Fetch Yesterday
-            const { data: tYest, error: tYestError } = await supabase.from('transactions').select('*').is('deleted_at', null).eq('date', yesterday);
-            const { data: eYest, error: eYestError } = await supabase.from('expenses').select('*').is('deleted_at', null).eq('date', yesterday);
-
-            if (tYestError || eYestError) {
-                throw new Error('Failed to fetch yesterday\'s data');
+            if (tError || eError) {
+                throw new Error('Failed to fetch data');
             }
 
-            const statYest = calculateProfit(tYest || [], eYest || []);
+            const { revenue, netProfit } = calculateProfit(transactions || [], expenses || []);
 
             setStats({
-                todayRevenue: statToday.revenue,
-                todayProfit: statToday.netProfit,
-                yesterdayRevenue: statYest.revenue,
-                yesterdayProfit: statYest.netProfit,
+                revenue,
+                profit: netProfit,
             });
         } catch (error) {
             console.error('Failed to fetch stats:', error);
@@ -92,10 +134,10 @@ export default function Dashboard() {
         } finally {
             setIsLoadingStats(false);
         }
-    }, []);
+    }, [getDateRange]);
 
-    // Real-time sync for transactions and expenses - auto-refreshes stats when data changes on any device
-    useRealtimeTables(['transactions', 'expenses'], fetchStats, []);
+    // Real-time sync for transactions and expenses
+    useRealtimeTables(['transactions', 'expenses'], fetchStats, [fetchStats]);
 
     // Grayscale palette for dark mode icons
     const menuItems = [
@@ -108,10 +150,13 @@ export default function Dashboard() {
     return (
         <div className="space-y-6 px-4 pt-6 pb-28 md:px-6 md:pt-8 md:pb-32 w-full md:max-w-lg md:mx-auto animate-in fade-in">
             {/* Header */}
-            <div className="flex justify-between items-end mb-6 md:mb-8">
-                <div className="flex-1">
-                    <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-[0.15em] mb-2">{format(new Date(), "EEEE, MMM d")}</p>
-                    <div className="flex items-center gap-2 group">
+            <div className="space-y-4">
+                {/* Date at top */}
+                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-[0.15em]">{format(new Date(), "EEEE, MMM d")}</p>
+
+                {/* Welcome message with edit and logout */}
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 group flex-1">
                         {isEditingName ? (
                             <div className="flex items-center gap-3">
                                 <input
@@ -143,7 +188,7 @@ export default function Dashboard() {
                                 </button>
                             </div>
                         ) : (
-                            <div className="flex items-center gap-3">
+                            <>
                                 <h1 className="text-2xl font-bold text-foreground tracking-tight leading-tight">
                                     Welcome back, <span className="text-white">{userName}</span>
                                 </h1>
@@ -161,11 +206,11 @@ export default function Dashboard() {
                                 >
                                     <Edit3 size={18} strokeWidth={2} />
                                 </button>
-                            </div>
+                            </>
                         )}
                     </div>
-                </div>
-                <div className="flex bg-white/5 p-1 rounded-full backdrop-blur-sm border border-white/10 items-center gap-1">
+
+                    {/* Logout button */}
                     <button
                         onClick={lockApp}
                         onKeyDown={(e) => {
@@ -175,28 +220,78 @@ export default function Dashboard() {
                             }
                         }}
                         tabIndex={0}
-                        className="p-3 rounded-full hover:bg-white/10 active:bg-white/15 text-muted-foreground hover:text-white transition-all duration-200 focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                        className="p-3 rounded-full bg-white/5 hover:bg-white/10 active:bg-white/15 text-muted-foreground hover:text-white transition-all duration-200 focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background border border-white/10"
                         title="Lock App"
                         aria-label="Lock App"
                     >
                         <LogOut size={18} strokeWidth={2.5} />
                     </button>
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-white/30 to-white/10 border border-white/20" />
                 </div>
             </div>
 
+            {/* Date Filter - Outside and above the stats card */}
+            <div className="relative" ref={dropdownRef}>
+                <button
+                    onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-white/10 hover:bg-white/15 active:bg-white/20 backdrop-blur-md rounded-lg text-xs font-medium text-white transition-all border border-white/10 focus:outline-none focus:ring-2 focus:ring-white/20"
+                >
+                    <Calendar size={14} className="opacity-70" />
+                    <span>
+                        {dateFilter === 'today' && 'Today'}
+                        {dateFilter === 'yesterday' && 'Yesterday'}
+                        {dateFilter === 'thisWeek' && 'This Week'}
+                        {dateFilter === 'thisMonth' && 'This Month'}
+                        {dateFilter === 'custom' && 'Custom'}
+                    </span>
+                    <ChevronDown size={12} className={`opacity-70 transition-transform duration-200 ${showFilterDropdown ? 'rotate-180' : ''}`} />
+                </button>
+
+                {showFilterDropdown && (
+                    <div className="absolute left-0 top-full mt-2 w-40 bg-zinc-900 border border-white/10 rounded-xl shadow-xl shadow-black/50 overflow-hidden py-1.5 z-50 animate-in fade-in zoom-in-95 duration-200">
+                        {['today', 'yesterday', 'thisWeek', 'thisMonth', 'custom'].map((filter) => (
+                            <button
+                                key={filter}
+                                onClick={() => {
+                                    if (filter === 'custom') {
+                                        setShowCustomDateModal(true);
+                                        setShowFilterDropdown(false);
+                                    } else {
+                                        setDateFilter(filter);
+                                        setShowFilterDropdown(false);
+                                    }
+                                }}
+                                className={cn(
+                                    "w-full text-left px-4 py-2.5 text-xs font-medium transition-colors hover:bg-white/10 active:bg-white/15",
+                                    dateFilter === filter ? "text-emerald-400 bg-emerald-500/10" : "text-zinc-400 hover:text-zinc-200"
+                                )}
+                            >
+                                {filter === 'today' && 'Today'}
+                                {filter === 'yesterday' && 'Yesterday'}
+                                {filter === 'thisWeek' && 'This Week'}
+                                {filter === 'thisMonth' && 'This Month'}
+                                {filter === 'custom' && 'Custom Range...'}
+                            </button>
+                        ))}
+                    </div>
+                )}
+            </div>
+
             {/* Main Stats Card - Dark Mode Grayscale */}
-            <div className="relative overflow-hidden bg-gradient-to-br from-slate-700 to-slate-900 dark:from-zinc-800 dark:to-zinc-950 rounded-[1.75rem] p-6 md:p-7 shadow-2xl shadow-black/40 ring-1 ring-white/5 transition-all duration-300 hover:shadow-3xl hover:shadow-black/50 hover:ring-white/10">
-                {/* Background Icon */}
-                <div className="absolute top-0 right-0 p-6 opacity-[0.06] text-white pointer-events-none">
-                    <TrendingUp size={120} strokeWidth={1.5} />
+            <div className="relative bg-gradient-to-br from-slate-700 to-slate-900 dark:from-zinc-800 dark:to-zinc-950 rounded-[1.75rem] shadow-2xl shadow-black/40 ring-1 ring-white/5 transition-all duration-300 hover:shadow-3xl hover:shadow-black/50 hover:ring-white/10">
+                {/* Decorative Background Layer - Clipped */}
+                <div className="absolute inset-0 overflow-hidden rounded-[1.75rem] pointer-events-none">
+                    {/* Background Icon */}
+                    <div className="absolute top-0 right-0 p-6 opacity-[0.06] text-white">
+                        <TrendingUp size={120} strokeWidth={1.5} />
+                    </div>
+
+                    {/* Decorative elements */}
+                    <div className="absolute -top-12 -left-12 w-36 h-36 bg-white/5 rounded-full blur-3xl" />
+                    <div className="absolute bottom-0 right-0 w-44 h-44 bg-white/3 rounded-full blur-3xl" />
                 </div>
 
-                {/* Decorative elements */}
-                <div className="absolute -top-12 -left-12 w-36 h-36 bg-white/5 rounded-full blur-3xl" />
-                <div className="absolute bottom-0 right-0 w-44 h-44 bg-white/3 rounded-full blur-3xl" />
 
-                <div className="relative z-10 space-y-6">
+                <div className="relative z-10 space-y-6  p-6 md:p-7">
                     {isLoadingStats ? (
                         // Loading Skeleton
                         <div className="space-y-5 animate-pulse">
@@ -228,22 +323,28 @@ export default function Dashboard() {
                         <>
                             <div className="grid grid-cols-2 gap-5 md:gap-6">
                                 <div className="space-y-2">
-                                    <p className="text-white/50 font-medium text-[10px] uppercase tracking-wider">Total Revenue</p>
+                                    <p className="text-white/50 font-medium text-[10px] uppercase tracking-wider">
+                                        {dateFilter === 'today' ? 'Revenue (Today)' :
+                                            dateFilter === 'yesterday' ? 'Revenue (Yesterday)' :
+                                                dateFilter === 'thisWeek' ? 'Revenue (This Week)' :
+                                                    dateFilter === 'thisMonth' ? 'Revenue (This Month)' :
+                                                        'Revenue (Custom)'}
+                                    </p>
                                     <h2 className="text-3xl font-bold text-white tracking-tight">
                                         <span className="text-lg align-top opacity-50 font-normal mr-0.5">₹</span>
-                                        {stats.todayRevenue.toLocaleString()}
+                                        {stats.revenue.toLocaleString()}
                                     </h2>
                                 </div>
                                 <div className="space-y-2">
                                     <p className="text-white/50 font-medium text-[10px] uppercase tracking-wider">Net Profit</p>
                                     <h2 className={cn(
                                         "text-3xl font-bold tracking-tight flex items-center gap-1",
-                                        stats.todayProfit >= 0 ? "text-emerald-400" : "text-rose-400"
+                                        stats.profit >= 0 ? "text-emerald-400" : "text-rose-400"
                                     )}>
-                                        {stats.todayProfit >= 0 ? <Plus size={22} strokeWidth={2.5} /> : <Minus size={22} strokeWidth={2.5} />}
+                                        {stats.profit >= 0 ? <Plus size={22} strokeWidth={2.5} /> : <Minus size={22} strokeWidth={2.5} />}
                                         <span>
                                             <span className="text-lg align-top opacity-60 font-normal mr-0.5">₹</span>
-                                            {Math.abs(stats.todayProfit).toLocaleString()}
+                                            {Math.abs(stats.profit).toLocaleString()}
                                         </span>
                                     </h2>
                                 </div>
@@ -316,6 +417,53 @@ export default function Dashboard() {
                     })}
                 </div>
             </div>
+            {/* Custom Date Modal */}
+            <Modal
+                isOpen={showCustomDateModal}
+                onClose={() => setShowCustomDateModal(false)}
+                title={<span className="text-lg font-bold">Select Date Range</span>}
+            >
+                <div className="space-y-5">
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">From</label>
+                            <input
+                                type="date"
+                                value={customDateRange.start}
+                                onChange={(e) => setCustomDateRange(prev => ({ ...prev, start: e.target.value }))}
+                                className="w-full bg-secondary/50 border border-border rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">To</label>
+                            <input
+                                type="date"
+                                value={customDateRange.end}
+                                onChange={(e) => setCustomDateRange(prev => ({ ...prev, end: e.target.value }))}
+                                className="w-full bg-secondary/50 border border-border rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 pt-2">
+                        <button
+                            onClick={() => setShowCustomDateModal(false)}
+                            className="flex-1 px-4 py-3 text-sm font-semibold text-muted-foreground hover:bg-secondary rounded-xl transition-all"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={() => {
+                                setDateFilter('custom');
+                                setShowCustomDateModal(false);
+                            }}
+                            className="flex-1 px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl shadow-lg shadow-emerald-900/20 active:scale-[0.98] transition-all"
+                        >
+                            Apply Filter
+                        </button>
+                    </div>
+                </div>
+            </Modal>
         </div>
     );
 }

@@ -86,35 +86,37 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             {children}
 
             {/* Toast Container */}
-            <div className="fixed top-4 right-4 z-[110] space-y-2 max-w-sm w-full">
-                {toasts.map((t) => (
-                    <div
-                        key={t.id}
-                        className={cn(
-                            "flex items-center gap-3 p-4 rounded-xl shadow-2xl border-2 animate-in slide-in-from-right relative overflow-hidden",
-                            "bg-surface-elevation-3 dark:bg-zinc-900 border-border z-[120]"
-                        )}
-                    >
-                        {getIcon(t.type)}
-                        <div className="flex-1">
-                            <p className="text-sm font-medium">{t.message}</p>
-                            {t.action && (
-                                <button
-                                    onClick={t.action.onClick}
-                                    className="mt-1.5 text-xs font-bold text-primary hover:underline block"
-                                >
-                                    {t.action.label}
-                                </button>
+            <div className="fixed top-4 left-0 right-0 z-[110] px-4 pointer-events-none">
+                <div className="max-w-sm ml-auto space-y-2 pointer-events-auto">
+                    {toasts.map((t) => (
+                        <div
+                            key={t.id}
+                            className={cn(
+                                "flex items-center gap-3 p-4 rounded-xl shadow-2xl border-2 animate-in slide-in-from-right relative overflow-hidden",
+                                "bg-surface-elevation-3 dark:bg-zinc-900 border-border z-[120]"
                             )}
-                        </div>
-                        <button
-                            onClick={() => setToasts((prev) => prev.filter((x) => x.id !== t.id))}
-                            className="text-muted-foreground hover:text-foreground p-1 self-start"
                         >
-                            <X size={16} />
-                        </button>
-                    </div>
-                ))}
+                            {getIcon(t.type)}
+                            <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium break-words">{t.message}</p>
+                                {t.action && (
+                                    <button
+                                        onClick={t.action.onClick}
+                                        className="mt-1.5 text-xs font-bold text-primary hover:underline block"
+                                    >
+                                        {t.action.label}
+                                    </button>
+                                )}
+                            </div>
+                            <button
+                                onClick={() => setToasts((prev) => prev.filter((x) => x.id !== t.id))}
+                                className="text-muted-foreground hover:text-foreground p-1 self-start flex-shrink-0"
+                            >
+                                <X size={16} />
+                            </button>
+                        </div>
+                    ))}
+                </div>
             </div>
 
             {/* Confirm Modal */}

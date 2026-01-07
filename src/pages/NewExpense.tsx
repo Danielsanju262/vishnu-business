@@ -180,25 +180,12 @@ export default function NewExpense() {
             title: `Delete "${preset.label}"?`,
             description: "This preset will be moved to trash.",
             onConfirm: async () => {
-                // Optimistic update
-                const previousPresets = [...presets];
-                setPresets(presets.filter(p => p.id !== id));
-
-                // Soft delete
                 const { error } = await supabase.from('expense_presets').update({ deleted_at: new Date().toISOString() }).eq('id', id);
 
                 if (!error) {
-                    toast("Preset deleted", "success", {
-                        label: "Undo",
-                        onClick: async () => {
-                            // Restore
-                            setPresets(previousPresets);
-                            await supabase.from('expense_presets').update({ deleted_at: null }).eq('id', id);
-                            toast("Deletion undone", "success");
-                        }
-                    }, 10000); // 10 seconds duration
+                    toast("Preset deleted", "success");
+                    fetchPresets();
                 } else {
-                    setPresets(previousPresets); // Revert on error
                     toast(`Failed to delete: ${error.message}`, "error");
                 }
             },

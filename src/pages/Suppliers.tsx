@@ -2,7 +2,7 @@ import { useState, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { Button } from "../components/ui/Button";
-import { ArrowLeft, Trash2, Plus, User, Search, Truck, MoreVertical, CheckCircle2, Circle, X, Edit2, WifiOff } from "lucide-react";
+import { ArrowLeft, Trash2, Plus, User, Truck, MoreVertical, CheckCircle2, Circle, X, Edit2, WifiOff } from "lucide-react";
 import { useToast } from "../components/toast-provider";
 import { cn } from "../lib/utils";
 import { useRealtimeTable } from "../hooks/useRealtimeSync";
@@ -117,30 +117,14 @@ export default function Suppliers() {
         setConfirmConfig({
             isOpen: true,
             title: `Delete "${name}"?`,
-            description: "This action cannot be undone immediately, but you can undo within 10 seconds.",
+            description: "This action cannot be undone.",
             onConfirm: async () => {
-                // Optimistic Remove
-                const previousSuppliers = [...suppliers];
-                setSuppliers(prev => prev.filter(s => s.id !== id));
-
                 const { error } = await supabase.from("suppliers").update({ is_active: false }).eq("id", id);
                 if (!error) {
-                    toast("Supplier deleted", "success", {
-                        label: "Undo",
-                        onClick: async () => {
-                            // Restore
-                            setSuppliers(previousSuppliers);
-                            const { error: restoreError } = await supabase.from("suppliers").update({ is_active: true }).eq("id", id);
-                            if (!restoreError) {
-                                toast("Restored", "success");
-                                fetchSuppliers();
-                            }
-                        }
-                    }, 10000);
-                } else {
-                    setSuppliers(previousSuppliers);
-                    toast("Failed to delete", "error");
+                    toast("Supplier deleted", "success");
                     fetchSuppliers();
+                } else {
+                    toast("Failed to delete", "error");
                 }
             },
             variant: "destructive",
@@ -291,11 +275,10 @@ export default function Suppliers() {
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 {!isAdding && suppliers.length > 0 && (
                     <div className="relative mb-6">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
                         <input
                             type="text"
                             placeholder="Search suppliers..."
-                            className="w-full pl-10 h-12 rounded-xl bg-accent/50 border-transparent focus:bg-background focus:border-ring transition-all"
+                            className="w-full px-4 h-12 rounded-xl bg-accent/50 border-transparent focus:bg-background focus:border-ring transition-all"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                         />

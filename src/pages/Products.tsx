@@ -2,7 +2,7 @@ import { useState, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { Button } from "../components/ui/Button";
-import { Trash2, Plus, Milk, Package, ArrowLeft, Search, Tag, Box, MoreVertical, CheckCircle2, Circle, X, Edit2 } from "lucide-react";
+import { Trash2, Plus, Milk, Package, ArrowLeft, Tag, Box, MoreVertical, CheckCircle2, Circle, X, Edit2 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useToast } from "../components/toast-provider";
 import { useRealtimeTable } from "../hooks/useRealtimeSync";
@@ -128,30 +128,14 @@ export default function Products() {
         setConfirmConfig({
             isOpen: true,
             title: `Delete "${name}"?`,
-            description: "This action cannot be undone immediately, but you can undo within 10 seconds.",
+            description: "This action cannot be undone.",
             onConfirm: async () => {
-                // Optimistic Remove
-                const previousProducts = [...products];
-                setProducts(prev => prev.filter(p => p.id !== id));
-
                 const { error } = await supabase.from("products").update({ is_active: false }).eq("id", id);
                 if (!error) {
-                    toast("Deleted product", "success", {
-                        label: "Undo",
-                        onClick: async () => {
-                            // Restore
-                            setProducts(previousProducts);
-                            const { error: restoreError } = await supabase.from("products").update({ is_active: true }).eq("id", id);
-                            if (!restoreError) {
-                                toast("Restored", "success");
-                                fetchProducts();
-                            }
-                        }
-                    }, 10000); // 10s undo
-                } else {
-                    setProducts(previousProducts); // Revert
-                    toast("Failed to delete", "error");
+                    toast("Deleted product", "success");
                     fetchProducts();
+                } else {
+                    toast("Failed to delete", "error");
                 }
             },
             variant: "destructive",
@@ -286,11 +270,10 @@ export default function Products() {
                 {/* Search Bar */}
                 {!isAdding && products.length > 0 && (
                     <div className="relative mb-6">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
                         <input
                             type="text"
                             placeholder="Search products..."
-                            className="w-full pl-10 h-12 rounded-xl bg-accent/50 border-transparent focus:bg-background focus:border-ring transition-all"
+                            className="w-full px-4 h-12 rounded-xl bg-accent/50 border-transparent focus:bg-background focus:border-ring transition-all"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                         />

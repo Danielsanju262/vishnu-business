@@ -34,6 +34,30 @@ type TransactionLog = {
     balance: number;
 };
 
+// Helper function to format date with ordinal suffix
+const formatDateWithOrdinal = (dateStr: string): string => {
+    try {
+        // Parse the date string (format: "8 Jan" or similar)
+        const parts = dateStr.trim().split(' ');
+        if (parts.length < 2) return dateStr;
+
+        const day = parseInt(parts[0]);
+        const month = parts[1];
+        const currentYear = new Date().getFullYear();
+
+        // Get ordinal suffix
+        const getOrdinal = (n: number): string => {
+            const s = ["th", "st", "nd", "rd"];
+            const v = n % 100;
+            return n + (s[(v - 20) % 10] || s[v] || s[0]);
+        };
+
+        return `${getOrdinal(day)} ${month} ${currentYear}`;
+    } catch (e) {
+        return dateStr;
+    }
+};
+
 export default function CustomerPaymentDetail() {
     const { customerId } = useParams<{ customerId: string }>();
     const navigate = useNavigate();
@@ -168,8 +192,8 @@ export default function CustomerPaymentDetail() {
                         const dateMatch = line.match(/\[(.*?)\]/);
                         if (!dateMatch) return;
                         const dateParts = dateMatch[1].split(' ');
-                        const datePart = dateParts[0] || '';
-                        const timePart = dateParts[1] || '';
+                        const datePart = dateParts.length >= 2 ? `${dateParts[0]} ${dateParts[1]}` : dateParts[0] || '';
+                        const timePart = dateParts[2] || '';
 
                         const isCreditSale = line.includes('Credit Sale:');
                         const isDueAdded = line.includes('New Due Added:');
@@ -478,8 +502,9 @@ export default function CustomerPaymentDetail() {
                     if (!dateMatch) continue;
 
                     const dateParts = dateMatch[1].split(' ');
-                    const datePart = dateParts[0] || '';
-                    const timePart = dateParts[1] || '';
+                    // Format is "8 Jan 10:30" - first two parts are date, third is time
+                    const datePart = dateParts.length >= 2 ? `${dateParts[0]} ${dateParts[1]}` : dateParts[0] || '';
+                    const timePart = dateParts[2] || '';
 
                     const isCreditSale = line.includes('Credit Sale:');
                     const isDueAdded = line.includes('New Due Added:');
@@ -640,8 +665,8 @@ export default function CustomerPaymentDetail() {
                         const dateMatch = line.match(/\[(.*?)\]/);
                         if (!dateMatch) return;
                         const dateParts = dateMatch[1].split(' ');
-                        const datePart = dateParts[0] || '';
-                        const timePart = dateParts[1] || '';
+                        const datePart = dateParts.length >= 2 ? `${dateParts[0]} ${dateParts[1]}` : dateParts[0] || '';
+                        const timePart = dateParts[2] || '';
 
                         const isCreditSale = line.includes('Credit Sale:');
                         const isDueAdded = line.includes('New Due Added:');
@@ -772,8 +797,8 @@ export default function CustomerPaymentDetail() {
                         const dateMatch = line.match(/\[(.*?)\]/);
                         if (!dateMatch) return;
                         const dateParts = dateMatch[1].split(' ');
-                        const datePart = dateParts[0] || '';
-                        const timePart = dateParts[1] || '';
+                        const datePart = dateParts.length >= 2 ? `${dateParts[0]} ${dateParts[1]}` : dateParts[0] || '';
+                        const timePart = dateParts[2] || '';
 
                         const isCreditSale = line.includes('Credit Sale:');
                         const isDueAdded = line.includes('New Due Added:');
@@ -1065,15 +1090,18 @@ export default function CustomerPaymentDetail() {
                 {/* Balance Card */}
                 <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 dark:from-emerald-600 dark:to-emerald-700 rounded-2xl p-6 mb-6 text-white shadow-xl">
                     <p className="text-sm opacity-90 mb-1">Current Balance</p>
-                    <p className="text-4xl font-black mb-4">₹{totalBalance.toLocaleString()}</p>
-                    <div className="flex items-center gap-2">
-                        <p className="text-xs opacity-75">Due: {earliestDueDate ? new Date(earliestDueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A'}</p>
+                    <p className="text-4xl font-black mb-6">₹{totalBalance.toLocaleString()}</p>
+                    <div className="flex items-center gap-3">
+                        <div className="flex-1">
+                            <p className="text-xs opacity-75 mb-1">Due Date</p>
+                            <p className="text-base font-bold">{earliestDueDate ? new Date(earliestDueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A'}</p>
+                        </div>
                         <button
                             onClick={() => { setNewDueDate(earliestDueDate || ''); setShowEditDate(true); }}
-                            className="p-1.5 rounded hover:bg-white/20 transition-colors"
+                            className="p-2 rounded-lg hover:bg-white/20 transition-colors"
                             aria-label="Edit due date"
                         >
-                            <Edit2 size={14} />
+                            <Edit2 size={16} />
                         </button>
                     </div>
                 </div>
@@ -1169,9 +1197,9 @@ export default function CustomerPaymentDetail() {
                                                 </div>
                                             )}
                                             <div className="flex-1">
-                                                <div className="flex items-center gap-2 mb-1">
+                                                <div className="flex items-center gap-2 mb-0">
                                                     <span className={cn(
-                                                        "text-sm font-bold",
+                                                        "text-base font-bold",
                                                         txn.type === 'payment_received' ? "text-emerald-600 dark:text-emerald-400" :
                                                             txn.type === 'credit_sale' ? "text-blue-600 dark:text-blue-400" :
                                                                 "text-orange-600 dark:text-orange-400"
@@ -1199,7 +1227,7 @@ export default function CustomerPaymentDetail() {
                                                         </button>
                                                     )}
                                                 </div>
-                                                <p className="text-xs text-zinc-500">{txn.date}{txn.time ? ` at ${txn.time}` : ''}</p>
+                                                <p className="text-xs text-zinc-500 font-medium">{formatDateWithOrdinal(txn.date)}{txn.time ? ` • ${txn.time}` : ''}</p>
                                             </div>
                                             <div className="text-right">
                                                 <p className={cn(

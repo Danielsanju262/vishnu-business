@@ -45,6 +45,7 @@ export default function Reports() {
     const [editQty, setEditQty] = useState("");
     const [editPrice, setEditPrice] = useState("");
     const [editBuyPrice, setEditBuyPrice] = useState("");
+    const [editDate, setEditDate] = useState("");
 
     // Expense Edit State
     const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
@@ -174,7 +175,6 @@ export default function Reports() {
     useRealtimeTables(['transactions', 'expenses'], fetchData, [rangeType, startDate, endDate]);
 
     const deleteTransaction = async (id: string, customerName?: string, productName?: string) => {
-        // Find item locally for restoration
         const itemToDelete = data.transactions.find((t: any) => t.id === id);
         if (!itemToDelete) return;
 
@@ -182,31 +182,12 @@ export default function Reports() {
         const customer = itemToDelete.customers?.name || customerName || "Customer";
         if (!await confirm(`Delete sale of "${name}" to ${customer}?`)) return;
 
-        // Optimistic Remove
-        const previousData = { ...data };
-        setData(prev => ({
-            ...prev,
-            transactions: prev.transactions.filter((t: any) => t.id !== id)
-        }));
-
         const { error } = await supabase.from('transactions').update({ deleted_at: new Date().toISOString() }).eq('id', id);
 
         if (!error) {
-            toast("Transaction deleted", "success", {
-                label: "Undo",
-                onClick: async () => {
-                    // Restore
-                    setData(previousData);
-                    const { error: restoreError } = await supabase.from('transactions').update({ deleted_at: null }).eq('id', id);
-                    if (!restoreError) {
-                        toast("Restored", "success");
-                        fetchData();
-                    }
-                }
-            }, 10000);
-            // No strict need to fetchData immediately if optimistic update works, but cleaner to sync eventually.
+            toast("Transaction deleted", "success");
+            fetchData();
         } else {
-            setData(previousData);
             toast("Failed to delete", "error");
         }
     };
@@ -217,39 +198,12 @@ export default function Reports() {
 
         if (!await confirm(`Delete "${itemToDelete.title}"?`)) return;
 
-        // Optimistic remove
-        const previousExpenses = [...combinedExpenses];
-        const previousData = { ...data };
-
-        // Update local state quickly
-        setCombinedExpenses(prev => prev.filter(e => e.id !== id));
-        setData(prev => ({
-            ...prev,
-            expenses: prev.expenses.filter(e => e.id !== id)
-        }));
-
         const { error } = await supabase.from('expenses').update({ deleted_at: new Date().toISOString() }).eq('id', id);
 
         if (!error) {
-            toast("Expense deleted", "success", {
-                label: "Undo",
-                onClick: async () => {
-                    // Restore in UI
-                    setCombinedExpenses(previousExpenses);
-                    setData(previousData);
-
-                    // Restore in DB
-                    const { error: restoreError } = await supabase.from('expenses').update({ deleted_at: null }).eq('id', id);
-                    if (!restoreError) {
-                        toast("Restored expense", "success");
-                        fetchData();
-                    }
-                }
-            }, 10000); // 10s
+            toast("Expense deleted", "success");
+            fetchData();
         } else {
-            // Revert
-            setCombinedExpenses(previousExpenses);
-            setData(previousData);
             toast("Failed to delete", "error");
         }
     };
@@ -259,6 +213,7 @@ export default function Reports() {
         setEditQty(t.quantity.toString());
         setEditPrice(t.sell_price.toString());
         setEditBuyPrice(t.buy_price.toString());
+        setEditDate(t.date ? new Date(t.date).toISOString().split('T')[0] : "");
     };
 
     const saveEdit = async () => {
@@ -266,7 +221,8 @@ export default function Reports() {
         const { error } = await supabase.from('transactions').update({
             quantity: parseFloat(editQty),
             sell_price: parseFloat(editPrice),
-            buy_price: parseFloat(editBuyPrice) || 0
+            buy_price: parseFloat(editBuyPrice) || 0,
+            date: editDate
         }).eq('id', editingId);
 
         if (!error) {
@@ -519,39 +475,22 @@ export default function Reports() {
                 <div className="w-full px-3 md:px-4 py-3">
                     <div className="flex flex-col gap-3">
                         <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <Link to="/" className="p-3 -ml-2 rounded-full hover:bg-accent hover:text-foreground text-muted-foreground transition interactive active:scale-95 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1">
+                            <div className="flex items-center gap-2">
+                                <Link to="/" className="p-2 -ml-2 rounded-full hover:bg-accent hover:text-foreground text-muted-foreground transition interactive active:scale-95 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1">
                                     <ArrowLeft size={20} />
                                 </Link>
                                 <div>
-                                    {/* Breadcrumb */}
-                                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-0.5">
+                                    {/* Breadcrumb - Hidden on mobile */}
+                                    <div className="hidden md:flex items-center gap-1.5 text-xs text-muted-foreground mb-0.5">
                                         <Link to="/" className="hover:text-primary transition">Home</Link>
                                         <span>/</span>
                                         <span className="text-primary font-semibold">Reports</span>
                                     </div>
-                                    <h1 className="text-2xl font-black text-foreground tracking-tight">Reports</h1>
+                                    <h1 className="text-xl md:text-2xl font-black text-foreground tracking-tight">Reports</h1>
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-2">
-                                {/* Export Trigger */}
-                                <button
-                                    onClick={() => setShowExportModal(true)}
-                                    onKeyDown={(e) => {
-                                        if (e.key === "Enter" || e.key === " ") {
-                                            e.preventDefault();
-                                            setShowExportModal(true);
-                                        }
-                                    }}
-                                    tabIndex={0}
-                                    className="flex items-center gap-2 px-4 py-3 rounded-full text-xs md:text-sm font-bold bg-card text-muted-foreground border border-border hover:bg-accent hover:text-foreground transition-all focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
-                                    aria-label="Export data"
-                                >
-                                    <Download size={16} />
-                                    <span className="hidden sm:inline">Export</span>
-                                </button>
-
+                            <div className="flex items-center gap-1.5">
                                 {/* Filter Trigger */}
                                 <button
                                     ref={filterButtonRef}
@@ -564,13 +503,18 @@ export default function Reports() {
                                     }}
                                     tabIndex={0}
                                     className={cn(
-                                        "flex items-center gap-2 px-4 py-3 rounded-full text-xs md:text-sm font-bold border interactive transition-all focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-1",
+                                        "flex items-center gap-1.5 px-3 py-2.5 md:px-4 md:py-2.5 rounded-full text-xs md:text-sm font-bold border interactive transition-all focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-1 whitespace-nowrap",
                                         showFilters ? "bg-primary text-primary-foreground border-primary" : "bg-card text-muted-foreground border-border"
                                     )}
                                     aria-label="Toggle date filter"
                                 >
                                     <Calendar size={16} />
-                                    {ranges.find(r => r.key === rangeType)?.label}
+                                    <span className="text-xs md:text-sm">
+                                        {rangeType === 'custom'
+                                            ? `${new Date(startDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })} - ${new Date(endDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}`
+                                            : ranges.find(r => r.key === rangeType)?.label
+                                        }
+                                    </span>
                                     <ChevronDown size={16} className={cn("transition-transform", showFilters && "rotate-180")} />
                                 </button>
                             </div>
@@ -1065,7 +1009,16 @@ export default function Reports() {
                                                         <span className="font-bold text-foreground">{t.products?.name}</span>
                                                         <span className="text-[10px] text-primary font-black uppercase bg-primary/10 px-2 py-1 rounded-full">Editing Mode</span>
                                                     </div>
-                                                    <div className="grid grid-cols-3 gap-3">
+                                                    <div className="grid grid-cols-2 gap-3">
+                                                        <div>
+                                                            <label className="text-[10px] text-muted-foreground font-bold uppercase block mb-1">Date</label>
+                                                            <input
+                                                                className="w-full p-2 bg-accent rounded-lg border border-border text-foreground font-bold text-center focus:ring-2 focus:ring-primary outline-none"
+                                                                type="date"
+                                                                value={editDate}
+                                                                onChange={e => setEditDate(e.target.value)}
+                                                            />
+                                                        </div>
                                                         <div>
                                                             <label className="text-[10px] text-muted-foreground font-bold uppercase block mb-1">Qty</label>
                                                             <input
@@ -1101,28 +1054,28 @@ export default function Reports() {
                                                 </div>
                                             ) : (
                                                 <div
-                                                    className={cn("flex justify-between items-center group relative transition-all", activeMenuId === t.id ? "z-50" : "z-0")}
+                                                    className={cn("flex justify-between items-center gap-3 group relative transition-all", activeMenuId === t.id ? "z-50" : "z-0")}
                                                 >
                                                     <div
-                                                        className="flex-1 min-w-0 select-none cursor-pointer"
+                                                        className="flex-1 min-w-0 select-none cursor-pointer pr-2"
                                                         onTouchStart={(e) => handleTransactionTouchStart(e, t.id, selectedTransactionIds.has(t.id))}
                                                         onTouchEnd={handleTouchEnd}
                                                         onMouseDown={(e) => handleTransactionTouchStart(e, t.id, selectedTransactionIds.has(t.id))}
                                                         onMouseUp={handleTouchEnd}
                                                         onMouseLeave={handleTouchEnd}
                                                     >
-                                                        <div className="font-bold text-foreground truncate text-base">{t.customers?.name}</div>
-                                                        <div className="text-[10px] md:text-xs text-muted-foreground flex items-center gap-1.5 mt-1 font-medium">
-                                                            <span className="text-foreground/80">{t.products?.name}</span>
-                                                            <span className="w-1 h-1 rounded-full bg-muted-foreground/50" />
-                                                            <span>{t.quantity} {t.products?.unit}</span>
+                                                        <div className="font-bold text-foreground text-sm truncate pr-2">{t.customers?.name}</div>
+                                                        <div className="flex flex-wrap gap-2 mt-2">
+                                                            <div className="text-xs text-muted-foreground flex items-center gap-1 font-medium mr-2">
+                                                                <span className="text-foreground/90">{t.products?.name}</span>
+                                                                <span className="w-1 h-1 rounded-full bg-muted-foreground/30 mx-1" />
+                                                                <span>{t.quantity} {t.products?.unit}</span>
+                                                                <span className="text-emerald-600 dark:text-emerald-400 font-bold ml-1">@ ₹{t.sell_price}/-</span>
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                    <div className="text-right flex items-center gap-3 md:gap-4">
-                                                        <div>
-                                                            <div className="font-black text-emerald-600 dark:text-emerald-400 text-base md:text-lg">₹{(t.quantity * t.sell_price).toLocaleString()}</div>
-                                                            <div className="text-[10px] text-muted-foreground font-bold opacity-70">@ ₹{t.sell_price}/-</div>
-                                                        </div>
+                                                    <div className="text-right flex items-center gap-3 md:gap-4 flex-shrink-0">
+                                                        <div className="font-black text-emerald-600 dark:text-emerald-400 text-base md:text-lg whitespace-nowrap">₹{(t.quantity * t.sell_price).toLocaleString()}</div>
                                                         <div className="relative">
                                                             <button
                                                                 onClick={(e) => { e.stopPropagation(); setActiveMenuId(activeMenuId === t.id ? null : t.id); }}
