@@ -21,7 +21,7 @@ export default function Dashboard() {
     const [statsError, setStatsError] = useState<string | null>(null);
 
     // Date Filter State
-    const [dateFilter, setDateFilter] = useState("today"); // 'today', 'yesterday', 'thisWeek', 'thisMonth', 'custom'
+    const [dateFilter, setDateFilter] = useState("thisMonth"); // 'today', 'yesterday', 'thisWeek', 'thisMonth', 'custom'
     const [customDateRange, setCustomDateRange] = useState({
         start: format(new Date(), 'yyyy-MM-dd'),
         end: format(new Date(), 'yyyy-MM-dd')
