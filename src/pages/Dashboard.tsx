@@ -371,24 +371,24 @@ export default function Dashboard() {
             <div className="grid grid-cols-2 gap-3">
                 <Link
                     to="/sale/new"
-                    className="group relative overflow-hidden flex flex-col items-center justify-center bg-gradient-to-br from-emerald-700/60 to-emerald-900/80 p-5 md:p-6 rounded-2xl shadow-lg shadow-black/20 active:scale-[0.97] transition-all duration-200 border border-emerald-500/30 hover:border-emerald-500/50 hover:shadow-xl hover:shadow-emerald-900/30 min-h-[120px]"
+                    className="group relative overflow-hidden flex flex-col items-center justify-center bg-gradient-to-br from-emerald-500 to-emerald-600 p-5 md:p-6 rounded-2xl shadow-lg shadow-black/20 active:scale-[0.97] transition-all duration-200 border border-emerald-400/50 hover:border-emerald-400/70 hover:shadow-xl hover:shadow-emerald-600/30 min-h-[120px]"
                 >
-                    <div className="absolute inset-0 bg-emerald-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
-                    <div className="bg-emerald-500/30 p-3.5 rounded-full mb-3 backdrop-blur-sm group-hover:bg-emerald-500/40 group-hover:scale-105 transition-all duration-200 border border-emerald-500/30">
-                        <Plus className="text-emerald-300" size={24} strokeWidth={2.5} />
+                    <div className="absolute inset-0 bg-emerald-400/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+                    <div className="bg-white/20 p-3.5 rounded-full mb-3 backdrop-blur-sm group-hover:bg-white/30 group-hover:scale-105 transition-all duration-200 border-2 border-white/40">
+                        <Plus className="text-white" size={24} strokeWidth={2.5} />
                     </div>
-                    <p className="text-emerald-50 font-semibold text-sm md:text-base tracking-wide">New Sale</p>
+                    <p className="text-white font-semibold text-sm md:text-base tracking-wide">New Sale</p>
                 </Link>
 
                 <Link
                     to="/expense/new"
-                    className="group relative overflow-hidden flex flex-col items-center justify-center bg-gradient-to-br from-rose-700/60 to-rose-900/80 p-5 md:p-6 rounded-2xl shadow-lg shadow-black/20 active:scale-[0.97] transition-all duration-200 border border-rose-500/30 hover:border-rose-500/50 hover:shadow-xl hover:shadow-rose-900/30 min-h-[120px]"
+                    className="group relative overflow-hidden flex flex-col items-center justify-center bg-gradient-to-br from-red-500 to-red-600 p-5 md:p-6 rounded-2xl shadow-lg shadow-black/20 active:scale-[0.97] transition-all duration-200 border border-red-400/50 hover:border-red-400/70 hover:shadow-xl hover:shadow-red-600/30 min-h-[120px]"
                 >
-                    <div className="absolute inset-0 bg-rose-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
-                    <div className="bg-rose-500/30 p-3.5 rounded-full mb-3 backdrop-blur-sm group-hover:bg-rose-500/40 group-hover:scale-105 transition-all duration-200 border border-rose-500/30">
-                        <Minus className="text-rose-300" size={24} strokeWidth={2.5} />
+                    <div className="absolute inset-0 bg-red-400/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+                    <div className="bg-white/20 p-3.5 rounded-full mb-3 backdrop-blur-sm group-hover:bg-white/30 group-hover:scale-105 transition-all duration-200 border-2 border-white/40">
+                        <Minus className="text-white" size={24} strokeWidth={2.5} />
                     </div>
-                    <p className="text-rose-50 font-semibold text-sm md:text-base tracking-wide">New Expense</p>
+                    <p className="text-white font-semibold text-sm md:text-base tracking-wide">New Expense</p>
                 </Link>
             </div>
 
