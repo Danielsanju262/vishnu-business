@@ -21,7 +21,7 @@ export default function Reports() {
     const [showFilters, setShowFilters] = useState(false);
     const filterButtonRef = useRef<HTMLButtonElement>(null);
     const filterPanelRef = useRef<HTMLDivElement>(null);
-    useDropdownClose(showFilters, () => setShowFilters(false), filterButtonRef, [filterPanelRef]);
+    useDropdownClose(showFilters, () => setShowFilters(false), filterButtonRef, [filterPanelRef as React.RefObject<HTMLElement>]);
     const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
     const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
 
