@@ -913,7 +913,7 @@ export default function NewSale() {
                                     }
                                 }}
                                 tabIndex={0}
-                                className="w-full py-3 rounded-xl border-2 border-dashed border-primary/30 text-primary font-bold flex items-center justify-center hover:bg-primary/5 transition interactive active:scale-95 mb-4 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+                                className="w-full py-3 rounded-xl border-2 border-dashed border-primary/30 text-primary font-bold flex items-center justify-center hover:bg-primary/5 transition interactive active:scale-95 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
                                 aria-label="Add another item"
                             >
                                 <div className="p-1 bg-primary/20 rounded-full mr-2">
@@ -1294,7 +1294,7 @@ export default function NewSale() {
                                                 <span className="absolute left-4 top-4 text-muted-foreground font-bold">₹</span>
                                                 <input
                                                     type="number"
-                                                    className="w-full bg-accent/50 border border-border/50 rounded-2xl py-3.5 pl-8 pr-4 text-xl font-bold text-foreground outline-none focus:ring-2 focus:ring-primary focus:bg-background transition-all"
+                                                    className="w-full bg-accent/50 border border-border/50 rounded-2xl py-3.5 pl-10 pr-4 text-xl font-bold text-foreground outline-none focus:ring-2 focus:ring-primary focus:bg-background transition-all"
                                                     placeholder="0"
                                                     value={sellPrice}
                                                     onChange={e => setSellPrice(e.target.value)}
@@ -1307,7 +1307,7 @@ export default function NewSale() {
                                                 <span className="absolute left-4 top-4 text-muted-foreground font-bold">₹</span>
                                                 <input
                                                     type="number"
-                                                    className="w-full bg-accent/50 border border-border/50 rounded-2xl py-3.5 pl-8 pr-4 text-xl font-bold text-foreground outline-none focus:ring-2 focus:ring-primary focus:bg-background transition-all"
+                                                    className="w-full bg-accent/50 border border-border/50 rounded-2xl py-3.5 pl-10 pr-4 text-xl font-bold text-foreground outline-none focus:ring-2 focus:ring-primary focus:bg-background transition-all"
                                                     placeholder="0"
                                                     value={buyPrice}
                                                     onChange={e => setBuyPrice(e.target.value)}
