@@ -63,7 +63,7 @@ export default function Layout() {
 
     return (
         <div className="min-h-screen pb-28 md:pb-32 relative bg-background selection:bg-primary/20">
-            <main className="h-full animate-in fade-in duration-500">
+            <main className="h-full">
                 <Outlet />
             </main>
 
