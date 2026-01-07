@@ -1,5 +1,5 @@
 import { Outlet, useLocation, Link } from "react-router-dom";
-import { LayoutDashboard, Settings, IndianRupee, Wallet } from "lucide-react";
+import { LayoutDashboard, Settings, Wallet } from "lucide-react";
 import { cn } from "../lib/utils";
 import { usePaymentNotifications } from "../hooks/usePaymentNotifications";
 
@@ -7,17 +7,43 @@ export default function Layout() {
     const location = useLocation();
     usePaymentNotifications();
 
+    const RupeeTextIcon = ({ size = 24, className, strokeWidth }: any) => {
+        return (
+            <div
+                style={{
+                    fontSize: `${size}px`,
+                    height: `${size}px`,
+                    width: `${size}px`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontWeight: strokeWidth > 2 ? 800 : 600,
+                    lineHeight: 1
+                }}
+                className={cn("select-none", className)}
+            >
+                ₹
+            </div>
+        );
+    };
+
     // Updated Navigation with more items for easier access
     const navItems = [
         {
             path: "/",
             icon: LayoutDashboard,
             label: "Home",
-            isActive: (pathname: string) => pathname === "/" || pathname.startsWith("/customers") || pathname.startsWith("/products") || pathname.startsWith("/reports")
+            isActive: (pathname: string) =>
+                pathname === "/" ||
+                pathname.startsWith("/customers") ||
+                pathname.startsWith("/products") ||
+                pathname.startsWith("/reports") ||
+                pathname.startsWith("/sale") ||
+                pathname.startsWith("/expense")
         },
         {
             path: "/payment-reminders",
-            icon: IndianRupee,
+            icon: RupeeTextIcon,
             label: "Payments",
             isActive: (pathname: string) => pathname.startsWith("/payment-reminders")
         },
@@ -25,7 +51,7 @@ export default function Layout() {
             path: "/accounts-payable",
             icon: Wallet,
             label: "Payables",
-            isActive: (pathname: string) => pathname.startsWith("/accounts-payable")
+            isActive: (pathname: string) => pathname.startsWith("/accounts-payable") || pathname.startsWith("/suppliers")
         },
         {
             path: "/settings",
@@ -49,8 +75,8 @@ export default function Layout() {
                         const isCorePage = ["/", "/payment-reminders", "/accounts-payable", "/settings"].includes(location.pathname);
                         if (isCorePage) return true;
 
-                        // Otherwise, ONLY show Dashboard/Home to allow going back
-                        return item.path === "/";
+                        // Otherwise, ONLY show the button for the active section
+                        return item.isActive(location.pathname);
                     }).map((item) => {
                         const isActive = item.isActive(location.pathname);
                         const Icon = item.icon;
@@ -70,7 +96,7 @@ export default function Layout() {
                                 <Icon
                                     size={22}
                                     className={cn("relative z-10 transition-transform duration-200", isActive ? "scale-110" : "group-hover:scale-105 group-active:scale-105")}
-                                    strokeWidth={isActive ? 2.5 : 2}
+                                    strokeWidth={isActive ? 3 : 2}
                                 />
                                 {isActive && (
                                     <span className="absolute -bottom-0.5 w-1.5 h-1.5 bg-white rounded-full animate-in zoom-in" />

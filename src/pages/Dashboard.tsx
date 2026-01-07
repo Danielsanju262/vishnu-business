@@ -84,9 +84,9 @@ export default function Dashboard() {
     ];
 
     return (
-        <div className="space-y-6 px-4 pt-8 pb-32 max-w-lg mx-auto animate-in fade-in">
+        <div className="space-y-6 px-3 pt-6 pb-28 md:px-4 md:pt-8 md:pb-32 w-full md:max-w-lg md:mx-auto animate-in fade-in">
             {/* Header */}
-            <div className="flex justify-between items-end mb-8">
+            <div className="flex justify-between items-end mb-6 md:mb-8">
                 <div className="flex-1">
                     <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-[0.15em] mb-2">{format(new Date(), "EEEE, MMM d")}</p>
                     <div className="flex items-center gap-2 group">
@@ -106,7 +106,7 @@ export default function Dashboard() {
                                             setIsEditingName(false);
                                         }
                                     }}
-                                    className="bg-transparent text-2xl font-bold text-foreground tracking-tight border-b-2 border-white/60 dark:border-white/40 outline-none min-w-[180px] py-1 placeholder:text-muted-foreground/50"
+                                    className="bg-transparent text-2xl font-bold text-foreground tracking-tight border-b-2 border-white/60 dark:border-white/40 outline-none min-w-[140px] py-1 placeholder:text-muted-foreground/50"
                                     placeholder="Enter name..."
                                 />
                                 <button
@@ -150,7 +150,7 @@ export default function Dashboard() {
             </div>
 
             {/* Main Stats Card - Dark Mode Grayscale */}
-            <div className="relative overflow-hidden bg-gradient-to-br from-slate-700 to-slate-900 dark:from-zinc-800 dark:to-zinc-950 rounded-[1.75rem] p-6 shadow-2xl shadow-black/40 ring-1 ring-white/5">
+            <div className="relative overflow-hidden bg-gradient-to-br from-slate-700 to-slate-900 dark:from-zinc-800 dark:to-zinc-950 rounded-[1.75rem] p-5 md:p-6 shadow-2xl shadow-black/40 ring-1 ring-white/5">
                 {/* Background Icon */}
                 <div className="absolute top-0 right-0 p-6 opacity-[0.06] text-white pointer-events-none">
                     <TrendingUp size={120} strokeWidth={1.5} />
@@ -161,16 +161,16 @@ export default function Dashboard() {
                 <div className="absolute bottom-0 right-0 w-44 h-44 bg-white/3 rounded-full blur-3xl" />
 
                 <div className="relative z-10 space-y-5">
-                    <div className="grid grid-cols-2 gap-5">
+                    <div className="grid grid-cols-2 gap-4 md:gap-5">
                         <div className="space-y-1.5">
-                            <p className="text-white/50 font-medium text-[10px] uppercase tracking-[0.12em]">Total Revenue</p>
+                            <p className="text-white/50 font-medium text-[10px] uppercase tracking-wider">Total Revenue</p>
                             <h2 className="text-3xl font-bold text-white tracking-tight">
                                 <span className="text-lg align-top opacity-50 font-normal mr-0.5">₹</span>
                                 {stats.todayRevenue.toLocaleString()}
                             </h2>
                         </div>
                         <div className="space-y-1.5">
-                            <p className="text-white/50 font-medium text-[10px] uppercase tracking-[0.12em]">Net Profit</p>
+                            <p className="text-white/50 font-medium text-[10px] uppercase tracking-wider">Net Profit</p>
                             <h2 className={cn(
                                 "text-3xl font-bold tracking-tight flex items-center gap-1",
                                 stats.todayProfit >= 0 ? "text-emerald-400" : "text-rose-400"
@@ -198,29 +198,29 @@ export default function Dashboard() {
             <div className="grid grid-cols-2 gap-3">
                 <Link
                     to="/sale/new"
-                    className="group relative overflow-hidden flex flex-col items-center justify-center bg-gradient-to-br from-emerald-900/40 to-emerald-950/60 p-5 rounded-2xl shadow-lg shadow-black/20 active:scale-[0.97] transition-all duration-200 border border-emerald-500/20 hover:border-emerald-500/40 hover:shadow-xl hover:shadow-emerald-900/20"
+                    className="group relative overflow-hidden flex flex-col items-center justify-center bg-gradient-to-br from-emerald-900/40 to-emerald-950/60 p-4 md:p-5 rounded-2xl shadow-lg shadow-black/20 active:scale-[0.97] transition-all duration-200 border border-emerald-500/20 hover:border-emerald-500/40 hover:shadow-xl hover:shadow-emerald-900/20"
                 >
                     <div className="absolute inset-0 bg-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
                     <div className="bg-emerald-500/20 p-3 rounded-full mb-3 backdrop-blur-sm group-hover:bg-emerald-500/30 group-hover:scale-105 transition-all duration-200 border border-emerald-500/20">
                         <Plus className="text-emerald-400" size={24} strokeWidth={2.5} />
                     </div>
-                    <p className="text-emerald-100 font-semibold text-sm tracking-wide">New Sale</p>
+                    <p className="text-emerald-100 font-semibold text-xs md:text-sm tracking-wide">New Sale</p>
                 </Link>
 
                 <Link
                     to="/expense/new"
-                    className="group relative overflow-hidden flex flex-col items-center justify-center bg-gradient-to-br from-rose-900/40 to-rose-950/60 p-5 rounded-2xl shadow-lg shadow-black/20 active:scale-[0.97] transition-all duration-200 border border-rose-500/20 hover:border-rose-500/40 hover:shadow-xl hover:shadow-rose-900/20"
+                    className="group relative overflow-hidden flex flex-col items-center justify-center bg-gradient-to-br from-rose-900/40 to-rose-950/60 p-4 md:p-5 rounded-2xl shadow-lg shadow-black/20 active:scale-[0.97] transition-all duration-200 border border-rose-500/20 hover:border-rose-500/40 hover:shadow-xl hover:shadow-rose-900/20"
                 >
                     <div className="absolute inset-0 bg-rose-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
                     <div className="bg-rose-500/20 p-3 rounded-full mb-3 backdrop-blur-sm group-hover:bg-rose-500/30 group-hover:scale-105 transition-all duration-200 border border-rose-500/20">
                         <Minus className="text-rose-400" size={24} strokeWidth={2.5} />
                     </div>
-                    <p className="text-rose-100 font-semibold text-sm tracking-wide">New Expense</p>
+                    <p className="text-rose-100 font-semibold text-xs md:text-sm tracking-wide">New Expense</p>
                 </Link>
             </div>
 
             {/* Navigation Cards - Dark Mode Grayscale */}
-            <div className="space-y-4 pt-3">
+            <div className="space-y-4 pt-2">
                 <h3 className="font-semibold text-muted-foreground text-[10px] uppercase tracking-[0.15em] pl-1">Management</h3>
                 <div className="grid gap-2.5">
                     {menuItems.map((item) => {
@@ -229,10 +229,10 @@ export default function Dashboard() {
                             <Link
                                 key={item.title}
                                 to={item.link}
-                                className="flex items-center p-4 bg-zinc-900/50 dark:bg-zinc-900/40 hover:bg-zinc-800/60 active:bg-zinc-800/70 border border-white/5 hover:border-white/10 rounded-xl group transition-all duration-200 shadow-sm hover:shadow-md"
+                                className="flex items-center p-3 md:p-4 bg-zinc-900/50 dark:bg-zinc-900/40 hover:bg-zinc-800/60 active:bg-zinc-800/70 border border-white/5 hover:border-white/10 rounded-xl group transition-all duration-200 shadow-sm hover:shadow-md"
                             >
                                 <div className={cn(
-                                    "w-11 h-11 rounded-xl flex items-center justify-center mr-4 transition-all duration-200 group-hover:scale-105",
+                                    "w-10 h-10 md:w-11 md:h-11 rounded-xl flex items-center justify-center mr-4 transition-all duration-200 group-hover:scale-105",
                                     item.bg, item.color
                                 )}>
                                     <Icon size={20} strokeWidth={2} />

@@ -7,6 +7,7 @@ import { cn } from "../lib/utils";
 import { useToast } from "../components/toast-provider";
 import { useRealtimeTables } from "../hooks/useRealtimeSync";
 import { Modal } from "../components/ui/Modal";
+import { useDropdownClose } from "../hooks/useDropdownClose";
 
 type Customer = { id: string; name: string };
 type Product = { id: string; name: string; unit: string; category: string };
@@ -17,9 +18,11 @@ type CartItem = {
     buyPrice: number;
 };
 
+import { ConfirmationModal } from "../components/ui/ConfirmationModal";
+
 export default function NewSale() {
     const navigate = useNavigate();
-    const { toast, confirm } = useToast();
+    const { toast } = useToast();
 
     // Data State
     const [customers, setCustomers] = useState<Customer[]>([]);
@@ -53,6 +56,23 @@ export default function NewSale() {
     const [addToOutstanding, setAddToOutstanding] = useState(false);
     const [paidNowAmount, setPaidNowAmount] = useState("");
     const [outstandingDueDate, setOutstandingDueDate] = useState("");
+
+    const [confirmConfig, setConfirmConfig] = useState<{
+        isOpen: boolean;
+        title: string;
+        description: string;
+        onConfirm: () => void;
+        variant?: "default" | "destructive";
+        confirmText?: string;
+    }>({
+        isOpen: false,
+        title: "",
+        description: "",
+        onConfirm: () => { },
+        variant: "destructive",
+    });
+
+    const closeConfirm = () => setConfirmConfig(prev => ({ ...prev, isOpen: false }));
 
     // Workflow State -- Initialize based on restored data
     const [step, setStep] = useState<"customer" | "cart" | "product" | "details">(() => {
@@ -206,25 +226,21 @@ export default function NewSale() {
         }
     };
 
-    // Close menu when clicking outside
+    // Close menu when clicking outside or pressing ESC
+    useDropdownClose(activeMenuIndex !== null, () => setActiveMenuIndex(null));
+
+    // Close supplier list when clicking outside (separate handling)
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent | TouchEvent) => {
-            if (activeMenuIndex !== null) {
-                const target = event.target as HTMLElement;
-                if (!target.closest('.menu-content') && !target.closest('.menu-trigger')) {
-                    setActiveMenuIndex(null);
-                }
-            }
-            // Close suggestion list if clicking outside
             if (showPayableSupplierList) {
                 const target = event.target as HTMLElement;
-                if (!target.closest('.absolute.top-full')) { // simplified check
+                if (!target.closest('.absolute.top-full')) {
                     setShowPayableSupplierList(false);
                 }
             }
         };
 
-        if (activeMenuIndex !== null || showPayableSupplierList) {
+        if (showPayableSupplierList) {
             document.addEventListener('mousedown', handleClickOutside);
             document.addEventListener('touchstart', handleClickOutside);
         }
@@ -233,7 +249,7 @@ export default function NewSale() {
             document.removeEventListener('mousedown', handleClickOutside);
             document.removeEventListener('touchstart', handleClickOutside);
         };
-    }, [activeMenuIndex, showPayableSupplierList]);
+    }, [showPayableSupplierList]);
 
     // --- Actions ---
 
@@ -331,7 +347,17 @@ export default function NewSale() {
     };
 
     const removeFromCart = (index: number) => {
-        setCart(prev => prev.filter((_, i) => i !== index));
+        const item = cart[index];
+        setConfirmConfig({
+            isOpen: true,
+            title: `Remove "${item.product.name}"?`,
+            description: "Are you sure you want to remove this item from the cart?",
+            onConfirm: () => {
+                setCart(prev => prev.filter((_, i) => i !== index));
+            },
+            variant: "destructive",
+            confirmText: "Remove"
+        });
     };
 
     const editCartItem = (index: number) => {
@@ -355,16 +381,24 @@ export default function NewSale() {
         if (newSet.has(index)) newSet.delete(index);
         else newSet.add(index);
         setSelectedIndices(newSet);
+        if (newSet.size === 0) setIsSelectionMode(false);
     };
 
-    const deleteSelected = async () => {
+    const deleteSelected = () => {
         if (selectedIndices.size === 0) return;
-        if (!await confirm(`Delete ${selectedIndices.size} items?`)) return;
-
-        setCart(prev => prev.filter((_, i) => !selectedIndices.has(i)));
-        setIsSelectionMode(false);
-        setSelectedIndices(new Set());
-        toast("Items deleted", "success");
+        setConfirmConfig({
+            isOpen: true,
+            title: `Delete ${selectedIndices.size} items?`,
+            description: "These items will be removed from the cart.",
+            onConfirm: () => {
+                setCart(prev => prev.filter((_, i) => !selectedIndices.has(i)));
+                setIsSelectionMode(false);
+                setSelectedIndices(new Set());
+                toast("Items deleted", "success");
+            },
+            variant: "destructive",
+            confirmText: "Delete All"
+        });
     };
 
     const finalizeSale = async () => {
@@ -401,21 +435,72 @@ export default function NewSale() {
 
         // 1.5 Handle Linked Payable
         if (isLinkedPayable && payableSelectedSupplierId && payableAmount) {
-            const { error: payableError } = await supabase
+            // Check for existing pending payable
+            const { data: existingPayable } = await supabase
                 .from('accounts_payable')
-                .insert({
-                    supplier_id: payableSelectedSupplierId,
-                    amount: parseFloat(payableAmount),
-                    due_date: payableDueDate || null, // Allow null? Yes, though strict schema might assume date. Schema allows null? Let's check. Default to today if null? Or make required. UI didn't enforce. Let's send null if empty.
-                    note: `From Sale to ${selectedCust.name} (Total: ₹${cart.reduce((acc, i) => acc + (i.quantity * i.sellPrice), 0)})`,
-                    status: 'pending',
-                    recorded_at: new Date().toISOString()
-                });
+                .select('*')
+                .eq('supplier_id', payableSelectedSupplierId)
+                .eq('status', 'pending')
+                .order('due_date', { ascending: true })
+                .limit(1)
+                .maybeSingle();
 
-            if (payableError) {
-                console.error("Failed to create linked payable", payableError);
-                toast("Sale saved, but failed to link supplier payment.", "warning");
+            const pAmount = parseFloat(payableAmount);
+            const today = new Date();
+            const dateStr = today.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+            const timeStr = today.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+
+            if (existingPayable) {
+                // Update existing
+                const newAmount = existingPayable.amount + pAmount;
+                let newNote = existingPayable.note || "";
+                if (newNote) newNote += "\n";
+                newNote += `[${dateStr} ${timeStr}] Credit Purchase: ₹${pAmount.toLocaleString()}. Balance: ₹${newAmount.toLocaleString()} (Sale to ${selectedCust.name})`;
+
+                const updates: any = {
+                    amount: newAmount,
+                    note: newNote
+                };
+
+                // Update due date if provided and earlier
+                if (payableDueDate) {
+                    const newDue = new Date(payableDueDate);
+                    const existingDue = new Date(existingPayable.due_date);
+                    if (newDue < existingDue) {
+                        updates.due_date = payableDueDate;
+                    }
+                }
+
+                const { error: updateError } = await supabase
+                    .from('accounts_payable')
+                    .update(updates)
+                    .eq('id', existingPayable.id);
+
+                if (updateError) {
+                    console.error("Failed to update payable", updateError);
+                    toast("Sale saved, but failed to update supplier payment.", "warning");
+                }
+            } else {
+                // Insert new
+                const { error: payableError } = await supabase
+                    .from('accounts_payable')
+                    .insert({
+                        supplier_id: payableSelectedSupplierId,
+                        amount: pAmount,
+                        // Validate/Format Date for Note
+                        due_date: payableDueDate || new Date().toISOString().split('T')[0],
+                        note: `[${dateStr} ${timeStr}] Credit Purchase: ₹${pAmount.toLocaleString()}. Balance: ₹${pAmount.toLocaleString()} (Sale to ${selectedCust.name})`,
+                        status: 'pending',
+                        recorded_at: new Date().toISOString()
+                    });
+
+                if (payableError) {
+                    console.error("Failed to create linked payable", payableError);
+                    toast("Sale saved, but failed to link supplier payment.", "warning");
+                }
             }
+
+
         }
 
         // 2. Handle Outstanding (Credit)
@@ -425,18 +510,66 @@ export default function NewSale() {
             const remaining = totalAmount - paid;
 
             if (remaining > 0) {
-                // Create Payment Reminder
-                const { error: reminderError } = await supabase.from('payment_reminders').insert({
-                    customer_id: selectedCust.id,
-                    amount: remaining,
-                    due_date: outstandingDueDate,
-                    status: 'pending',
-                    note: `Credit Sale on ${new Date(date).toLocaleDateString()}. Total Bill: ₹${totalAmount}. Paid Now: ₹${paid}.`
-                });
+                const today = new Date();
+                const dateStr = today.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+                const timeStr = today.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
-                if (reminderError) {
-                    console.error("Failed to create reminder", reminderError);
-                    toast("Sale saved, but failed to set reminder.", "warning");
+                // Check if a pending reminder already exists for this customer
+                const { data: existingReminder } = await supabase
+                    .from('payment_reminders')
+                    .select('*')
+                    .eq('customer_id', selectedCust.id)
+                    .eq('status', 'pending')
+                    .order('due_date', { ascending: true })
+                    .limit(1)
+                    .maybeSingle();
+
+                if (existingReminder) {
+                    // Update existing reminder
+                    const newAmount = existingReminder.amount + remaining;
+                    let newNote = existingReminder.note || "";
+                    if (newNote) newNote += "\n";
+                    newNote += `[${dateStr} ${timeStr}] Credit Sale: ₹${remaining.toLocaleString()}. Balance: ₹${newAmount.toLocaleString()}`;
+
+                    const updates: any = {
+                        amount: newAmount,
+                        note: newNote
+                    };
+
+                    // Update due date if provided and earlier than existing
+                    if (outstandingDueDate) {
+                        const newDue = new Date(outstandingDueDate);
+                        const existingDue = new Date(existingReminder.due_date);
+                        if (newDue < existingDue) {
+                            updates.due_date = outstandingDueDate;
+                        }
+                    }
+
+                    const { error: updateError } = await supabase
+                        .from('payment_reminders')
+                        .update(updates)
+                        .eq('id', existingReminder.id);
+
+                    if (updateError) {
+                        console.error("Failed to update reminder", updateError);
+                        toast("Sale saved, but failed to update reminder.", "warning");
+                    }
+                } else {
+                    // Create new reminder with proper note format
+                    const noteStr = `[${dateStr} ${timeStr}] Credit Sale: ₹${remaining.toLocaleString()}. Balance: ₹${remaining.toLocaleString()}`;
+
+                    const { error: reminderError } = await supabase.from('payment_reminders').insert({
+                        customer_id: selectedCust.id,
+                        amount: remaining,
+                        due_date: outstandingDueDate || new Date().toISOString().split('T')[0],
+                        status: 'pending',
+                        note: noteStr
+                    });
+
+                    if (reminderError) {
+                        console.error("Failed to create reminder", reminderError);
+                        toast("Sale saved, but failed to set reminder.", "warning");
+                    }
                 }
             }
         }
@@ -464,9 +597,9 @@ export default function NewSale() {
     // --- Render ---
 
     return (
-        <div className="container mx-auto max-w-lg min-h-screen bg-background flex flex-col animate-in fade-in pb-8">
+        <div className="w-full md:max-w-lg md:mx-auto min-h-screen bg-background flex flex-col animate-in fade-in pb-8">
             {/* Glassmorphism Header */}
-            <div className="sticky top-0 z-50 bg-background/95 backdrop-blur-xl border-b border-border shadow-sm px-4 py-3 flex items-center justify-between transition-all">
+            <div className="fixed top-0 left-0 right-0 md:mx-auto w-full md:max-w-lg z-50 bg-white dark:bg-gray-900 border-b border-border shadow-sm px-3 py-3 md:px-4 flex items-center justify-between transition-all mb-4">
                 <button
                     onClick={() => {
                         if (step === "details") { setStep("product"); return; }
@@ -474,11 +607,11 @@ export default function NewSale() {
                         if (step === "cart") { setStep("customer"); return; }
                         navigate("/");
                     }}
-                    className="p-2.5 -ml-2 rounded-full hover:bg-accent hover:text-foreground text-muted-foreground transition interactive active:scale-95"
+                    className="p-2 -ml-2 rounded-full hover:bg-accent hover:text-foreground text-muted-foreground transition interactive active:scale-95"
                 >
                     <ArrowLeft size={20} />
                 </button>
-                <div className="font-black text-foreground text-lg tracking-tight">
+                <div className="font-black text-foreground text-base md:text-lg tracking-tight">
                     {step === "customer" && "Select Customer"}
                     {step === "cart" && "New Sale"}
                     {step === "product" && "Add Item"}
@@ -487,14 +620,14 @@ export default function NewSale() {
                 <div className="w-10" /> {/* Spacer */}
             </div>
 
-            <div className="p-4 flex-1 flex flex-col">
+            <div className="p-3 pt-20 md:p-4 md:pt-20 flex-1 flex flex-col">
                 {/* STEP 1: CUSTOMER */}
                 {step === "customer" && (
                     <div className="flex-1 flex flex-col animate-in slide-in-from-right-4 duration-300">
                         <div className="relative mb-6">
                             <Search className="absolute left-4 top-3.5 text-muted-foreground" size={20} />
                             <input
-                                className="w-full bg-accent/50 border border-border/50 pl-12 pr-4 py-3.5 rounded-2xl focus:ring-2 focus:ring-primary focus:bg-background outline-none text-lg text-foreground transition-all shadow-sm"
+                                className="w-full bg-accent/30 border border-border/30 pl-10 pr-3 py-2.5 rounded-xl focus:ring-2 focus:ring-primary focus:bg-background outline-none text-base text-foreground transition-all"
                                 placeholder="Search customer..."
                                 value={search}
                                 onChange={e => setSearch(e.target.value)}
@@ -534,7 +667,7 @@ export default function NewSale() {
                                 <button
                                     key={c.id}
                                     onClick={() => { setSelectedCust(c); setSearch(""); setStep("cart"); }}
-                                    className="w-full bg-card p-4 rounded-2xl border border-border/50 flex items-center justify-between shadow-sm hover:shadow-md hover:border-primary/50 hover:bg-accent/50 transition-all interactive group text-left"
+                                    className="w-full bg-card p-3 rounded-xl border border-border/30 flex items-center justify-between shadow-sm hover:shadow-md hover:border-primary/30 hover:bg-accent/30 transition-all interactive group text-left"
                                 >
                                     <div className="flex items-center gap-4">
                                         <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center font-bold text-sm shadow-md shadow-blue-500/20 group-hover:scale-110 transition-transform">
@@ -558,15 +691,15 @@ export default function NewSale() {
                 {step === "cart" && selectedCust && (
                     <div className="flex-1 flex flex-col animate-in slide-in-from-right-4 duration-300">
                         {/* Customer Card */}
-                        <div className="bg-gradient-to-r from-slate-900 to-slate-800 dark:from-slate-800 dark:to-slate-900 text-white p-5 rounded-3xl mb-6 shadow-xl shadow-slate-900/10 flex justify-between items-center relative overflow-hidden group">
-                            <div className="absolute top-0 right-0 p-8 opacity-5">
-                                <User size={120} />
+                        <div className="bg-gradient-to-r from-slate-900 to-slate-800 dark:from-slate-800 dark:to-slate-900 text-white p-4 md:p-5 rounded-3xl mb-5 md:mb-6 shadow-xl shadow-slate-900/10 flex justify-between items-center relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 p-6 md:p-8 opacity-5">
+                                <User size={100} className="md:w-[120px] md:h-[120px]" />
                             </div>
                             <div className="relative z-10">
-                                <p className="text-xs text-slate-300 uppercase font-bold tracking-wider mb-1">Billing To</p>
-                                <p className="text-xl font-black">{selectedCust.name}</p>
+                                <p className="text-[10px] md:text-xs text-slate-300 uppercase font-bold tracking-wider mb-0.5 md:mb-1">Billing To</p>
+                                <p className="text-lg md:text-xl font-black">{selectedCust.name}</p>
                             </div>
-                            <button onClick={() => setStep("customer")} className="relative z-10 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-full text-xs font-bold backdrop-blur-md transition border border-white/10">
+                            <button onClick={() => setStep("customer")} className="relative z-10 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-full text-[10px] md:text-xs font-bold backdrop-blur-md transition border border-white/10">
                                 Change
                             </button>
                         </div>
@@ -581,7 +714,7 @@ export default function NewSale() {
 
                             {/* Bulk Selection Header */}
                             {isSelectionMode && (
-                                <div className="flex justify-between items-center gap-4 mb-3 bg-card px-4 py-3 rounded-2xl border border-primary/20 shadow-lg animate-in fade-in sticky top-2 z-20">
+                                <div className="flex justify-between items-center gap-3 mb-3 bg-card px-3 py-2 rounded-xl border border-primary/20 shadow-lg animate-in fade-in sticky top-2 z-20">
                                     <div className="flex items-center gap-3">
                                         <Button size="icon" variant="ghost" onClick={toggleSelectionMode} className="h-8 w-8">
                                             <X size={18} />
@@ -611,7 +744,7 @@ export default function NewSale() {
                                         <div
                                             key={idx}
                                             className={cn(
-                                                "bg-card p-4 rounded-2xl border transition-all relative group touch-manipulation select-none",
+                                                "bg-card p-3 rounded-xl border transition-all relative group touch-manipulation select-none",
                                                 isSelectionMode && selectedIndices.has(idx) ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border/60 hover:shadow-md",
                                                 activeMenuIndex === idx ? "z-30" : "z-0"
                                             )}
@@ -656,7 +789,7 @@ export default function NewSale() {
 
                                                 {/* Right Side: Options */}
                                                 <div className="flex items-center gap-4 pl-4">
-                                                    <p className="font-black text-foreground text-lg whitespace-nowrap">₹{(item.quantity * item.sellPrice).toLocaleString()}</p>
+                                                    <p className="font-black text-foreground text-base md:text-lg whitespace-nowrap">₹{(item.quantity * item.sellPrice).toLocaleString()}</p>
 
                                                     {!isSelectionMode && (
                                                         <div className="relative">
@@ -668,7 +801,11 @@ export default function NewSale() {
                                                             </button>
 
                                                             {activeMenuIndex === idx && (
-                                                                <div className="menu-content absolute right-0 top-full mt-2 w-48 bg-zinc-950 border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 ring-1 ring-white/10">
+                                                                <div
+                                                                    className="menu-content absolute right-0 top-full mt-2 w-48 bg-zinc-950 border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 ring-1 ring-white/10"
+                                                                    onMouseDown={(e) => e.stopPropagation()}
+                                                                    onTouchStart={(e) => e.stopPropagation()}
+                                                                >
                                                                     <div className="flex flex-col p-1.5 gap-0.5">
                                                                         <button
                                                                             onClick={() => editCartItem(idx)}
@@ -707,7 +844,7 @@ export default function NewSale() {
 
                             <button
                                 onClick={() => { setStep("product"); setSearch(""); }}
-                                className="w-full py-4 rounded-2xl border-2 border-dashed border-primary/30 text-primary font-bold flex items-center justify-center hover:bg-primary/5 transition interactive active:scale-[0.98] mb-6"
+                                className="w-full py-3 rounded-xl border-2 border-dashed border-primary/30 text-primary font-bold flex items-center justify-center hover:bg-primary/5 transition interactive active:scale-95 mb-4"
                             >
                                 <div className="p-1 bg-primary/20 rounded-full mr-2">
                                     <Plus size={16} />
@@ -747,7 +884,7 @@ export default function NewSale() {
                                             <input
                                                 type="text"
                                                 placeholder="Search supplier..."
-                                                className="w-full bg-accent/50 border border-border/50 rounded-xl pl-9 pr-4 h-10 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-background transition-all"
+                                                className="w-full bg-accent/50 border border-border/50 rounded-xl pl-9 pr-4 h-9 md:h-10 text-xs md:text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-background transition-all"
                                                 value={payableSupplierSearch}
                                                 onChange={e => {
                                                     setPayableSupplierSearch(e.target.value);
@@ -792,7 +929,7 @@ export default function NewSale() {
                                                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-bold text-xs">₹</span>
                                                 <input
                                                     type="number"
-                                                    className="w-full bg-accent/50 border border-border/50 rounded-xl pl-6 pr-3 h-10 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-background transition-all"
+                                                    className="w-full bg-accent/50 border border-border/50 rounded-xl pl-6 pr-3 h-9 md:h-10 text-xs md:text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-background transition-all"
                                                     placeholder="0"
                                                     value={payableAmount}
                                                     onChange={e => setPayableAmount(e.target.value)}
@@ -918,7 +1055,7 @@ export default function NewSale() {
 
                                         {remaining > 0 && (
                                             <div>
-                                                <label className="text-xs font-bold text-muted-foreground ml-1 uppercase tracking-wider">Due Date</label>
+                                                <label className="text-xs font-bold text-muted-foreground ml-1 uppercase tracking-wider">Due Date (Optional)</label>
                                                 <input
                                                     type="date"
                                                     className="w-full mt-1 bg-background border-2 border-zinc-200 dark:border-zinc-700 focus:border-amber-500 dark:focus:border-amber-500 rounded-xl px-4 h-12 text-sm font-bold outline-none transition-all cursor-pointer"
@@ -933,7 +1070,7 @@ export default function NewSale() {
                                 <div className="pt-2">
                                     <Button
                                         onClick={finalizeSale}
-                                        disabled={addToOutstanding && remaining > 0 && !outstandingDueDate}
+                                        disabled={addToOutstanding && paidNowAmount === ""}
                                         className={cn(
                                             "w-full h-12 text-lg font-bold shadow-lg",
                                             addToOutstanding
@@ -1092,6 +1229,16 @@ export default function NewSale() {
                     </div>
                 )}
             </div>
+
+            <ConfirmationModal
+                isOpen={confirmConfig.isOpen}
+                onClose={closeConfirm}
+                onConfirm={confirmConfig.onConfirm}
+                title={confirmConfig.title}
+                description={confirmConfig.description}
+                variant={confirmConfig.variant}
+                confirmText={confirmConfig.confirmText}
+            />
         </div>
     );
 }

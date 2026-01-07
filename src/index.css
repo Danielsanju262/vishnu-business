@@ -83,26 +83,47 @@
 }
 
 /* Base Styles */
+html,
 body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
-  display: flex;
-  justify-content: center;
   min-height: 100vh;
+  width: 100%;
   margin: 0;
   padding: 0;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  touch-action: manipulation;
+}
+
+/* Disable Global Selection & Long Press Callouts */
+* {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* Re-enable selection for interactive input elements */
+input,
+textarea {
+  -webkit-touch-callout: default;
+  -webkit-user-select: text;
+  -khtml-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
 }
 
 #root {
   width: 100%;
-  max-width: 480px;
+  max-width: 100%;
   background-color: hsl(var(--background));
   min-height: 100vh;
   position: relative;
-  box-shadow: 0 0 50px -12px rgb(0 0 0 / 0.5);
 }
 
 /* Typography Enhancements */

@@ -52,6 +52,7 @@ export function Modal({ isOpen, onClose, children, title, className, showCloseBu
             <div
                 className="absolute inset-0 bg-black/90 backdrop-blur-sm"
                 onClick={onClose}
+                onTouchStart={onClose}
             />
 
             {/* Content */}

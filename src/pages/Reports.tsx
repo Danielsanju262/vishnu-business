@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import { supabase } from "../lib/supabase";
 import { ArrowLeft, Trash2, Calendar, ShoppingBag, Wallet, Edit2, ChevronDown, TrendingUp, TrendingDown, Search, ArrowUpDown, X, ChevronRight, User, CheckCircle2, Circle, MoreVertical, Download } from "lucide-react";
 import Papa from "papaparse";
@@ -9,6 +9,7 @@ import { cn } from "../lib/utils";
 import { useToast } from "../components/toast-provider";
 import { Modal } from "../components/ui/Modal";
 import { useRealtimeTables } from "../hooks/useRealtimeSync";
+import { useDropdownClose } from "../hooks/useDropdownClose";
 
 type DateRangeType = "today" | "yesterday" | "week" | "month" | "custom";
 
@@ -18,6 +19,7 @@ export default function Reports() {
     // Filters
     const [rangeType, setRangeType] = useState<DateRangeType>("today");
     const [showFilters, setShowFilters] = useState(false);
+    useDropdownClose(showFilters, () => setShowFilters(false));
     const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
     const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
 
@@ -99,38 +101,8 @@ export default function Reports() {
     };
 
 
-    // Close menu when clicking outside (Global Listener)
-    useEffect(() => {
-        const handleClickOutside = () => {
-            if (activeMenuId) setActiveMenuId(null);
-        };
-
-        if (activeMenuId) {
-            window.addEventListener('click', handleClickOutside);
-        }
-        return () => window.removeEventListener('click', handleClickOutside);
-    }, [activeMenuId]);
-
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === "Escape" && activeMenuId) {
-                setActiveMenuId(null);
-            }
-        };
-        window.addEventListener("keydown", handleKeyDown);
-        return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [activeMenuId]);
-
-    // Close menu on ESC key
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === "Escape" && activeMenuId) {
-                setActiveMenuId(null);
-            }
-        };
-        window.addEventListener("keydown", handleKeyDown);
-        return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [activeMenuId]);
+    // Close menu on ESC or click outside
+    useDropdownClose(!!activeMenuId, () => setActiveMenuId(null));
 
     const getDateFilter = () => {
         const today = new Date();
@@ -334,6 +306,7 @@ export default function Reports() {
         if (newSet.has(id)) newSet.delete(id);
         else newSet.add(id);
         setSelectedTransactionIds(newSet);
+        if (newSet.size === 0 && selectedExpenseIds.size === 0) setIsSelectionMode(false);
     };
 
     const toggleExpenseSelection = (id: string) => {
@@ -341,7 +314,7 @@ export default function Reports() {
         if (newSet.has(id)) newSet.delete(id);
         else newSet.add(id);
         setSelectedExpenseIds(newSet);
-
+        if (newSet.size === 0 && selectedTransactionIds.size === 0) setIsSelectionMode(false);
     };
 
     const toggleSelectAll = () => {
@@ -538,143 +511,148 @@ export default function Reports() {
     };
 
     return (
-        <div className="min-h-screen bg-background pb-32 animate-in fade-in max-w-lg mx-auto px-4 pt-4">
+        <div className="min-h-screen bg-background pb-28 md:pb-32 w-full md:max-w-2xl md:mx-auto px-3 md:px-4">
             {/* Header */}
-            {/* FIX: Solid background to prevent overlapping */}
-            <div className="relative bg-background -mx-4 px-4 py-3 mb-6 border-b border-border/50 flex flex-col gap-3 transition-all">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <Link to="/" className="p-2.5 -ml-2 rounded-full hover:bg-accent hover:text-foreground text-muted-foreground transition interactive active:scale-95">
-                            <ArrowLeft size={20} />
-                        </Link>
-                        <div>
-                            {/* Breadcrumb */}
-                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-0.5">
-                                <Link to="/" className="hover:text-primary transition">Home</Link>
-                                <span>/</span>
-                                <span className="text-primary font-semibold">Reports</span>
+            <div className="fixed top-0 left-0 right-0 z-40 bg-white dark:bg-gray-900 border-b border-border shadow-sm">
+                <div className="w-full px-3 md:px-4 py-3">
+                    <div className="flex flex-col gap-3">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <Link to="/" className="p-2.5 -ml-2 rounded-full hover:bg-accent hover:text-foreground text-muted-foreground transition interactive active:scale-95">
+                                    <ArrowLeft size={20} />
+                                </Link>
+                                <div>
+                                    {/* Breadcrumb */}
+                                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-0.5">
+                                        <Link to="/" className="hover:text-primary transition">Home</Link>
+                                        <span>/</span>
+                                        <span className="text-primary font-semibold">Reports</span>
+                                    </div>
+                                    <h1 className="text-2xl font-black text-foreground tracking-tight">Reports</h1>
+                                </div>
                             </div>
-                            <h1 className="text-2xl font-black text-foreground tracking-tight">Reports</h1>
-                        </div>
-                    </div>
 
-                    <div className="flex items-center gap-2">
-                        {/* Export Trigger */}
-                        <button
-                            onClick={() => setShowExportModal(true)}
-                            className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold bg-card text-muted-foreground border border-border hover:bg-accent hover:text-foreground transition-all"
-                        >
-                            <Download size={14} />
-                            <span className="hidden sm:inline">Export</span>
-                        </button>
-
-                        {/* Filter Trigger */}
-                        <button
-                            onClick={() => setShowFilters(!showFilters)}
-                            className={cn(
-                                "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold border interactive transition-all",
-                                showFilters ? "bg-primary text-primary-foreground border-primary" : "bg-card text-muted-foreground border-border"
-                            )}
-                        >
-                            <Calendar size={14} />
-                            {ranges.find(r => r.key === rangeType)?.label}
-                            <ChevronDown size={14} className={cn("transition-transform", showFilters && "rotate-180")} />
-                        </button>
-                    </div>
-                </div>
-
-                {/* Filter Panel */}
-                {showFilters && (
-                    <div className="animate-in slide-in-from-top-2 space-y-3 p-1">
-                        <div className="flex flex-wrap gap-2">
-                            {ranges.map(r => (
+                            <div className="flex items-center gap-2">
+                                {/* Export Trigger */}
                                 <button
-                                    key={r.key}
-                                    onClick={() => { setRangeType(r.key as DateRangeType); if (r.key !== 'custom') setShowFilters(false); }}
+                                    onClick={() => setShowExportModal(true)}
+                                    className="flex items-center gap-2 px-3 py-2 rounded-full text-xs md:text-sm font-bold bg-card text-muted-foreground border border-border hover:bg-accent hover:text-foreground transition-all"
+                                >
+                                    <Download size={16} />
+                                    <span className="hidden sm:inline">Export</span>
+                                </button>
+
+                                {/* Filter Trigger */}
+                                <button
+                                    onClick={() => setShowFilters(!showFilters)}
                                     className={cn(
-                                        "px-3 py-1.5 text-xs font-semibold rounded-full border transition-all active:scale-95",
-                                        rangeType === r.key
-                                            ? "bg-primary text-primary-foreground border-primary shadow-md shadow-primary/20"
-                                            : "bg-card text-muted-foreground border-border hover:bg-accent"
+                                        "flex items-center gap-2 px-3 py-2 rounded-full text-xs md:text-sm font-bold border interactive transition-all",
+                                        showFilters ? "bg-primary text-primary-foreground border-primary" : "bg-card text-muted-foreground border-border"
                                     )}
                                 >
-                                    {r.label}
+                                    <Calendar size={16} />
+                                    {ranges.find(r => r.key === rangeType)?.label}
+                                    <ChevronDown size={16} className={cn("transition-transform", showFilters && "rotate-180")} />
                                 </button>
-                            ))}
+                            </div>
                         </div>
 
-                        {rangeType === 'custom' && (
-                            <div className="bg-card p-4 rounded-xl border border-border shadow-sm flex flex-col gap-3">
-                                <div className="flex gap-3">
-                                    <div className="flex-1">
-                                        <label className="text-[10px] font-bold text-muted-foreground uppercase mb-1 block ml-1">Start Date</label>
-                                        <input
-                                            type="date"
-                                            value={startDate}
-                                            onChange={(e) => { setStartDate(e.target.value); if (endDate < e.target.value) setEndDate(e.target.value); }}
-                                            className="w-full px-3 py-2 bg-accent rounded-lg border border-border/50 text-xs font-bold text-foreground focus:ring-2 focus:ring-primary outline-none"
-                                        />
-                                    </div>
-                                    <div className="flex-1">
-                                        <label className="text-[10px] font-bold text-muted-foreground uppercase mb-1 block ml-1">End Date</label>
-                                        <input
-                                            type="date"
-                                            value={endDate}
-                                            onChange={(e) => setEndDate(e.target.value)}
-                                            className="w-full px-3 py-2 bg-accent rounded-lg border border-border/50 text-xs font-bold text-foreground focus:ring-2 focus:ring-primary outline-none"
-                                        />
-                                    </div>
+                        {/* Filter Panel */}
+                        {showFilters && (
+                            <div className="animate-in slide-in-from-top-2 space-y-3 p-1">
+                                <div className="flex flex-wrap gap-2">
+                                    {ranges.map(r => (
+                                        <button
+                                            key={r.key}
+                                            onClick={() => { setRangeType(r.key as DateRangeType); if (r.key !== 'custom') setShowFilters(false); }}
+                                            className={cn(
+                                                "px-3 py-2 text-xs md:text-sm font-semibold rounded-full border transition-all active:scale-95",
+                                                rangeType === r.key
+                                                    ? "bg-primary text-primary-foreground border-primary shadow-md shadow-primary/20"
+                                                    : "bg-card text-muted-foreground border-border hover:bg-accent"
+                                            )}
+                                        >
+                                            {r.label}
+                                        </button>
+                                    ))}
                                 </div>
-                                <Button size="sm" onClick={() => setShowFilters(false)} className="w-full bg-primary text-primary-foreground interactive">
-                                    Apply Filter
-                                </Button>
+
+                                {rangeType === 'custom' && (
+                                    <div className="bg-card p-4 rounded-xl border border-border shadow-sm flex flex-col gap-3">
+                                        <div className="flex gap-3">
+                                            <div className="flex-1">
+                                                <label className="text-[10px] font-bold text-muted-foreground uppercase mb-1 block ml-1">Start Date</label>
+                                                <input
+                                                    type="date"
+                                                    value={startDate}
+                                                    onChange={(e) => { setStartDate(e.target.value); if (endDate < e.target.value) setEndDate(e.target.value); }}
+                                                    className="w-full px-3 py-2 bg-accent rounded-lg border border-border/50 text-xs font-bold text-foreground focus:ring-2 focus:ring-primary outline-none"
+                                                />
+                                            </div>
+                                            <div className="flex-1">
+                                                <label className="text-[10px] font-bold text-muted-foreground uppercase mb-1 block ml-1">End Date</label>
+                                                <input
+                                                    type="date"
+                                                    value={endDate}
+                                                    onChange={(e) => setEndDate(e.target.value)}
+                                                    className="w-full px-3 py-2 bg-accent rounded-lg border border-border/50 text-xs font-bold text-foreground focus:ring-2 focus:ring-primary outline-none"
+                                                />
+                                            </div>
+                                        </div>
+                                        <Button size="sm" onClick={() => setShowFilters(false)} className="w-full bg-primary text-primary-foreground interactive">
+                                            Apply Filter
+                                        </Button>
+                                    </div>
+                                )}
                             </div>
                         )}
-                    </div>
-                )}
 
-                {/* Tabs */}
-                <div className="flex p-1 bg-muted/50 rounded-xl">
-                    <button
-                        onClick={() => setActiveTab('profit')}
-                        className={cn("flex-1 py-2 text-xs font-bold rounded-lg transition-all", activeTab === 'profit' ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/20" : "text-muted-foreground hover:text-foreground")}
-                    >
-                        P&L Statement
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('customers')}
-                        className={cn("flex-1 py-2 text-xs font-bold rounded-lg transition-all", activeTab === 'customers' ? "bg-blue-500 text-white shadow-md shadow-blue-500/20" : "text-muted-foreground hover:text-foreground")}
-                    >
-                        Customers
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('activity')}
-                        className={cn("flex-1 py-2 text-xs font-bold rounded-lg transition-all", activeTab === 'activity' ? "bg-rose-500 text-white shadow-md shadow-rose-500/20" : "text-muted-foreground hover:text-foreground")}
-                    >
-                        Activity
-                    </button>
+                        {/* Tabs */}
+                        <div className="flex p-1 bg-muted/50 rounded-xl">
+                            <button
+                                onClick={() => setActiveTab('profit')}
+                                className={cn("flex-1 py-2 md:py-2.5 text-xs md:text-sm font-bold rounded-lg transition-all", activeTab === 'profit' ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/20" : "text-muted-foreground hover:text-foreground")}
+                            >
+                                P&L Statement
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('customers')}
+                                className={cn("flex-1 py-2 md:py-2.5 text-xs md:text-sm font-bold rounded-lg transition-all", activeTab === 'customers' ? "bg-blue-500 text-white shadow-md shadow-blue-500/20" : "text-muted-foreground hover:text-foreground")}
+                            >
+                                Customers
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('activity')}
+                                className={cn("flex-1 py-2 md:py-2.5 text-xs md:text-sm font-bold rounded-lg transition-all", activeTab === 'activity' ? "bg-rose-500 text-white shadow-md shadow-rose-500/20" : "text-muted-foreground hover:text-foreground")}
+                            >
+                                Activity
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <div className="space-y-6">
+            <div className="h-40 md:h-44" /> {/* Spacer for larger fixed header */}
+
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
                 {/* --- PROFIT VIEW --- */}
                 {activeTab === 'profit' && (
                     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
                         <div className="grid grid-cols-2 gap-4">
-                            <div className="p-5 rounded-3xl bg-emerald-500 text-white shadow-xl shadow-emerald-500/20 relative overflow-hidden">
+                            <div className="p-4 md:p-5 rounded-3xl bg-emerald-500 text-white shadow-xl shadow-emerald-500/20 relative overflow-hidden">
                                 <div className="relative z-10">
-                                    <p className="text-emerald-100 text-xs font-bold uppercase tracking-wider mb-1">Total Revenue</p>
-                                    <p className="text-2xl font-black">₹{totalSales.toLocaleString()}</p>
+                                    <p className="text-emerald-100 text-[10px] md:text-xs font-bold uppercase tracking-wider mb-1">Total Revenue</p>
+                                    <p className="text-xl md:text-2xl font-black">₹{totalSales.toLocaleString()}</p>
                                 </div>
-                                <TrendingUp className="absolute right-[-10px] bottom-[-10px] text-emerald-600 opacity-50" size={80} />
+                                <TrendingUp className="absolute right-[-10px] bottom-[-10px] text-emerald-600 opacity-50" size={60} />
                             </div>
-                            <div className="p-5 rounded-3xl bg-rose-500 text-white shadow-xl shadow-rose-500/20 relative overflow-hidden">
+                            <div className="p-4 md:p-5 rounded-3xl bg-rose-500 text-white shadow-xl shadow-rose-500/20 relative overflow-hidden">
                                 <div className="relative z-10">
-                                    <p className="text-rose-100 text-xs font-bold uppercase tracking-wider mb-1">Total Costs</p>
-                                    <p className="text-2xl font-black">₹{(totalGoodsCost + totalOtherExpenses).toLocaleString()}</p>
+                                    <p className="text-rose-100 text-[10px] md:text-xs font-bold uppercase tracking-wider mb-1">Total Costs</p>
+                                    <p className="text-xl md:text-2xl font-black">₹{(totalGoodsCost + totalOtherExpenses).toLocaleString()}</p>
                                 </div>
-                                <TrendingDown className="absolute right-[-10px] bottom-[-10px] text-rose-600 opacity-50" size={80} />
+                                <TrendingDown className="absolute right-[-10px] bottom-[-10px] text-rose-600 opacity-50" size={60} />
                             </div>
                         </div>
 
@@ -688,7 +666,7 @@ export default function Reports() {
                                 {/* Gross Sales Row */}
                                 <div
                                     onClick={() => setSelectedDetail('sales')}
-                                    className="flex justify-between items-center p-3 -mx-3 rounded-xl hover:bg-accent/50 cursor-pointer transition-colors group"
+                                    className="flex justify-between items-center p-2.5 md:p-3 -mx-2 md:-mx-3 rounded-xl hover:bg-accent/50 cursor-pointer transition-colors group"
                                 >
                                     <div className="flex items-center gap-2">
                                         <div className="p-1.5 bg-emerald-500/10 rounded-lg text-emerald-600">
@@ -705,7 +683,7 @@ export default function Reports() {
                                 {/* Goods Sold Row */}
                                 <div
                                     onClick={() => setSelectedDetail('goods')}
-                                    className="flex justify-between items-center p-3 -mx-3 rounded-xl hover:bg-accent/50 cursor-pointer transition-colors group"
+                                    className="flex justify-between items-center p-2.5 md:p-3 -mx-2 md:-mx-3 rounded-xl hover:bg-accent/50 cursor-pointer transition-colors group"
                                 >
                                     <div className="flex items-center gap-2">
                                         <div className="p-1.5 bg-orange-500/10 rounded-lg text-orange-600">
@@ -729,7 +707,7 @@ export default function Reports() {
                                 {/* Other Expenses Row */}
                                 <div
                                     onClick={() => setSelectedDetail('expenses')}
-                                    className="flex justify-between items-center p-3 -mx-3 rounded-xl hover:bg-accent/50 cursor-pointer transition-colors group"
+                                    className="flex justify-between items-center p-2.5 md:p-3 -mx-2 md:-mx-3 rounded-xl hover:bg-accent/50 cursor-pointer transition-colors group"
                                 >
                                     <div className="flex items-center gap-2">
                                         <div className="p-1.5 bg-rose-500/10 rounded-lg text-rose-600">
@@ -743,15 +721,16 @@ export default function Reports() {
                                     </div>
                                 </div>
 
-                                <div className="bg-muted/50 p-3 rounded-xl mt-4 flex justify-between items-center border border-border/50">
-                                    <span className="text-sm font-black text-foreground uppercase tracking-wide">Net Profit</span>
-                                    <div className="text-right">
-                                        <span className={cn("text-xl font-black", netProfit >= 0 ? "text-emerald-600" : "text-rose-600")}>
-                                            ₹{netProfit.toLocaleString()}
-                                        </span>
-                                        <div className="text-[10px] font-bold text-muted-foreground">
-                                            {profitMargin.toFixed(1)}% Margin
-                                        </div>
+                            </div>
+
+                            <div className="bg-muted/50 p-2.5 md:p-3 rounded-xl mt-4 flex justify-between items-center border border-border/50">
+                                <span className="text-sm font-black text-foreground uppercase tracking-wide">Net Profit</span>
+                                <div className="text-right">
+                                    <span className={cn("text-xl font-black", netProfit >= 0 ? "text-emerald-600" : "text-rose-600")}>
+                                        ₹{netProfit.toLocaleString()}
+                                    </span>
+                                    <div className="text-[10px] font-bold text-muted-foreground">
+                                        {profitMargin.toFixed(1)}% Margin
                                     </div>
                                 </div>
                             </div>
@@ -892,14 +871,14 @@ export default function Reports() {
                                     <div
                                         key={c.name}
                                         onClick={() => setSelectedCustomer(c.name)}
-                                        className="bg-card p-4 rounded-xl border border-border/50 shadow-sm flex items-center justify-between cursor-pointer hover:bg-accent/50 transition-all group"
+                                        className="bg-card p-3 md:p-4 rounded-xl border border-border/50 shadow-sm flex items-center justify-between cursor-pointer hover:bg-accent/50 transition-all group"
                                     >
                                         <div>
-                                            <p className="font-bold text-foreground text-base mb-0.5 group-hover:text-primary transition-colors">{c.name}</p>
-                                            <p className="text-xs text-muted-foreground font-medium">{c.count} items purchased</p>
+                                            <p className="font-bold text-foreground text-sm md:text-base mb-0.5 group-hover:text-primary transition-colors">{c.name}</p>
+                                            <p className="text-[10px] md:text-xs text-muted-foreground font-medium">{c.count} items purchased</p>
                                         </div>
-                                        <div className="text-right flex items-center gap-3">
-                                            <p className="text-lg font-black text-emerald-600">₹{c.sales.toLocaleString()}</p>
+                                        <div className="text-right flex items-center gap-2 md:gap-3">
+                                            <p className="text-base md:text-lg font-black text-emerald-600">₹{c.sales.toLocaleString()}</p>
                                             <ChevronRight size={16} className="text-muted-foreground/30 group-hover:text-primary group-hover:opacity-100 transition-all" />
                                         </div>
                                     </div>
@@ -971,24 +950,24 @@ export default function Reports() {
                                 )}
 
                                 {data.transactions.map((t: any) => (
-                                    <div key={t.id} className={cn("bg-card p-4 rounded-xl shadow-sm border border-border/60 transition-all relative", isSelectionMode && selectedTransactionIds.has(t.id) && "ring-2 ring-primary bg-primary/5", activeMenuId === t.id && "z-[150]")}>
+                                    <div key={t.id} className={cn("bg-card p-3 md:p-4 rounded-xl shadow-sm border border-border/60 transition-all relative", isSelectionMode && selectedTransactionIds.has(t.id) && "ring-2 ring-primary bg-primary/5", activeMenuId === t.id && "z-[150]")}>
                                         {isSelectionMode ? (
                                             <div className="flex items-center cursor-pointer" onClick={() => toggleTransactionSelection(t.id)}>
-                                                <div className="mr-4">
+                                                <div className="mr-3 md:mr-4">
                                                     {selectedTransactionIds.has(t.id) ?
                                                         <CheckCircle2 className="text-primary fill-primary/20" /> :
                                                         <Circle className="text-muted-foreground" />
                                                     }
                                                 </div>
                                                 <div className="flex-1 min-w-0 opacity-80 pointer-events-none">
-                                                    <div className="font-bold text-foreground truncate text-base">{t.customers?.name}</div>
-                                                    <div className="text-xs text-muted-foreground flex items-center gap-1.5 mt-1 font-medium">
+                                                    <div className="font-bold text-foreground truncate text-sm md:text-base">{t.customers?.name}</div>
+                                                    <div className="text-[10px] md:text-xs text-muted-foreground flex items-center gap-1.5 mt-1 font-medium">
                                                         <span>{t.products?.name}</span>
                                                         <span className="w-1 h-1 rounded-full bg-muted-foreground/50" />
                                                         <span>{t.quantity} {t.products?.unit}</span>
                                                     </div>
                                                 </div>
-                                                <div className="font-black text-emerald-600 dark:text-emerald-400 text-lg pointer-events-none">₹{(t.quantity * t.sell_price).toLocaleString()}</div>
+                                                <div className="font-black text-emerald-600 dark:text-emerald-400 text-base md:text-lg pointer-events-none">₹{(t.quantity * t.sell_price).toLocaleString()}</div>
                                             </div>
                                         ) : (
                                             editingId === t.id ? (
@@ -1044,15 +1023,15 @@ export default function Reports() {
                                                         onMouseLeave={handleTouchEnd}
                                                     >
                                                         <div className="font-bold text-foreground truncate text-base">{t.customers?.name}</div>
-                                                        <div className="text-xs text-muted-foreground flex items-center gap-1.5 mt-1 font-medium">
+                                                        <div className="text-[10px] md:text-xs text-muted-foreground flex items-center gap-1.5 mt-1 font-medium">
                                                             <span className="text-foreground/80">{t.products?.name}</span>
                                                             <span className="w-1 h-1 rounded-full bg-muted-foreground/50" />
                                                             <span>{t.quantity} {t.products?.unit}</span>
                                                         </div>
                                                     </div>
-                                                    <div className="text-right flex items-center gap-4">
+                                                    <div className="text-right flex items-center gap-3 md:gap-4">
                                                         <div>
-                                                            <div className="font-black text-emerald-600 dark:text-emerald-400 text-lg">₹{(t.quantity * t.sell_price).toLocaleString()}</div>
+                                                            <div className="font-black text-emerald-600 dark:text-emerald-400 text-base md:text-lg">₹{(t.quantity * t.sell_price).toLocaleString()}</div>
                                                             <div className="text-[10px] text-muted-foreground font-bold opacity-70">@ ₹{t.sell_price}/-</div>
                                                         </div>
                                                         <div className="relative">
@@ -1127,13 +1106,13 @@ export default function Reports() {
                             <div className="space-y-3">
                                 {combinedExpenses.map((e: any) => (
                                     <div key={e.id} className={cn(
-                                        "bg-card p-4 rounded-xl shadow-sm border border-border/60 hover:shadow-md transition-all relative",
+                                        "bg-card p-3 md:p-4 rounded-xl shadow-sm border border-border/60 hover:shadow-md transition-all relative",
                                         isSelectionMode && selectedExpenseIds.has(e.id) && "ring-2 ring-primary bg-primary/5",
                                         activeMenuId === e.id && "z-[150]"
                                     )}>
                                         {isSelectionMode && e.type === 'manual' ? (
                                             <div className="flex items-center cursor-pointer" onClick={() => toggleExpenseSelection(e.id)}>
-                                                <div className="mr-4">
+                                                <div className="mr-3 md:mr-4">
                                                     {selectedExpenseIds.has(e.id) ?
                                                         <CheckCircle2 className="text-primary fill-primary/20" /> :
                                                         <Circle className="text-muted-foreground" />
@@ -1141,7 +1120,7 @@ export default function Reports() {
                                                 </div>
                                                 <div className="flex-1 opacity-70 pointer-events-none">
                                                     <div className="font-bold text-foreground text-sm">{e.title}</div>
-                                                    <div className="text-rose-600 font-bold">-₹{e.amount.toLocaleString()}</div>
+                                                    <div className="text-rose-600 font-bold text-base md:text-xl">-₹{e.amount.toLocaleString()}</div>
                                                 </div>
                                             </div>
                                         ) : isSelectionMode && e.type !== 'manual' ? (
@@ -1216,8 +1195,8 @@ export default function Reports() {
                                                                 )}
                                                             </div>
                                                         </div>
-                                                        <div className="text-right flex items-center gap-4">
-                                                            <div className="font-black text-rose-600 dark:text-rose-400 text-lg">-₹{e.amount.toLocaleString()}</div>
+                                                        <div className="text-right flex items-center gap-3 md:gap-4">
+                                                            <div className="font-black text-rose-600 dark:text-rose-400 text-base md:text-lg">-₹{e.amount.toLocaleString()}</div>
                                                             {e.type === 'manual' && (
                                                                 <div className="relative">
                                                                     <button
@@ -1291,7 +1270,7 @@ export default function Reports() {
             >
                 {
                     selectedCustomer && (() => {
-                        const { transactions, totalSold, totalBought, customerProfit } = getCustomerFinancials(selectedCustomer);
+                        const { transactions, totalSold, totalBought, customerProfit } = getCustomerFinancials(selectedCustomer!);
 
                         return (
                             <>
@@ -1434,15 +1413,7 @@ export default function Reports() {
                 </div>
             </Modal>
 
-            {/* Backdrop for Menu (Visual Only) */}
-            {
-                activeMenuId && (
-                    <div
-                        className="fixed inset-0 z-[90] bg-black/5 pointer-events-none"
-                        style={{ WebkitTapHighlightColor: 'transparent' }}
-                    />
-                )
-            }
+
         </div >
     );
 }

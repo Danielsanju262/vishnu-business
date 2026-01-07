@@ -1,19 +1,21 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
-import { ArrowLeft, Check, Fuel, Utensils, Wrench, Sparkles, Plus, Trash2, Edit2, Settings2, X, CheckCircle2, Circle, Search } from "lucide-react";
+import { ArrowLeft, Check, Fuel, Utensils, Wrench, Sparkles, Plus, Trash2, Edit2, Settings2, X, CheckCircle2, Circle } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useToast } from "../components/toast-provider";
 
-import { useClickOutside } from "../hooks/useClickOutside";
 import { useRealtimeTable } from "../hooks/useRealtimeSync";
+import { useDropdownClose } from "../hooks/useDropdownClose";
 
 type Preset = {
     id: string;
     label: string;
 };
+
+import { ConfirmationModal } from "../components/ui/ConfirmationModal";
 
 export default function NewExpense() {
     const navigate = useNavigate();
@@ -27,7 +29,8 @@ export default function NewExpense() {
     const [presetSearch, setPresetSearch] = useState("");
 
     // Hook for click outside
-    const suggestionsRef = useClickOutside<HTMLDivElement>(() => setShowSuggestions(false));
+    const suggestionsRef = useRef<HTMLDivElement>(null);
+    useDropdownClose(showSuggestions, () => setShowSuggestions(false), suggestionsRef);
 
     // Presets Management
     const [presets, setPresets] = useState<Preset[]>([]);
@@ -38,14 +41,6 @@ export default function NewExpense() {
     const [presetName, setPresetName] = useState("");
     const [editingPresetId, setEditingPresetId] = useState<string | null>(null);
 
-    // Payment Mode State
-    const [paymentMode, setPaymentMode] = useState<'cash' | 'credit'>('cash');
-    const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
-    const [supplierSearch, setSupplierSearch] = useState("");
-    const [selectedSupplierId, setSelectedSupplierId] = useState<string>("");
-    const [paymentDueDate, setPaymentDueDate] = useState("");
-    const [showSupplierList, setShowSupplierList] = useState(false);
-
     // Menu & Long Press
     const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
     const timerRef = useRef<any>(null);
@@ -53,21 +48,23 @@ export default function NewExpense() {
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [isSelectionMode, setIsSelectionMode] = useState(false);
 
-    useEffect(() => {
-        const fetchSuppliers = async () => {
-            const { data } = await supabase
-                .from('suppliers')
-                .select('id, name')
-                .eq('is_active', true)
-                .order('name');
-            if (data) setSuppliers(data);
-        };
-        fetchSuppliers();
-    }, []);
+    const [confirmConfig, setConfirmConfig] = useState<{
+        isOpen: boolean;
+        title: string;
+        description: string;
+        onConfirm: () => void;
+        variant?: "default" | "destructive";
+        confirmText?: string;
+    }>({
+        isOpen: false,
+        title: "",
+        description: "",
+        onConfirm: () => { },
+        variant: "destructive",
+    });
 
-    const filteredSuppliers = suppliers.filter(s =>
-        s.name.toLowerCase().includes(supplierSearch.toLowerCase())
-    );
+    const closeConfirm = () => setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+
 
     const handleTouchStart = (id: string, currentSelected: boolean = false) => {
         timerRef.current = setTimeout(() => {
@@ -98,17 +95,10 @@ export default function NewExpense() {
     // Real-time sync for expense presets - auto-refreshes when data changes on any device
     useRealtimeTable('expense_presets', fetchPresets, []);
 
-    // Close menu on ESC
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === "Escape") {
-                if (activeMenuId) setActiveMenuId(null);
-                if (showSuggestions) setShowSuggestions(false);
-            }
-        };
-        window.addEventListener("keydown", handleKeyDown);
-        return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [activeMenuId, showSuggestions]);
+    // Close menu on ESC or click outside
+    useDropdownClose(!!activeMenuId, () => setActiveMenuId(null));
+
+
 
     const handleSave = async () => {
         if (!title || !amount || !date) {
@@ -116,48 +106,21 @@ export default function NewExpense() {
             return;
         }
 
-        if (paymentMode === 'credit' && (!selectedSupplierId || !paymentDueDate)) {
-            toast("Please select a supplier and due date for credit expense", "warning");
-            return;
-        }
-
-        // 1. Create Expense
-        const { data: expenseData, error } = await supabase
+        // Create Expense
+        const { error } = await supabase
             .from("expenses")
             .insert([{
                 title,
                 amount: parseFloat(amount),
                 date: date
-            }])
-            .select();
+            }]);
 
         if (error) {
             toast(`Failed to save: ${error.message}`, "error");
             return;
         }
 
-        // 2. Create Payable if Credit
-        if (paymentMode === 'credit' && expenseData) {
-            const { error: payableError } = await supabase
-                .from('accounts_payable')
-                .insert({
-                    supplier_id: selectedSupplierId,
-                    amount: parseFloat(amount),
-                    due_date: paymentDueDate,
-                    note: `Expense: ${title}`,
-                    status: 'pending',
-                    recorded_at: new Date().toISOString()
-                });
-
-            if (payableError) {
-                console.error("Failed to create payable:", payableError);
-                toast("Expense saved but failed to add to Payables", "warning");
-            } else {
-                toast("Expense & Payable saved", "success");
-            }
-        } else {
-            toast("Expense saved", "success");
-        }
+        toast("Expense saved", "success");
 
         // Check presets logic...
         const matchingPreset = presets.find(p => p.label.toLowerCase() === title.toLowerCase());
@@ -205,36 +168,43 @@ export default function NewExpense() {
         }
     };
 
-    const deletePreset = async (id: string, e: React.MouseEvent) => {
+    const deletePreset = (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
 
         // Find preset to get label
         const preset = presets.find(p => p.id === id);
         if (!preset) return;
 
-        if (!await confirm(`Delete "${preset.label}"?`)) return;
+        setConfirmConfig({
+            isOpen: true,
+            title: `Delete "${preset.label}"?`,
+            description: "This preset will be moved to trash.",
+            onConfirm: async () => {
+                // Optimistic update
+                const previousPresets = [...presets];
+                setPresets(presets.filter(p => p.id !== id));
 
-        // Optimistic update
-        const previousPresets = [...presets];
-        setPresets(presets.filter(p => p.id !== id));
+                // Soft delete
+                const { error } = await supabase.from('expense_presets').update({ deleted_at: new Date().toISOString() }).eq('id', id);
 
-        // Soft delete
-        const { error } = await supabase.from('expense_presets').update({ deleted_at: new Date().toISOString() }).eq('id', id);
-
-        if (!error) {
-            toast("Preset deleted", "success", {
-                label: "Undo",
-                onClick: async () => {
-                    // Restore
-                    setPresets(previousPresets);
-                    await supabase.from('expense_presets').update({ deleted_at: null }).eq('id', id);
-                    toast("Deletion undone", "success");
+                if (!error) {
+                    toast("Preset deleted", "success", {
+                        label: "Undo",
+                        onClick: async () => {
+                            // Restore
+                            setPresets(previousPresets);
+                            await supabase.from('expense_presets').update({ deleted_at: null }).eq('id', id);
+                            toast("Deletion undone", "success");
+                        }
+                    }, 10000); // 10 seconds duration
+                } else {
+                    setPresets(previousPresets); // Revert on error
+                    toast(`Failed to delete: ${error.message}`, "error");
                 }
-            }, 10000); // 10 seconds duration
-        } else {
-            setPresets(previousPresets); // Revert on error
-            toast(`Failed to delete: ${error.message}`, "error");
-        }
+            },
+            variant: "destructive",
+            confirmText: "Delete"
+        });
     };
 
     const editPreset = (p: Preset, e: React.MouseEvent) => {
@@ -254,6 +224,7 @@ export default function NewExpense() {
         if (newSet.has(id)) newSet.delete(id);
         else newSet.add(id);
         setSelectedIds(newSet);
+        if (newSet.size === 0) setIsSelectionMode(false);
     };
 
     const toggleSelectAll = () => {
@@ -264,18 +235,25 @@ export default function NewExpense() {
         }
     };
 
-    const deleteSelected = async () => {
+    const deleteSelected = () => {
         if (selectedIds.size === 0) return;
-        if (!await confirm(`Delete ${selectedIds.size} presets?`)) return;
-
-        const { error } = await supabase.from('expense_presets').update({ deleted_at: new Date().toISOString() }).in('id', Array.from(selectedIds));
-        if (!error) {
-            toast(`Deleted ${selectedIds.size} presets`, "success");
-            toggleSelectionMode();
-            fetchPresets();
-        } else {
-            toast("Failed to delete", "error");
-        }
+        setConfirmConfig({
+            isOpen: true,
+            title: `Delete ${selectedIds.size} presets?`,
+            description: "These presets will be moved to trash.",
+            onConfirm: async () => {
+                const { error } = await supabase.from('expense_presets').update({ deleted_at: new Date().toISOString() }).in('id', Array.from(selectedIds));
+                if (!error) {
+                    toast(`Deleted ${selectedIds.size} presets`, "success");
+                    toggleSelectionMode();
+                    fetchPresets();
+                } else {
+                    toast("Failed to delete", "error");
+                }
+            },
+            variant: "destructive",
+            confirmText: "Delete All"
+        });
     };
 
     const getIcon = (name: string) => {
@@ -287,7 +265,7 @@ export default function NewExpense() {
     };
 
     return (
-        <div className="container mx-auto max-w-lg min-h-screen bg-background flex flex-col animate-in fade-in pb-8">
+        <div className="w-full md:max-w-lg md:mx-auto bg-background flex flex-col animate-in fade-in">
             {/* Glassmorphism Header */}
             {/* Glassmorphism Header */}
             {isSelectionMode && isManageMode ? (
@@ -308,18 +286,18 @@ export default function NewExpense() {
                     </div>
                 </div>
             ) : (
-                <div className="sticky top-0 z-50 bg-background/95 backdrop-blur-xl border-b border-border shadow-sm px-4 py-3 flex items-center justify-between transition-all w-full">
+                <div className="fixed top-0 left-0 right-0 z-50 bg-white dark:bg-gray-900 border-b border-border shadow-sm px-3 py-3 md:px-4 flex items-center justify-between transition-all w-full mb-4">
                     {isManageMode ? (
-                        <button onClick={() => setIsManageMode(false)} className="p-2.5 -ml-2 rounded-full hover:bg-accent hover:text-foreground text-muted-foreground transition interactive active:scale-95">
+                        <button onClick={() => setIsManageMode(false)} className="p-2 -ml-2 rounded-full hover:bg-accent hover:text-foreground text-muted-foreground transition interactive active:scale-95">
                             <ArrowLeft size={20} />
                         </button>
                     ) : (
-                        <button onClick={() => navigate("/")} className="p-2.5 -ml-2 rounded-full hover:bg-accent hover:text-foreground text-muted-foreground transition interactive active:scale-95">
+                        <button onClick={() => navigate("/")} className="p-2 -ml-2 rounded-full hover:bg-accent hover:text-foreground text-muted-foreground transition interactive active:scale-95">
                             <ArrowLeft size={20} />
                         </button>
                     )}
 
-                    <h1 className="text-lg font-black text-foreground tracking-tight">New Expense</h1>
+                    <h1 className="text-base md:text-lg font-black text-foreground tracking-tight">New Expense</h1>
 
                     {/* Right Action Button */}
                     {isManageMode ? (
@@ -334,9 +312,9 @@ export default function NewExpense() {
                 </div>
             )}
 
-            <div className="p-4 flex-1 flex flex-col space-y-6">
+            <div className="p-3 md:p-4 flex flex-col space-y-3 md:space-y-4 pt-20 md:pt-20">
                 {/* Quick Select Grid */}
-                <div className="flex-1">
+                <div>
                     <div className="flex justify-between items-center mb-4">
                         <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider pl-1">
                             {isManageMode ? "Manage Quick Expenses" : "Quick Select"}
@@ -413,7 +391,7 @@ export default function NewExpense() {
                                     </div>
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-3 gap-3">
+                                <div className="grid grid-cols-3 gap-2 md:gap-3">
                                     {presets.length === 0 && (
                                         <div className="col-span-3 text-center py-8 text-muted-foreground text-sm border-2 border-dashed border-border/60 rounded-3xl bg-accent/20">
                                             No presets found. <br /> Tap the <Settings2 size={14} className="inline mx-1" /> icon to add one!
@@ -434,7 +412,7 @@ export default function NewExpense() {
                                                 onMouseUp={handleTouchEnd}
                                                 onMouseLeave={handleTouchEnd}
                                                 className={cn(
-                                                    "relative flex flex-col items-center gap-3 p-4 rounded-2xl border-2 transition-all duration-200 group min-h-[110px] justify-center active:scale-95 shadow-sm cursor-pointer select-none",
+                                                    "relative flex flex-col items-center gap-2 md:gap-3 p-3 md:p-4 rounded-2xl border-2 transition-all duration-200 group min-h-[100px] md:min-h-[110px] justify-center active:scale-95 shadow-sm cursor-pointer select-none",
                                                     selected
                                                         ? "border-primary bg-primary/10 text-primary shadow-primary/20"
                                                         : "border-border/60 bg-card text-muted-foreground hover:border-primary/30 hover:bg-accent/50 hover:text-foreground"
@@ -455,9 +433,9 @@ export default function NewExpense() {
 
                 {/* Custom Entry Fields */}
                 {!isManageMode && (
-                    <div className="bg-card border border-border rounded-t-3xl shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.1)] -mx-4 -mb-4 p-6 space-y-5 animate-in slide-in-from-bottom-6 z-10">
+                    <div className="bg-card border border-border rounded-3xl shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.1)] p-4 md:p-5 space-y-3 md:space-y-4 animate-in slide-in-from-bottom-6 z-10 mt-4 mb-1">
                         {/* Title Input */}
-                        <div className="space-y-4">
+                        <div className="space-y-3 md:space-y-4">
                             <div className="relative" ref={suggestionsRef}>
                                 <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5 block ml-1">Title</label>
                                 <Input
@@ -468,7 +446,7 @@ export default function NewExpense() {
                                     }}
                                     onFocus={() => setShowSuggestions(title.length > 0)}
                                     placeholder="Expense Name"
-                                    className="bg-accent/50 border-border/50 text-foreground placeholder:text-muted-foreground/50 font-bold h-12 rounded-xl focus:bg-background transition-all"
+                                    className="bg-accent/50 border-border/50 text-foreground placeholder:text-muted-foreground/50 font-bold h-11 md:h-12 rounded-xl focus:bg-background transition-all"
                                 />
 
                                 {/* Suggestions Dropdown */}
@@ -505,10 +483,10 @@ export default function NewExpense() {
                                 <div>
                                     <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5 block ml-1">Amount</label>
                                     <div className="relative">
-                                        <span className="absolute left-3.5 top-3.5 text-muted-foreground font-bold">₹</span>
+                                        <span className="absolute left-3.5 top-2.5 md:top-3.5 text-muted-foreground font-bold">₹</span>
                                         <input
                                             type="number"
-                                            className="w-full bg-accent/50 border border-border/50 rounded-xl py-3 pl-8 pr-4 text-lg font-bold text-foreground outline-none focus:ring-2 focus:ring-primary focus:bg-background transition-all"
+                                            className="w-full bg-accent/50 border border-border/50 rounded-xl py-2.5 md:py-3 pl-8 pr-4 text-base md:text-lg font-bold text-foreground outline-none focus:ring-2 focus:ring-primary focus:bg-background transition-all"
                                             placeholder="0"
                                             value={amount}
                                             onChange={e => setAmount(e.target.value)}
@@ -519,119 +497,37 @@ export default function NewExpense() {
                                     <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5 block ml-1">Date</label>
                                     <input
                                         type="date"
-                                        className="w-full bg-accent/50 border border-border/50 rounded-xl py-3 px-3 text-sm font-bold text-foreground outline-none focus:ring-2 focus:ring-primary focus:bg-background transition-all"
+                                        className="w-full bg-accent/50 border border-border/50 rounded-xl py-2.5 md:py-3 px-3 text-xs md:text-sm font-bold text-foreground outline-none focus:ring-2 focus:ring-primary focus:bg-background transition-all"
                                         value={date}
                                         onChange={e => setDate(e.target.value)}
                                     />
                                 </div>
                             </div>
 
-                            {/* Payment Mode Toggle */}
-                            <div className="bg-accent/30 p-1 rounded-xl flex">
-                                <button
-                                    className={cn(
-                                        "flex-1 py-2 rounded-lg text-xs font-bold transition-all duration-200",
-                                        paymentMode === 'cash'
-                                            ? "bg-background text-foreground shadow-sm ring-1 ring-border/50"
-                                            : "text-muted-foreground hover:text-foreground"
-                                    )}
-                                    onClick={() => setPaymentMode('cash')}
-                                >
-                                    Paid Now
-                                </button>
-                                <button
-                                    className={cn(
-                                        "flex-1 py-2 rounded-lg text-xs font-bold transition-all duration-200",
-                                        paymentMode === 'credit'
-                                            ? "bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 shadow-sm"
-                                            : "text-muted-foreground hover:text-foreground"
-                                    )}
-                                    onClick={() => setPaymentMode('credit')}
-                                >
-                                    Pay Later
-                                </button>
-                            </div>
 
-                            {/* Credit Fields */}
-                            {paymentMode === 'credit' && (
-                                <div className="space-y-4 animate-in slide-in-from-top-2 pt-2">
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Select Supplier</label>
-                                        <div className="relative">
-                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
-                                            <input
-                                                type="text"
-                                                placeholder="Search supplier..."
-                                                className="w-full bg-accent/50 border border-border/50 rounded-xl pl-10 pr-4 h-11 text-sm font-bold outline-none focus:ring-2 focus:ring-primary focus:bg-background transition-all"
-                                                value={supplierSearch}
-                                                onChange={e => {
-                                                    setSupplierSearch(e.target.value);
-                                                    setShowSupplierList(true);
-                                                }}
-                                                onFocus={() => setShowSupplierList(true)}
-                                            />
-                                        </div>
-
-                                        {showSupplierList && (supplierSearch.trim() !== "") && (
-                                            <div className="max-h-40 overflow-y-auto border border-border/50 bg-background rounded-xl shadow-lg divide-y divide-border/30">
-                                                {filteredSuppliers.length > 0 ? (
-                                                    filteredSuppliers.map(s => (
-                                                        <button
-                                                            key={s.id}
-                                                            onClick={() => {
-                                                                setSelectedSupplierId(s.id);
-                                                                setSupplierSearch(s.name);
-                                                                setShowSupplierList(false);
-                                                            }}
-                                                            className={cn(
-                                                                "w-full text-left px-4 py-3 text-sm font-bold transition-colors hover:bg-accent",
-                                                                selectedSupplierId === s.id ? "bg-primary/5 text-primary" : "text-foreground"
-                                                            )}
-                                                        >
-                                                            {s.name}
-                                                        </button>
-                                                    ))
-                                                ) : (
-                                                    <div className="p-3 text-center">
-                                                        <p className="text-xs text-muted-foreground mb-2">No supplier found</p>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Payment Due Date</label>
-                                        <input
-                                            type="date"
-                                            className="w-full bg-accent/50 border border-border/50 rounded-xl px-4 h-11 text-sm font-bold outline-none focus:ring-2 focus:ring-primary focus:bg-background transition-all"
-                                            value={paymentDueDate}
-                                            onChange={e => setPaymentDueDate(e.target.value)}
-                                        />
-                                    </div>
-                                </div>
-                            )}
 
                             <Button
                                 size="lg"
-                                className="w-full h-14 text-lg font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-xl shadow-rose-500/20 rounded-2xl transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                                className="w-full h-12 md:h-14 text-base md:text-lg font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-xl shadow-rose-500/20 rounded-2xl transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
                                 onClick={handleSave}
                             >
                                 <Check className="mr-2" size={20} />
-                                {paymentMode === 'credit' ? 'Record Expense & Payable' : 'Add Expense'}
+                                Add Expense
                             </Button>
                         </div>
                     </div>
                 )}
             </div>
 
-            {/* Backdrop for Menu */}
-            {activeMenuId && (
-                <div
-                    className="fixed inset-0 z-[40] bg-black/5 backdrop-blur-[1px]"
-                    onClick={() => setActiveMenuId(null)}
-                />
-            )}
+            <ConfirmationModal
+                isOpen={confirmConfig.isOpen}
+                onClose={closeConfirm}
+                onConfirm={confirmConfig.onConfirm}
+                title={confirmConfig.title}
+                description={confirmConfig.description}
+                variant={confirmConfig.variant}
+                confirmText={confirmConfig.confirmText}
+            />
         </div>
     );
 }

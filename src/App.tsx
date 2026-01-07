@@ -10,10 +10,12 @@ import NewSale from "./pages/NewSale";
 import NewExpense from "./pages/NewExpense";
 import Reports from "./pages/Reports";
 import PaymentReminders from "./pages/PaymentReminders";
+import CustomerPaymentDetail from "./pages/CustomerPaymentDetail";
 import Settings from "./pages/Settings";
 import MasterPinSetup from "./pages/MasterPinSetup";
 import AccountsPayable from "./pages/AccountsPayable";
 import Suppliers from "./pages/Suppliers";
+import SupplierPaymentDetail from "./pages/SupplierPaymentDetail";
 
 import ScrollToTop from "./components/ScrollToTop";
 import { AuthProvider, useAuth } from "./context/AuthContext";
@@ -78,7 +80,9 @@ function AppContent() {
           <Route path="products" element={<Products />} />
           <Route path="reports" element={<Reports />} />
           <Route path="payment-reminders" element={<PaymentReminders />} />
+          <Route path="payment-reminders/:customerId" element={<CustomerPaymentDetail />} />
           <Route path="accounts-payable" element={<AccountsPayable />} />
+          <Route path="accounts-payable/:supplierId" element={<SupplierPaymentDetail />} />
           <Route path="suppliers" element={<Suppliers />} />
           <Route path="settings" element={<Settings />} />
           <Route path="sale/new" element={<NewSale />} />

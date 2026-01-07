@@ -1,12 +1,14 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { Button } from "../components/ui/Button";
-import { ArrowLeft, Plus, Trash2, Search, IndianRupee, Calendar, Receipt, X, Check, XCircle, WifiOff, History } from "lucide-react";
+import { ArrowLeft, Plus, Receipt, IndianRupee, Calendar, WifiOff, Search, Edit2 } from "lucide-react";
 import { useToast } from "../components/toast-provider";
 import { cn } from "../lib/utils";
 import { Link } from "react-router-dom";
 import { useRealtimeTable } from "../hooks/useRealtimeSync";
 import { Modal } from "../components/ui/Modal";
+import { useDropdownClose } from "../hooks/useDropdownClose";
 
 type Customer = {
     id: string;
@@ -23,134 +25,57 @@ type PaymentReminder = {
     recorded_at: string;
 };
 
+// Grouped customer data for display
+type GroupedCustomer = {
+    customerId: string;
+    customerName: string;
+    totalBalance: number;
+    earliestDueDate: string;
+    reminders: PaymentReminder[]; // All reminders for this customer
+    primaryReminder: PaymentReminder; // The one with earliest due date (for quick actions)
+};
+
 export default function PaymentReminders() {
-    const { toast, confirm } = useToast();
+    const navigate = useNavigate();
+    const { toast } = useToast();
 
     // Data State
     const [reminders, setReminders] = useState<PaymentReminder[]>([]);
     const [customers, setCustomers] = useState<Customer[]>([]);
     const [loading, setLoading] = useState(true);
     const [setupRequired, setSetupRequired] = useState(false);
-
-    // UI State
-    const [isAdding, setIsAdding] = useState(false);
-    const [searchQuery, setSearchQuery] = useState("");
-    const [editingId, setEditingId] = useState<string | null>(null);
-
-    // Selection State
-    const [isSelectionMode, setIsSelectionMode] = useState(false);
-    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-    const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
     const isFirstLoad = useRef(true);
 
-    // Form State
-    const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
+    // Quick Action Modals
+    const [quickActionCustomer, setQuickActionCustomer] = useState<{ id: string; name: string; reminder: PaymentReminder; totalBalance: number } | null>(null);
+    const [actionType, setActionType] = useState<'add' | 'receive' | null>(null);
     const [amount, setAmount] = useState("");
     const [dueDate, setDueDate] = useState("");
-    const [note, setNote] = useState("");
-    const [customerSearch, setCustomerSearch] = useState("");
 
-    // Partial Payment State
-    const [receivePaymentId, setReceivePaymentId] = useState<string | null>(null);
-    const [receiveAmount, setReceiveAmount] = useState("");
-    const [receiveNextDate, setReceiveNextDate] = useState("");
+    // New Reminder Modal
+    const [showNewReminder, setShowNewReminder] = useState(false);
+    const [newReminderCustomer, setNewReminderCustomer] = useState<string>("");
+    const [newReminderCustomerSearch, setNewReminderCustomerSearch] = useState("");
+    const [newReminderAmount, setNewReminderAmount] = useState("");
+    const [newReminderDueDate, setNewReminderDueDate] = useState("");
+    const [showCustomerList, setShowCustomerList] = useState(false);
 
-    const handleReceivePayment = async (reminder: PaymentReminder) => {
-        const received = parseFloat(receiveAmount);
-        if (isNaN(received) || received <= 0) {
-            toast("Please enter a valid amount", "warning");
-            return;
-        }
+    // Edit Due Date Modal
+    const [editDateCustomer, setEditDateCustomer] = useState<{ id: string; name: string } | null>(null);
+    const [editDateValue, setEditDateValue] = useState("");
 
-        const newBalance = reminder.amount - received;
-        const isFullPayment = newBalance <= 0;
-
-        if (!isFullPayment && !receiveNextDate) {
-            toast("Please set a next due date for the remaining balance", "warning");
-            return;
-        }
-
-        // Append to existing note or create new
-        const today = new Date();
-        const dateStr = today.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-        const timeStr = today.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-
-        let newNote = reminder.note || "";
-        if (newNote) newNote += "\n";
-        newNote += `[${dateStr} ${timeStr}] Received: ₹${received.toLocaleString()}. Balance: ₹${isFullPayment ? 0 : newBalance.toLocaleString()}`;
-
-        const updates: any = {
-            note: newNote,
-            amount: isFullPayment ? 0 : newBalance
-        };
-
-        if (isFullPayment) {
-            updates.status = 'paid';
-        } else if (receiveNextDate) {
-            // Update due date for the remaining balance
-            updates.due_date = receiveNextDate;
-        }
-
-        const { error } = await supabase
-            .from('payment_reminders')
-            .update(updates)
-            .eq('id', reminder.id);
-
-        if (error) {
-            console.error(error);
-            toast("Failed to update payment", "error");
-        } else {
-            toast(isFullPayment ? "Marked as fully paid" : `Updated balance: ₹${newBalance.toLocaleString()}`, "success");
-            setReceivePaymentId(null);
-            setReceiveAmount("");
-            setReceiveNextDate("");
-        }
-    };
-
-    // Migrate localStorage data to Supabase on first load
-    const migrateLocalStorageToSupabase = useCallback(async () => {
-        const stored = localStorage.getItem('vishnu_payment_reminders');
-        if (stored) {
-            try {
-                const localReminders = JSON.parse(stored);
-                if (localReminders.length > 0) {
-                    // Map old format to new Supabase format
-                    const remindersToInsert = localReminders.map((r: any) => ({
-                        customer_id: r.customerId,
-                        amount: r.amount,
-                        due_date: r.dueDate,
-                        note: r.note || null,
-                        status: r.status,
-                        recorded_at: r.recordedAt
-                    }));
-
-                    const { error } = await supabase.from('payment_reminders').insert(remindersToInsert);
-
-                    if (!error) {
-                        // Clear localStorage after successful migration
-                        localStorage.removeItem('vishnu_payment_reminders');
-                        console.log('[Migration] Successfully migrated payment reminders to Supabase');
-                    } else {
-                        console.error('[Migration] Error migrating reminders:', error);
-                    }
-                }
-            } catch (e) {
-                console.error('[Migration] Failed to parse localStorage reminders:', e);
-            }
-        }
-    }, []);
+    // Close dropdowns on ESC or click outside
+    const listRef = useRef<HTMLDivElement>(null);
+    useDropdownClose(showCustomerList, () => setShowCustomerList(false), listRef);
 
     const loadData = useCallback(async () => {
-        // Only show loading spinner on initial load, not during background syncs
         if (isFirstLoad.current) setLoading(true);
 
-        // Check and migrate localStorage data
-        await migrateLocalStorageToSupabase();
-
-        // Load Reminders from Supabase
+        // Load Reminders
         const { data: remindersData, error } = await supabase
             .from("payment_reminders")
             .select("*")
+            .eq("status", "pending")
             .order("due_date", { ascending: true });
 
         if (error) {
@@ -159,19 +84,12 @@ export default function PaymentReminders() {
                 setSetupRequired(true);
                 setLoading(false);
                 return;
-            } else {
-                toast(`Error: ${error.message} (${error.code})`, "error");
-                // Retry once silently after 2s
-                setTimeout(async () => {
-                    const { data } = await supabase.from("payment_reminders").select("*");
-                    if (data) setReminders(data);
-                }, 2000);
             }
         } else if (remindersData) {
             setReminders(remindersData);
         }
 
-        // Load Customers from Supabase
+        // Load Customers
         const { data: customersData } = await supabase
             .from("customers")
             .select("id, name")
@@ -181,19 +99,16 @@ export default function PaymentReminders() {
 
         setLoading(false);
         isFirstLoad.current = false;
-    }, [migrateLocalStorageToSupabase, toast]);
+    }, []);
 
-    // Setup real-time subscription for payment_reminders table
     useRealtimeTable('payment_reminders', loadData, []);
 
-    // Also subscribe to customers for real-time customer updates
     useEffect(() => {
         const channel = supabase
             .channel('customers-changes')
             .on('postgres_changes',
                 { event: '*', schema: 'public', table: 'customers' },
                 () => {
-                    // Refresh customers when they change
                     supabase.from("customers").select("id, name").eq('is_active', true).order("name")
                         .then(({ data }) => {
                             if (data) setCustomers(data);
@@ -207,158 +122,203 @@ export default function PaymentReminders() {
         };
     }, []);
 
-    const handleAddReminder = async () => {
-        if (!selectedCustomerId || !amount || !dueDate) {
-            toast("Please fill all required fields", "warning");
-            return;
-        }
-
-        if (editingId) {
-            // Update existing reminder
-            const { error } = await supabase
-                .from('payment_reminders')
-                .update({
-                    customer_id: selectedCustomerId,
-                    amount: parseFloat(amount),
-                    due_date: dueDate,
-                    note: note || null
-                })
-                .eq('id', editingId);
-
-            if (error) {
-                toast("Failed to update reminder", "error");
-                console.error(error);
-            } else {
-                toast("Reminder updated", "success");
-            }
-        } else {
-            // Create new reminder
-            const { error } = await supabase
-                .from('payment_reminders')
-                .insert({
-                    customer_id: selectedCustomerId,
-                    amount: parseFloat(amount),
-                    due_date: dueDate,
-                    note: note || null,
-                    status: 'pending',
-                    recorded_at: new Date().toISOString()
-                });
-
-            if (error) {
-                toast("Failed to create reminder", "error");
-                console.error(error);
-            } else {
-                toast("Reminder added", "success");
-            }
-        }
-
-        resetForm();
-    };
-
-    const resetForm = () => {
-        setIsAdding(false);
-        setEditingId(null);
-        setSelectedCustomerId("");
-        setAmount("");
-        setDueDate("");
-        setNote("");
-        setCustomerSearch("");
-    };
-
-    const handleEdit = (reminder: PaymentReminder) => {
-        setEditingId(reminder.id);
-        setSelectedCustomerId(reminder.customer_id);
-        setAmount(reminder.amount.toString());
-        setDueDate(reminder.due_date);
-        setNote(reminder.note || "");
-        setIsAdding(true);
-    };
-
-
-
-    const handleDelete = async (id: string) => {
-        if (!await confirm("Delete this reminder?")) return;
-
-        const { error } = await supabase
-            .from('payment_reminders')
-            .delete()
-            .eq('id', id);
-
-        if (error) {
-            toast("Failed to delete reminder", "error");
-        } else {
-            toast("Reminder deleted", "success");
-        }
-    };
-
-    // Bulk Actions
-    const handleTouchStart = (id: string) => {
-        if (isSelectionMode) return;
-
-        const timer = setTimeout(() => {
-            if (navigator.vibrate) navigator.vibrate(50);
-            setIsSelectionMode(true);
-            const newSet = new Set(selectedIds);
-            newSet.add(id);
-            setSelectedIds(newSet);
-        }, 500);
-        setLongPressTimer(timer);
-    };
-
-    const handleTouchEnd = () => {
-        if (longPressTimer) {
-            clearTimeout(longPressTimer);
-            setLongPressTimer(null);
-        }
-    };
-
-    const toggleSelection = (id: string) => {
-        const newSet = new Set(selectedIds);
-        if (newSet.has(id)) {
-            newSet.delete(id);
-            if (newSet.size === 0) setIsSelectionMode(false);
-        } else {
-            newSet.add(id);
-        }
-        setSelectedIds(newSet);
-    };
-
-    const handleBulkDelete = async () => {
-        if (!await confirm(`Delete ${selectedIds.size} reminders?`)) return;
-
-        const idsToDelete = Array.from(selectedIds);
-        const { error } = await supabase
-            .from('payment_reminders')
-            .delete()
-            .in('id', idsToDelete);
-
-        if (error) {
-            toast("Failed to delete reminders", "error");
-        } else {
-            toast(`Deleted ${selectedIds.size} reminders`, "success");
-            setIsSelectionMode(false);
-            setSelectedIds(new Set());
-        }
-    };
-
     const getCustomerName = (id: string) => {
         return customers.find(c => c.id === id)?.name || "Unknown Customer";
     };
 
-    const sortedReminders = [...reminders].sort((a, b) => {
-        // Pending first
-        if (a.status !== b.status) return a.status === 'pending' ? -1 : 1;
-        // Then by due date (soonest first)
-        return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
-    });
+    // Group reminders by customer - ONE card per customer
+    const groupedCustomers = useMemo((): GroupedCustomer[] => {
+        if (!reminders || !reminders.length) return [];
 
-    const filteredReminders = sortedReminders.filter(r => {
-        const cName = getCustomerName(r.customer_id).toLowerCase();
-        return cName.includes(searchQuery.toLowerCase());
-    });
+        try {
+            const customerMap = new Map<string, PaymentReminder[]>();
 
-    const filteredCustomers = customers.filter(c =>
-        c.name.toLowerCase().includes(customerSearch.toLowerCase())
+            // Group reminders by customer_id
+            reminders.forEach(reminder => {
+                if (!reminder || !reminder.customer_id) return;
+                const existing = customerMap.get(reminder.customer_id) || [];
+                existing.push(reminder);
+                customerMap.set(reminder.customer_id, existing);
+            });
+
+            // Convert to array with aggregated data
+            const grouped: GroupedCustomer[] = [];
+            customerMap.forEach((customerReminders, customerId) => {
+                if (!customerReminders.length) return;
+
+                // Calculate total balance - safely handle potential string/number mix
+                const totalBalance = customerReminders.reduce((sum, r) => {
+                    const val = typeof r.amount === 'string' ? parseFloat(r.amount) : r.amount;
+                    return sum + (isNaN(val) ? 0 : val);
+                }, 0);
+
+                // Find the earliest due date safely
+                const sortedByDueDate = [...customerReminders].sort((a, b) => {
+                    const t1 = new Date(a.due_date).getTime() || 0;
+                    const t2 = new Date(b.due_date).getTime() || 0;
+                    return t1 - t2;
+                });
+
+                const primaryReminder = sortedByDueDate[0];
+                if (!primaryReminder) return;
+
+                grouped.push({
+                    customerId,
+                    customerName: getCustomerName(customerId),
+                    totalBalance,
+                    earliestDueDate: primaryReminder.due_date,
+                    reminders: customerReminders,
+                    primaryReminder
+                });
+            });
+
+            // Sort by earliest due date
+            return grouped.sort((a, b) => {
+                const t1 = new Date(a.earliestDueDate).getTime() || 0;
+                const t2 = new Date(b.earliestDueDate).getTime() || 0;
+                return t1 - t2;
+            });
+        } catch (e) {
+            console.error("Error grouping customers:", e);
+            return [];
+        }
+    }, [reminders, customers]);
+
+    const handleQuickAction = async () => {
+        if (!amount || !quickActionCustomer) {
+            toast("Please enter an amount", "warning");
+            return;
+        }
+
+        const reminder = quickActionCustomer.reminder;
+        const today = new Date();
+        const dateStr = today.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+        const timeStr = today.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+
+        if (actionType === 'add') {
+            // Add new due
+            const newAmount = reminder.amount + parseFloat(amount);
+            let newNote = reminder.note || "";
+            if (newNote) newNote += "\n";
+            newNote += `[${dateStr} ${timeStr}] New Due Added: ₹${parseFloat(amount).toLocaleString()}. Balance: ₹${newAmount.toLocaleString()}`;
+
+            const updates: any = {
+                amount: newAmount,
+                note: newNote
+            };
+
+            if (dueDate) {
+                updates.due_date = dueDate;
+            }
+
+            const { error } = await supabase
+                .from('payment_reminders')
+                .update(updates)
+                .eq('id', reminder.id);
+
+            if (error) {
+                toast("Failed to add due", "error");
+            } else {
+                toast(`Added ₹${parseFloat(amount).toLocaleString()}`, "success");
+                closeQuickAction();
+            }
+        } else if (actionType === 'receive') {
+            // Receive payment
+            const received = parseFloat(amount);
+            const newBalance = reminder.amount - received;
+            let newNote = reminder.note || "";
+            if (newNote) newNote += "\n";
+            newNote += `[${dateStr} ${timeStr}] Received: ₹${received.toLocaleString()}. Balance: ₹${Math.max(0, newBalance).toLocaleString()}`;
+
+            const updates: any = {
+                note: newNote,
+                amount: Math.max(0, newBalance)
+            };
+
+            if (newBalance <= 0) {
+                updates.status = 'paid';
+            }
+
+            const { error } = await supabase
+                .from('payment_reminders')
+                .update(updates)
+                .eq('id', reminder.id);
+
+            if (error) {
+                toast("Failed to record payment", "error");
+            } else {
+                toast(newBalance <= 0 ? "Fully paid!" : `Received ₹${received.toLocaleString()}`, "success");
+                closeQuickAction();
+            }
+        }
+    };
+
+    const closeQuickAction = () => {
+        setQuickActionCustomer(null);
+        setActionType(null);
+        setAmount("");
+        setDueDate("");
+    };
+
+    const handleUpdateDueDate = async () => {
+        if (!editDateCustomer || !editDateValue) return;
+
+        const { error } = await supabase
+            .from('payment_reminders')
+            .update({ due_date: editDateValue })
+            .eq('customer_id', editDateCustomer.id)
+            .eq('status', 'pending');
+
+        if (error) {
+            toast("Failed to update due date", "error");
+        } else {
+            toast("Due date updated for all pending items", "success");
+            setEditDateCustomer(null);
+            setEditDateValue("");
+            loadData();
+        }
+    };
+
+    const handleNewReminder = async () => {
+        if (!newReminderCustomer || !newReminderAmount || !newReminderDueDate) {
+            toast("Please fill all fields", "warning");
+            return;
+        }
+
+        const reminderAmount = parseFloat(newReminderAmount);
+        if (isNaN(reminderAmount) || reminderAmount <= 0) {
+            toast("Please enter a valid amount", "warning");
+            return;
+        }
+
+        const today = new Date();
+        const dateStr = today.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+        const timeStr = today.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+        const noteStr = `[${dateStr} ${timeStr}] New Due Added: \u20b9${reminderAmount.toLocaleString()}. Balance: \u20b9${reminderAmount.toLocaleString()}`;
+
+        const { error } = await supabase.from('payment_reminders').insert({
+            customer_id: newReminderCustomer,
+            amount: reminderAmount,
+            due_date: newReminderDueDate,
+            status: 'pending',
+            note: noteStr
+        });
+
+        if (error) {
+            toast("Failed to create reminder", "error");
+        } else {
+            toast("Reminder created successfully", "success");
+            setShowNewReminder(false);
+            setNewReminderCustomer("");
+            setNewReminderCustomerSearch("");
+            setNewReminderAmount("");
+            setNewReminderDueDate("");
+            loadData();
+        }
+    };
+
+    const filteredCustomersForNewReminder = customers.filter(c =>
+        c.name.toLowerCase().includes(newReminderCustomerSearch.toLowerCase())
     );
 
     const getDueStatus = (dateStr: string) => {
@@ -426,111 +386,47 @@ export default function PaymentReminders() {
 
     return (
         <>
-            <div className={cn("min-h-screen bg-background text-foreground px-4 pb-32 animate-in fade-in max-w-lg mx-auto selection:bg-primary/20", setupRequired ? "hidden" : "")}>
-                {/* Header - Fixed on Top */}
-                <div className={cn(
-                    "fixed top-0 left-0 right-0 z-50 border-b px-4 py-4 flex items-center justify-between transition-all duration-300 max-w-lg mx-auto backdrop-blur-xl",
-                    isSelectionMode
-                        ? "bg-white/95 dark:bg-zinc-900/95 border-zinc-300 dark:border-zinc-700"
-                        : "bg-white/95 dark:bg-zinc-900/95 border-zinc-200 dark:border-zinc-800"
-                )}>
-                    {isSelectionMode ? (
-                        <div className="flex items-center gap-3 w-full">
-                            <button
-                                onClick={() => {
-                                    setIsSelectionMode(false);
-                                    setSelectedIds(new Set());
-                                }}
-                                className="p-2.5 -ml-1 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-all duration-150 active:scale-95"
-                            >
-                                <X size={18} strokeWidth={2.5} />
-                            </button>
-                            <span className="font-bold text-base text-violet-600 dark:text-violet-400">{selectedIds.size} Selected</span>
-                            <div className="flex-1" />
-                            <button
-                                onClick={handleBulkDelete}
-                                className="p-2.5 rounded-xl bg-red-500 dark:bg-red-500 text-white hover:bg-red-600 dark:hover:bg-red-600 transition-all duration-150 active:scale-95"
-                            >
-                                <Trash2 size={18} strokeWidth={2} />
-                            </button>
-                        </div>
-                    ) : (
-                        <>
-                            <div className="flex items-center gap-3">
-                                <Link to="/" className="p-2.5 -ml-1 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-all duration-150 active:scale-95">
-                                    <ArrowLeft size={18} strokeWidth={2.5} />
-                                </Link>
-                                <div>
-                                    <div className="flex items-center gap-1.5 text-[10px] uppercase font-bold tracking-widest text-zinc-500 dark:text-zinc-500 mb-0.5">
-                                        <Link to="/" className="hover:text-zinc-900 dark:hover:text-white transition-colors">Home</Link>
-                                        <span className="text-zinc-300 dark:text-zinc-700">/</span>
-                                        <span className="text-zinc-900 dark:text-white">Payments</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <h1 className="text-xl font-black text-zinc-900 dark:text-white tracking-tight">Payment Reminders</h1>
-
-                                    </div>
-                                </div>
+            {/* Header */}
+            <div className="fixed top-0 left-0 right-0 z-50 bg-white dark:bg-zinc-900 border-b border-border px-3 py-3 md:px-4 md:py-4">
+                <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center gap-3">
+                        <Link to="/" className="p-2 -ml-1 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-all duration-150 active:scale-95">
+                            <ArrowLeft size={18} strokeWidth={2.5} />
+                        </Link>
+                        <div>
+                            <div className="flex items-center gap-1.5 text-[10px] uppercase font-bold tracking-widest text-zinc-500 dark:text-zinc-500 mb-0.5">
+                                <Link to="/" className="hover:text-zinc-900 dark:hover:text-white transition-colors">Home</Link>
+                                <span className="text-zinc-300 dark:text-zinc-700">/</span>
+                                <span className="text-zinc-900 dark:text-white">Payments</span>
                             </div>
-
-                            <button
-                                onClick={() => {
-                                    resetForm();
-                                    setIsAdding(!isAdding);
-                                }}
-                                className={cn(
-                                    "rounded-xl w-10 h-10 flex items-center justify-center transition-all duration-200 active:scale-95 border-2",
-                                    isAdding
-                                        ? "bg-zinc-900 dark:bg-white border-zinc-900 dark:border-white text-white dark:text-zinc-900 rotate-45"
-                                        : "bg-zinc-900 dark:bg-white border-zinc-900 dark:border-white text-white dark:text-zinc-900 shadow-lg shadow-zinc-900/20 dark:shadow-black/20 hover:bg-zinc-800 dark:hover:bg-zinc-100"
-                                )}
-                            >
-                                <Plus size={20} strokeWidth={2.5} />
-                            </button>
-                        </>
-                    )}
-                </div>
-
-                {/* Spacer for fixed header */}
-                <div className="h-28" />
-
-                {/* Search */}
-                {(!isAdding && reminders.length > 0) && (
-                    <div className="relative mb-6 group z-10">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-500 group-focus-within:text-zinc-600 dark:group-focus-within:text-zinc-300 transition-colors duration-200" size={18} />
-                        <input
-                            type="text"
-                            placeholder="Search by customer name..."
-                            className="w-full pl-12 pr-12 h-13 rounded-2xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/60 focus:border-zinc-400 dark:focus:border-zinc-500 focus:bg-white dark:focus:bg-zinc-800 outline-none transition-all duration-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 text-zinc-900 dark:text-zinc-100 text-sm font-medium"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                        />
-                        {searchQuery && (
-                            <button
-                                onClick={() => setSearchQuery("")}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-xl bg-zinc-200 dark:bg-zinc-700 hover:bg-zinc-300 dark:hover:bg-zinc-600 text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-all duration-150 active:scale-95"
-                            >
-                                <X size={14} strokeWidth={2.5} />
-                            </button>
-                        )}
+                            <h1 className="text-lg md:text-xl font-black text-zinc-900 dark:text-white tracking-tight">Payment Reminders</h1>
+                        </div>
                     </div>
-                )}
+                    <button
+                        onClick={() => setShowNewReminder(true)}
+                        className="p-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white transition-all duration-150 active:scale-95"
+                    >
+                        <Plus size={18} strokeWidth={2.5} />
+                    </button>
+                </div>
+            </div>
+
+            <div className="min-h-screen bg-background text-foreground px-3 md:px-4 pb-32 animate-in fade-in w-full md:max-w-2xl md:mx-auto">
+
+                <div className="h-20" />
 
                 {/* Total Stats */}
-                {!loading && filteredReminders.length > 0 && (
+                {!loading && groupedCustomers.length > 0 && (
                     <div className="bg-zinc-100 dark:bg-zinc-800/50 rounded-2xl p-4 mb-6 flex items-center justify-between border border-zinc-200 dark:border-zinc-800">
                         <div>
                             <p className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-0.5">Total to be Received</p>
                             <p className="text-xs text-zinc-400 dark:text-zinc-500 font-medium">
-                                {filteredReminders.filter(r => r.status === 'pending').length} pending reminders
+                                {groupedCustomers.length} pending customer{groupedCustomers.length !== 1 ? 's' : ''}
                             </p>
                         </div>
                         <div className="text-right">
                             <p className="text-xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight">
-                                ₹{filteredReminders
-                                    .filter(r => r.status === 'pending')
-                                    .reduce((sum, r) => sum + r.amount, 0)
-                                    .toLocaleString()}
+                                ₹{groupedCustomers.reduce((sum, g) => sum + g.totalBalance, 0).toLocaleString()}
                             </p>
                         </div>
                     </div>
@@ -542,189 +438,82 @@ export default function PaymentReminders() {
                             <div key={i} className="h-32 bg-muted/50 rounded-3xl animate-pulse" />
                         ))}
                     </div>
-                ) : filteredReminders.length === 0 ? (
+                ) : groupedCustomers.length === 0 ? (
                     <div className="text-center py-16 px-6 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-3xl bg-zinc-50/50 dark:bg-zinc-900/30">
                         <div className="bg-emerald-100 dark:bg-emerald-500/20 w-16 h-16 rounded-2xl flex items-center justify-center mb-5 mx-auto border border-emerald-200 dark:border-emerald-500/30">
                             <IndianRupee size={26} className="text-emerald-600 dark:text-emerald-400" strokeWidth={1.5} />
                         </div>
-                        <p className="font-bold text-zinc-800 dark:text-zinc-200 text-base">No reminders found</p>
-                        <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-2 max-w-xs mx-auto">Add a new payment reminder to track pending dues from customers</p>
+                        <p className="font-bold text-zinc-800 dark:text-zinc-200 text-base">No pending payments</p>
+                        <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-2 max-w-xs mx-auto">All payments are up to date</p>
                     </div>
                 ) : (
                     <div className="space-y-3">
-                        {filteredReminders.map(r => {
-                            const isPaid = r.status === 'paid';
-                            const dueStatus = getDueStatus(r.due_date);
-                            const isSelected = selectedIds.has(r.id);
+                        {groupedCustomers.map(customer => {
+                            const dueStatus = getDueStatus(customer.earliestDueDate);
 
                             return (
                                 <div
-                                    key={r.id}
-                                    className={cn(
-                                        "group relative overflow-hidden bg-white dark:bg-zinc-900 border-2 transition-all duration-200 rounded-2xl",
-                                        isSelected
-                                            ? "border-violet-500 dark:border-violet-400 ring-2 ring-violet-500/20 dark:ring-violet-400/20 bg-violet-50 dark:bg-violet-500/10"
-                                            : isPaid
-                                                ? "border-zinc-200 dark:border-zinc-800 opacity-50 hover:opacity-75"
-                                                : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-lg hover:shadow-zinc-900/5 dark:hover:shadow-black/20",
-                                        isSelectionMode ? "cursor-pointer active:scale-[0.99]" : ""
-                                    )}
-                                    onTouchStart={() => handleTouchStart(r.id)}
-                                    onTouchEnd={handleTouchEnd}
-                                    onMouseDown={() => handleTouchStart(r.id)}
-                                    onMouseUp={handleTouchEnd}
-                                    onMouseLeave={handleTouchEnd}
-                                    onClick={(e) => {
-                                        if (isSelectionMode) {
-                                            e.preventDefault();
-                                            toggleSelection(r.id);
-                                        }
-                                    }}
+                                    key={customer.customerId}
+                                    onClick={() => navigate(`/payment-reminders/${customer.customerId}`)}
+                                    className="bg-white dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-lg transition-all cursor-pointer active:scale-[0.99]"
                                 >
-                                    <div className="p-5">
-                                        <div className="flex justify-between items-start mb-3">
-                                            {/* Selection Checkbox */}
-                                            {isSelectionMode && (
-                                                <div className="absolute top-4 right-4 z-20">
-                                                    <div className={cn(
-                                                        "w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all duration-150",
-                                                        isSelected ? "bg-violet-500 dark:bg-violet-500 border-violet-500 dark:border-violet-500" : "border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800"
-                                                    )}>
-                                                        {isSelected && <Check size={14} className="text-white" strokeWidth={3} />}
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            <div className="flex-1 min-w-0 pr-10">
-                                                <div className="flex items-center gap-2 mb-2">
-                                                    <h3 className={cn("font-bold text-base truncate", isPaid ? "text-zinc-400 dark:text-zinc-500 line-through decoration-zinc-400/50" : "text-zinc-900 dark:text-white")}>
-                                                        {getCustomerName(r.customer_id)}
-                                                    </h3>
-                                                </div>
-
-                                                <div className="flex flex-wrap gap-2">
-                                                    {isPaid ? (
-                                                        <span className="inline-flex items-center gap-1.5 bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 text-[10px] font-bold px-2.5 py-1 rounded-lg uppercase tracking-wider border border-emerald-200 dark:border-emerald-500/30">
-                                                            <Check size={10} strokeWidth={3} /> Paid
-                                                        </span>
-                                                    ) : (
-                                                        <span className={cn("inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-lg uppercase tracking-wider border", dueStatus.classes)}>
-                                                            <Calendar size={10} strokeWidth={2.5} /> {dueStatus.text}
-                                                        </span>
-                                                    )}
-                                                </div>
+                                    {/* Customer Info */}
+                                    <div className="flex justify-between items-start mb-3">
+                                        <div className="flex-1 min-w-0">
+                                            <h3 className="font-bold text-base text-zinc-900 dark:text-white truncate mb-2">
+                                                {customer.customerName}
+                                            </h3>
+                                            <div className="flex items-center gap-2">
+                                                <span className={cn("inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-lg uppercase tracking-wider border", dueStatus.classes)}>
+                                                    <Calendar size={10} strokeWidth={2.5} /> {dueStatus.text}
+                                                </span>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setEditDateCustomer({ id: customer.customerId, name: customer.customerName });
+                                                        setEditDateValue(customer.earliestDueDate);
+                                                    }}
+                                                    className="p-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
+                                                >
+                                                    <Edit2 size={12} strokeWidth={2.5} />
+                                                </button>
                                             </div>
-
-                                            {!isSelectionMode && (
-                                                <div className="text-right shrink-0">
-                                                    <span className={cn(
-                                                        "text-xl font-bold block tracking-tight tabular-nums",
-                                                        isPaid ? "text-zinc-400 dark:text-zinc-500 line-through decoration-zinc-400/50" : "text-zinc-900 dark:text-white"
-                                                    )}>
-                                                        ₹{r.amount.toLocaleString()}
-                                                    </span>
-                                                    <div className="flex items-center justify-end gap-1.5 mt-1 text-zinc-500 dark:text-zinc-400">
-                                                        <span className="text-[10px] font-semibold uppercase tracking-wider">
-                                                            {new Date(r.due_date).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            )}
                                         </div>
 
-                                        {r.note && (
-                                            <div className="mb-4 space-y-2">
-                                                {/* Helper to separate history logs from actual user notes */}
-                                                {(() => {
-                                                    const lines = r.note.split('\n');
-                                                    const historyLines = lines.filter(l => l.startsWith('[') && l.includes('Received:'));
-                                                    const noteLines = lines.filter(l => !l.startsWith('[') || !l.includes('Received:'));
-
-                                                    return (
-                                                        <>
-                                                            {/* Regular Notes */}
-                                                            {noteLines.length > 0 && (
-                                                                <div className="bg-amber-50 dark:bg-amber-500/10 rounded-xl p-3 border border-amber-100 dark:border-amber-500/20">
-                                                                    <p className="text-xs text-amber-900 dark:text-amber-200 font-medium italic">
-                                                                        {noteLines.join('\n')}
-                                                                    </p>
-                                                                </div>
-                                                            )}
-
-                                                            {/* Payment History */}
-                                                            {historyLines.length > 0 && (
-                                                                <div className="bg-zinc-50 dark:bg-zinc-800/50 rounded-xl border border-zinc-100 dark:border-zinc-800 overflow-hidden">
-                                                                    <div className="px-3 py-2 bg-zinc-100 dark:bg-zinc-800 border-b border-zinc-200 dark:border-zinc-700 flex items-center gap-2">
-                                                                        <History size={12} className="text-zinc-500" />
-                                                                        <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Payment History</span>
-                                                                    </div>
-                                                                    <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
-                                                                        {historyLines.map((line, i) => {
-                                                                            // Parse: [Date Time] Received: X. Balance: Y
-                                                                            // Expected format from handleReceivePayment
-                                                                            try {
-                                                                                const dateMatch = line.match(/\[(.*?)\]/);
-                                                                                const date = dateMatch ? dateMatch[1] : "Unknown Date";
-
-                                                                                const amountMatch = line.match(/Received: (.*?)\./);
-                                                                                const amount = amountMatch ? amountMatch[1] : "0";
-
-                                                                                const balanceMatch = line.match(/Balance: (.*)/);
-                                                                                const balance = balanceMatch ? balanceMatch[1] : "0";
-
-                                                                                return (
-                                                                                    <div key={i} className="px-3 py-2 flex items-center justify-between hover:bg-zinc-100/50 dark:hover:bg-zinc-800/50 transition-colors">
-                                                                                        <div className="flex flex-col">
-                                                                                            <span className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase">{date}</span>
-                                                                                            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">Received {amount}</span>
-                                                                                        </div>
-                                                                                        <div className="text-right">
-                                                                                            <span className="text-[10px] font-medium text-zinc-400 block">Balance</span>
-                                                                                            <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300">{balance}</span>
-                                                                                        </div>
-                                                                                    </div>
-                                                                                );
-                                                                            } catch (e) {
-                                                                                return <div key={i} className="px-3 py-2 text-xs text-zinc-500">{line}</div>
-                                                                            }
-                                                                        })}
-                                                                    </div>
-                                                                </div>
-                                                            )}
-                                                        </>
-                                                    );
-                                                })()}
-                                            </div>
-                                        )}
-
-                                        <div className="flex items-center gap-2 mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800">
-                                            {!isPaid && (
-                                                <>
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); setReceivePaymentId(r.id); setReceiveAmount(""); setReceiveNextDate(""); }}
-                                                        className="flex-1 flex items-center justify-center gap-2 bg-emerald-500 dark:bg-emerald-500 text-white hover:bg-emerald-600 dark:hover:bg-emerald-600 active:bg-emerald-700 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 active:scale-[0.98]"
-                                                    >
-                                                        <Receipt size={15} strokeWidth={2.5} /> Receive Pay
-                                                    </button>
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); handleEdit(r); }}
-                                                        className="flex items-center justify-center gap-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 active:bg-zinc-300 dark:active:bg-zinc-600 text-zinc-700 dark:text-zinc-300 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 active:scale-[0.98]"
-                                                    >
-                                                        Edit
-                                                    </button>
-                                                </>
-                                            )}
-
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); handleDelete(r.id); }}
-                                                className={cn(
-                                                    "flex items-center justify-center gap-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-red-100 dark:hover:bg-red-500/20 active:bg-red-200 dark:active:bg-red-500/30 text-zinc-500 dark:text-zinc-400 hover:text-red-600 dark:hover:text-red-400 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-150 active:scale-[0.98]",
-                                                    isPaid ? "flex-1" : ""
-                                                )}
-                                            >
-                                                <Trash2 size={15} strokeWidth={2} />
-                                            </button>
+                                        <div className="text-right">
+                                            <p className="text-2xl font-black text-zinc-900 dark:text-white tracking-tight">
+                                                ₹{customer.totalBalance.toLocaleString()}
+                                            </p>
+                                            <p className="text-xs text-zinc-500 mt-1">
+                                                {new Date(customer.earliestDueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                                            </p>
                                         </div>
+                                    </div>
+
+                                    {/* Action Buttons */}
+                                    <div className="grid grid-cols-2 gap-2 pt-3 border-t border-zinc-100 dark:border-zinc-800">
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setQuickActionCustomer({ id: customer.customerId, name: customer.customerName, reminder: customer.primaryReminder, totalBalance: customer.totalBalance });
+                                                setActionType('add');
+                                            }}
+                                            className="flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white py-2 px-3 rounded-xl text-xs font-bold transition-all active:scale-95"
+                                        >
+                                            <Plus size={14} strokeWidth={2.5} />
+                                            Add Due
+                                        </button>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setQuickActionCustomer({ id: customer.customerId, name: customer.customerName, reminder: customer.primaryReminder, totalBalance: customer.totalBalance });
+                                                setActionType('receive');
+                                            }}
+                                            className="flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white py-2 px-3 rounded-xl text-xs font-bold transition-all active:scale-95"
+                                        >
+                                            <Receipt size={14} strokeWidth={2.5} />
+                                            Received
+                                        </button>
                                     </div>
                                 </div>
                             );
@@ -733,214 +522,203 @@ export default function PaymentReminders() {
                 )}
             </div>
 
-            {/* Receive Payment Modal */}
+            {/* Quick Action Modal */}
             <Modal
-                isOpen={!!receivePaymentId}
-                onClose={() => setReceivePaymentId(null)}
-                title={<h2 className="text-lg font-bold">Receive Payment</h2>}
+                isOpen={!!quickActionCustomer && !!actionType}
+                onClose={closeQuickAction}
+                title={<h2 className="text-lg font-bold">{actionType === 'add' ? 'Add New Due' : 'Receive Payment'}</h2>}
             >
-                {(() => {
-                    const reminder = reminders.find(r => r.id === receivePaymentId);
-                    if (!reminder) return null;
-
-                    return (
-                        <div className="space-y-4">
-                            <div className="bg-zinc-50 dark:bg-zinc-800/50 p-4 rounded-xl text-center border-2 border-zinc-100 dark:border-zinc-800">
-                                <p className="text-xs text-zinc-500 dark:text-zinc-400 font-bold uppercase tracking-wider mb-1">Current Balance Due</p>
-                                <p className="text-2xl font-black text-zinc-900 dark:text-white">₹{reminder.amount.toLocaleString()}</p>
-                            </div>
-
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400 ml-1 uppercase tracking-wider">Amount Received</label>
-                                <div className="relative">
-                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-500 font-bold text-lg">₹</span>
-                                    <input
-                                        type="number"
-                                        autoFocus
-                                        className="w-full bg-zinc-50 dark:bg-zinc-800 border-2 border-zinc-200 dark:border-zinc-700 focus:border-emerald-500 dark:focus:border-emerald-500 rounded-xl pl-9 pr-20 h-14 text-xl font-bold outline-none transition-all duration-150 placeholder:text-zinc-300 dark:placeholder:text-zinc-600 text-zinc-900 dark:text-white tabular-nums"
-                                        placeholder="0"
-                                        value={receiveAmount}
-                                        onChange={e => setReceiveAmount(e.target.value)}
-                                    />
-                                    <button
-                                        onClick={() => setReceiveAmount(reminder.amount.toString())}
-                                        className="absolute right-2 top-2 bottom-2 px-3 bg-white dark:bg-zinc-700 text-emerald-600 dark:text-emerald-400 text-xs font-bold rounded-lg border border-zinc-200 dark:border-zinc-600 hover:bg-emerald-50 dark:hover:bg-zinc-600 transition-colors"
-                                    >
-                                        FULL
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* New Due Date Input (Only if partial payment) */}
-                            {(() => {
-                                const received = parseFloat(receiveAmount || "0");
-                                const remaining = reminder.amount - received;
-
-                                if (remaining > 0 && received > 0) {
-                                    return (
-                                        <div className="space-y-2 animate-in slide-in-from-top-2">
-                                            <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400 ml-1 uppercase tracking-wider">Next Due Date (For Remaining ₹{remaining.toLocaleString()})</label>
-                                            <input
-                                                type="date"
-                                                className="w-full bg-zinc-50 dark:bg-zinc-800 border-2 border-zinc-200 dark:border-zinc-700 focus:border-zinc-400 dark:focus:border-zinc-500 rounded-xl px-4 h-12 text-sm font-bold outline-none transition-all duration-150 cursor-pointer text-zinc-900 dark:text-white dark:scheme-dark"
-                                                value={receiveNextDate}
-                                                onChange={e => setReceiveNextDate(e.target.value)}
-                                            />
-                                        </div>
-                                    );
-                                }
-                                return null;
-                            })()}
-
-                            <div className="grid grid-cols-2 gap-3 pt-2">
-                                <Button
-                                    variant="outline"
-                                    onClick={() => setReceivePaymentId(null)}
-                                    className="h-12 font-bold"
-                                >
-                                    Cancel
-                                </Button>
-                                <Button
-                                    onClick={() => handleReceivePayment(reminder)}
-                                    disabled={!receiveAmount || parseFloat(receiveAmount) <= 0}
-                                    className="h-12 bg-emerald-500 hover:bg-emerald-600 text-white font-bold"
-                                >
-                                    Confirm Update
-                                </Button>
-                            </div>
+                <div className="space-y-4">
+                    <p className="font-bold text-lg text-zinc-900 dark:text-white truncate">
+                        {quickActionCustomer?.name}
+                    </p>
+                    {actionType === 'receive' && quickActionCustomer && (
+                        <div className="bg-zinc-50 dark:bg-zinc-800 p-4 rounded-xl text-center">
+                            <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Current Balance</p>
+                            <p className="text-2xl font-black text-zinc-900 dark:text-white">₹{quickActionCustomer.totalBalance.toLocaleString()}</p>
                         </div>
-                    );
-                })()}
-            </Modal>
+                    )}
 
-            {/* Add Form Modal Overlay */}
-            {isAdding && (
-                <div
-                    className="fixed inset-0 z-50 flex items-start justify-center pt-20 px-4 bg-black/50 dark:bg-black/70 backdrop-blur-sm animate-in fade-in duration-200"
-                    onClick={() => resetForm()}
-                >
-                    <div
-                        className="bg-white dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-800 p-6 rounded-2xl w-full max-w-lg shadow-2xl shadow-black/20 animate-in slide-in-from-bottom-4 duration-300"
-                        onClick={e => e.stopPropagation()}
-                    >
-                        <div className="flex items-center justify-between mb-6">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center">
-                                    <Receipt size={18} className="text-emerald-600 dark:text-emerald-400" strokeWidth={2} />
-                                </div>
-                                <h2 className="font-bold text-zinc-900 dark:text-white text-base">{editingId ? "Edit Reminder" : "New Reminder"}</h2>
-                            </div>
-                            <button
-                                onClick={resetForm}
-                                className="p-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-all duration-150 active:scale-95"
-                            >
-                                <X size={18} strokeWidth={2.5} />
-                            </button>
-                        </div>
-
-                        <div className="space-y-5">
-                            {/* Customer Select */}
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400 ml-1 uppercase tracking-wider">Customer</label>
-                                {selectedCustomerId ? (
-                                    <div className="flex items-center justify-between bg-zinc-50 dark:bg-zinc-800/50 border-2 border-zinc-200 dark:border-zinc-700 rounded-xl p-2 pl-3">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-9 h-9 rounded-lg bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 flex items-center justify-center text-sm font-black">
-                                                {getCustomerName(selectedCustomerId)[0]}
-                                            </div>
-                                            <span className="text-sm font-semibold text-zinc-900 dark:text-white">{getCustomerName(selectedCustomerId)}</span>
-                                        </div>
-                                        <button
-                                            onClick={() => setSelectedCustomerId("")}
-                                            className="p-2 rounded-lg text-zinc-400 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all duration-150 active:scale-95"
-                                        >
-                                            <XCircle size={18} strokeWidth={2} />
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <div className="relative z-30">
-                                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-500" size={18} />
-                                        <input
-                                            className="w-full bg-zinc-50 dark:bg-zinc-800 border-2 border-zinc-200 dark:border-zinc-700 focus:border-zinc-400 dark:focus:border-zinc-500 rounded-xl pl-12 pr-4 h-12 text-sm font-medium outline-none transition-all duration-150 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 text-zinc-900 dark:text-white"
-                                            placeholder="Search customer..."
-                                            value={customerSearch}
-                                            onChange={(e) => setCustomerSearch(e.target.value)}
-                                            autoFocus
-                                        />
-                                        {customerSearch && (
-                                            <div className="absolute top-full left-0 right-0 mt-2 max-h-52 overflow-y-auto bg-white dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-700 rounded-xl shadow-xl z-50 p-1">
-                                                {filteredCustomers.length > 0 ? (
-                                                    filteredCustomers.map(c => (
-                                                        <button
-                                                            key={c.id}
-                                                            onClick={() => {
-                                                                setSelectedCustomerId(c.id);
-                                                                setCustomerSearch("");
-                                                            }}
-                                                            className="w-full text-left px-4 py-2.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 active:bg-zinc-200 dark:active:bg-zinc-700 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white text-sm font-medium rounded-lg transition-all duration-100 flex items-center justify-between group"
-                                                        >
-                                                            {c.name}
-                                                            <Check size={14} className="opacity-0 group-hover:opacity-100 text-zinc-900 dark:text-white transition-opacity" strokeWidth={2.5} />
-                                                        </button>
-                                                    ))
-                                                ) : (
-                                                    <div className="p-6 text-center">
-                                                        <p className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">No customers found</p>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Amount & Date */}
-                            <div className="grid grid-cols-2 gap-3">
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400 ml-1 uppercase tracking-wider">Amount</label>
-                                    <div className="relative">
-                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-500 font-bold text-lg">₹</span>
-                                        <input
-                                            type="number"
-                                            className="w-full bg-zinc-50 dark:bg-zinc-800 border-2 border-zinc-200 dark:border-zinc-700 focus:border-zinc-400 dark:focus:border-zinc-500 rounded-xl pl-9 pr-4 h-12 text-lg font-bold outline-none transition-all duration-150 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 text-zinc-900 dark:text-white tabular-nums"
-                                            placeholder="0"
-                                            value={amount}
-                                            onChange={e => setAmount(e.target.value)}
-                                        />
-                                    </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400 ml-1 uppercase tracking-wider">Due Date</label>
-                                    <input
-                                        type="date"
-                                        className="w-full bg-zinc-50 dark:bg-zinc-800 border-2 border-zinc-200 dark:border-zinc-700 focus:border-zinc-400 dark:focus:border-zinc-500 rounded-xl px-4 h-12 text-sm font-bold outline-none transition-all duration-150 cursor-pointer text-zinc-900 dark:text-white dark:scheme-dark"
-                                        value={dueDate}
-                                        onChange={e => setDueDate(e.target.value)}
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Note */}
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400 ml-1 uppercase tracking-wider">Note (Optional)</label>
-                                <input
-                                    placeholder="Add a note..."
-                                    value={note}
-                                    onChange={e => setNote(e.target.value)}
-                                    className="w-full bg-zinc-50 dark:bg-zinc-800 border-2 border-zinc-200 dark:border-zinc-700 focus:border-zinc-400 dark:focus:border-zinc-500 rounded-xl px-4 h-12 text-sm outline-none transition-all duration-150 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 text-zinc-900 dark:text-white"
-                                />
-                            </div>
-
-                            <Button
-                                onClick={handleAddReminder}
-                                className="w-full h-12 text-sm font-bold bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-100 active:bg-zinc-700 dark:active:bg-zinc-200 shadow-lg shadow-zinc-900/10 dark:shadow-black/10 active:scale-[0.99] transition-all duration-150 rounded-xl mt-2"
-                            >
-                                {editingId ? "Update Reminder" : "Create Reminder"}
-                            </Button>
+                    <div>
+                        <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Amount</label>
+                        <div className="relative mt-1">
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 font-bold text-lg">₹</span>
+                            <input
+                                type="number"
+                                autoFocus
+                                className="w-full bg-zinc-50 dark:bg-zinc-800 border-2 border-zinc-200 dark:border-zinc-700 focus:border-emerald-500 rounded-xl pl-9 pr-4 h-14 text-xl font-bold outline-none transition-all"
+                                placeholder="0"
+                                value={amount}
+                                onChange={e => setAmount(e.target.value)}
+                            />
                         </div>
                     </div>
+
+                    {actionType === 'add' && (
+                        <div>
+                            <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Due Date (Optional)</label>
+                            <input
+                                type="date"
+                                className="w-full bg-zinc-50 dark:bg-zinc-800 border-2 border-zinc-200 dark:border-zinc-700 focus:border-orange-500 rounded-xl px-4 h-12 text-sm font-bold outline-none transition-all mt-1"
+                                value={dueDate}
+                                onChange={e => setDueDate(e.target.value)}
+                            />
+                            <p className="text-xs text-zinc-500 mt-1 ml-1">Leave empty to keep current due date</p>
+                        </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-3 pt-2">
+                        <Button variant="outline" onClick={closeQuickAction} className="h-12">
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={handleQuickAction}
+                            className={cn("h-12", actionType === 'add' ? "bg-orange-500 hover:bg-orange-600" : "bg-emerald-500 hover:bg-emerald-600")}
+                        >
+                            {actionType === 'add' ? 'Add Due' : 'Receive'}
+                        </Button>
+                    </div>
                 </div>
-            )}
+            </Modal>
+
+            {/* New Reminder Modal */}
+            <Modal
+                isOpen={showNewReminder}
+                onClose={() => {
+                    setShowNewReminder(false);
+                    setNewReminderCustomer("");
+                    setNewReminderCustomerSearch("");
+                    setNewReminderAmount("");
+                    setNewReminderDueDate("");
+                    setShowCustomerList(false);
+                }}
+                title={<h2 className="text-lg font-bold">Add New Reminder</h2>}
+            >
+                <div className="space-y-4">
+                    {/* Customer Selection */}
+                    <div className="relative">
+                        <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Customer *</label>
+                        <div className="relative mt-1">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={16} />
+                            <input
+                                type="text"
+                                className="w-full bg-zinc-50 dark:bg-zinc-800 border-2 border-zinc-200 dark:border-zinc-700 focus:border-emerald-500 rounded-xl pl-10 pr-4 h-12 text-sm font-bold outline-none transition-all"
+                                placeholder="Search customer..."
+                                value={newReminderCustomerSearch}
+                                onChange={e => {
+                                    setNewReminderCustomerSearch(e.target.value);
+                                    setShowCustomerList(true);
+                                }}
+                                onFocus={() => setShowCustomerList(true)}
+                            />
+                        </div>
+                        {showCustomerList && newReminderCustomerSearch && (
+                            <div ref={listRef} className="absolute z-50 top-full left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-lg">
+                                {filteredCustomersForNewReminder.length > 0 ? (
+                                    filteredCustomersForNewReminder.map(c => (
+                                        <button
+                                            key={c.id}
+                                            onClick={() => {
+                                                setNewReminderCustomer(c.id);
+                                                setNewReminderCustomerSearch(c.name);
+                                                setShowCustomerList(false);
+                                            }}
+                                            className={cn(
+                                                "w-full text-left px-4 py-3 text-sm font-bold transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800",
+                                                newReminderCustomer === c.id ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600" : ""
+                                            )}
+                                        >
+                                            {c.name}
+                                        </button>
+                                    ))
+                                ) : (
+                                    <div className="p-3 text-sm text-zinc-500 text-center">No customers found</div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Amount */}
+                    <div>
+                        <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Amount *</label>
+                        <div className="relative mt-1">
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 font-bold text-lg">₹</span>
+                            <input
+                                type="number"
+                                className="w-full bg-zinc-50 dark:bg-zinc-800 border-2 border-zinc-200 dark:border-zinc-700 focus:border-emerald-500 rounded-xl pl-9 pr-4 h-14 text-xl font-bold outline-none transition-all"
+                                placeholder="0"
+                                value={newReminderAmount}
+                                onChange={e => setNewReminderAmount(e.target.value)}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Due Date (Required) */}
+                    <div>
+                        <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Due Date *</label>
+                        <input
+                            type="date"
+                            className="w-full bg-zinc-50 dark:bg-zinc-800 border-2 border-zinc-200 dark:border-zinc-700 focus:border-emerald-500 rounded-xl px-4 h-12 text-sm font-bold outline-none transition-all mt-1"
+                            value={newReminderDueDate}
+                            onChange={e => setNewReminderDueDate(e.target.value)}
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 pt-2">
+                        <Button variant="outline" onClick={() => {
+                            setShowNewReminder(false);
+                            setNewReminderCustomer("");
+                            setNewReminderCustomerSearch("");
+                            setNewReminderAmount("");
+                            setNewReminderDueDate("");
+                            setShowCustomerList(false);
+                        }} className="h-12">
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={handleNewReminder}
+                            className="h-12 bg-emerald-500 hover:bg-emerald-600"
+                        >
+                            Create Reminder
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
+
+            {/* Edit Due Date Modal */}
+            <Modal
+                isOpen={!!editDateCustomer}
+                onClose={() => setEditDateCustomer(null)}
+                title={<h2 className="text-lg font-bold">Edit Due Date</h2>}
+            >
+                <div className="space-y-4">
+                    <p className="font-bold text-lg text-zinc-900 dark:text-white truncate">
+                        {editDateCustomer?.name}
+                    </p>
+                    <p className="text-sm text-zinc-500">
+                        This will update the due date for all pending payment reminders for this customer.
+                    </p>
+                    <div>
+                        <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">New Due Date</label>
+                        <input
+                            type="date"
+                            autoFocus
+                            className="w-full bg-zinc-50 dark:bg-zinc-800 border-2 border-zinc-200 dark:border-zinc-700 focus:border-emerald-500 rounded-xl px-4 h-12 text-sm font-bold outline-none transition-all mt-1"
+                            value={editDateValue}
+                            onChange={e => setEditDateValue(e.target.value)}
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 pt-2">
+                        <Button variant="outline" onClick={() => setEditDateCustomer(null)} className="h-12">
+                            Cancel
+                        </Button>
+                        <Button onClick={handleUpdateDueDate} className="h-12 bg-emerald-500 hover:bg-emerald-600">
+                            Update Date
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
         </>
     );
 }
