@@ -150,9 +150,9 @@ export default function Dashboard() {
     return (
         <div className="space-y-6 px-4 pt-6 pb-28 md:px-6 md:pt-8 md:pb-32 w-full md:max-w-lg md:mx-auto animate-in fade-in">
             {/* Header */}
-            <div className="space-y-4">
+            <div className="space-y-1.5">
                 {/* Date at top */}
-                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-[0.15em]">{format(new Date(), "EEEE, MMM d")}</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-[0.15em]">{format(new Date(), "EEEE, MMM d")}</p>
 
                 {/* Welcome message with edit and logout */}
                 <div className="flex items-center justify-between">
@@ -229,138 +229,143 @@ export default function Dashboard() {
                 </div>
             </div>
 
-            {/* Date Filter - Outside and above the stats card */}
-            <div className="relative" ref={dropdownRef}>
-                <button
-                    onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-                    className="flex items-center gap-1.5 px-3 py-2 bg-white/10 hover:bg-white/15 active:bg-white/20 backdrop-blur-md rounded-lg text-xs font-medium text-white transition-all border border-white/10 focus:outline-none focus:ring-2 focus:ring-white/20"
-                >
-                    <Calendar size={14} className="opacity-70" />
-                    <span>
-                        {dateFilter === 'today' && 'Today'}
-                        {dateFilter === 'yesterday' && 'Yesterday'}
-                        {dateFilter === 'thisWeek' && 'This Week'}
-                        {dateFilter === 'thisMonth' && 'This Month'}
-                        {dateFilter === 'custom' && 'Custom'}
-                    </span>
-                    <ChevronDown size={12} className={`opacity-70 transition-transform duration-200 ${showFilterDropdown ? 'rotate-180' : ''}`} />
-                </button>
 
-                {showFilterDropdown && (
-                    <div className="absolute left-0 top-full mt-2 w-40 bg-zinc-900 border border-white/10 rounded-xl shadow-xl shadow-black/50 overflow-hidden py-1.5 z-50 animate-in fade-in zoom-in-95 duration-200">
-                        {['today', 'yesterday', 'thisWeek', 'thisMonth', 'custom'].map((filter) => (
-                            <button
-                                key={filter}
-                                onClick={() => {
-                                    if (filter === 'custom') {
-                                        setShowCustomDateModal(true);
-                                        setShowFilterDropdown(false);
-                                    } else {
-                                        setDateFilter(filter);
-                                        setShowFilterDropdown(false);
-                                    }
-                                }}
-                                className={cn(
-                                    "w-full text-left px-4 py-2.5 text-xs font-medium transition-colors hover:bg-white/10 active:bg-white/15",
-                                    dateFilter === filter ? "text-emerald-400 bg-emerald-500/10" : "text-zinc-400 hover:text-zinc-200"
-                                )}
-                            >
-                                {filter === 'today' && 'Today'}
-                                {filter === 'yesterday' && 'Yesterday'}
-                                {filter === 'thisWeek' && 'This Week'}
-                                {filter === 'thisMonth' && 'This Month'}
-                                {filter === 'custom' && 'Custom Range...'}
-                            </button>
-                        ))}
-                    </div>
-                )}
-            </div>
+            {/* Date Filter and Stats Card - Grouped with tighter spacing */}
+            <div className="space-y-3">
+                {/* Date Filter - Outside and above the stats card */}
+                <div className="relative" ref={dropdownRef}>
+                    <button
+                        onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                        className="flex items-center gap-1.5 px-3 py-2 bg-white/10 hover:bg-white/15 active:bg-white/20 backdrop-blur-md rounded-lg text-xs font-medium text-white transition-all border border-white/10 focus:outline-none focus:ring-2 focus:ring-white/20"
+                    >
+                        <Calendar size={14} className="opacity-70" />
+                        <span>
+                            {dateFilter === 'today' && 'Today'}
+                            {dateFilter === 'yesterday' && 'Yesterday'}
+                            {dateFilter === 'thisWeek' && 'This Week'}
+                            {dateFilter === 'thisMonth' && 'This Month'}
+                            {dateFilter === 'custom' && 'Custom'}
+                        </span>
+                        <ChevronDown size={12} className={`opacity-70 transition-transform duration-200 ${showFilterDropdown ? 'rotate-180' : ''}`} />
+                    </button>
 
-            {/* Main Stats Card - Dark Mode Grayscale */}
-            <div className="relative bg-gradient-to-br from-slate-700 to-slate-900 dark:from-zinc-800 dark:to-zinc-950 rounded-[1.75rem] shadow-2xl shadow-black/40 ring-1 ring-white/5 transition-all duration-300 hover:shadow-3xl hover:shadow-black/50 hover:ring-white/10">
-                {/* Decorative Background Layer - Clipped */}
-                <div className="absolute inset-0 overflow-hidden rounded-[1.75rem] pointer-events-none">
-                    {/* Background Icon */}
-                    <div className="absolute top-0 right-0 p-6 opacity-[0.06] text-white">
-                        <TrendingUp size={120} strokeWidth={1.5} />
-                    </div>
-
-                    {/* Decorative elements */}
-                    <div className="absolute -top-12 -left-12 w-36 h-36 bg-white/5 rounded-full blur-3xl" />
-                    <div className="absolute bottom-0 right-0 w-44 h-44 bg-white/3 rounded-full blur-3xl" />
-                </div>
-
-
-                <div className="relative z-10 space-y-6  p-6 md:p-7">
-                    {isLoadingStats ? (
-                        // Loading Skeleton
-                        <div className="space-y-5 animate-pulse">
-                            <div className="grid grid-cols-2 gap-4 md:gap-5">
-                                <div className="space-y-2">
-                                    <div className="h-3 w-20 bg-white/20 rounded" />
-                                    <div className="h-9 w-32 bg-white/30 rounded" />
-                                </div>
-                                <div className="space-y-2">
-                                    <div className="h-3 w-20 bg-white/20 rounded" />
-                                    <div className="h-9 w-32 bg-white/30 rounded" />
-                                </div>
-                            </div>
-                            <div className="h-12 w-full bg-white/10 rounded-xl" />
+                    {showFilterDropdown && (
+                        <div className="absolute left-0 top-full mt-2 w-40 bg-zinc-900 border border-white/10 rounded-xl shadow-xl shadow-black/50 overflow-hidden py-1.5 z-50 animate-in fade-in zoom-in-95 duration-200">
+                            {['today', 'yesterday', 'thisWeek', 'thisMonth', 'custom'].map((filter) => (
+                                <button
+                                    key={filter}
+                                    onClick={() => {
+                                        if (filter === 'custom') {
+                                            setShowCustomDateModal(true);
+                                            setShowFilterDropdown(false);
+                                        } else {
+                                            setDateFilter(filter);
+                                            setShowFilterDropdown(false);
+                                        }
+                                    }}
+                                    className={cn(
+                                        "w-full text-left px-4 py-2.5 text-xs font-medium transition-colors hover:bg-white/10 active:bg-white/15",
+                                        dateFilter === filter ? "text-emerald-400 bg-emerald-500/10" : "text-zinc-400 hover:text-zinc-200"
+                                    )}
+                                >
+                                    {filter === 'today' && 'Today'}
+                                    {filter === 'yesterday' && 'Yesterday'}
+                                    {filter === 'thisWeek' && 'This Week'}
+                                    {filter === 'thisMonth' && 'This Month'}
+                                    {filter === 'custom' && 'Custom Range...'}
+                                </button>
+                            ))}
                         </div>
-                    ) : statsError ? (
-                        // Error State
-                        <div className="space-y-4 text-center py-4">
-                            <div className="text-rose-400 text-sm font-medium">{statsError}</div>
-                            <button
-                                onClick={fetchStats}
-                                className="px-4 py-2 bg-white/10 hover:bg-white/15 active:bg-white/20 active:scale-[0.98] text-white text-sm font-semibold rounded-lg transition-all duration-200"
-                            >
-                                Retry
-                            </button>
-                        </div>
-                    ) : (
-                        // Stats Content
-                        <>
-                            <div className="grid grid-cols-2 gap-5 md:gap-6">
-                                <div className="space-y-2">
-                                    <p className="text-white/50 font-medium text-[10px] uppercase tracking-wider">
-                                        {dateFilter === 'today' ? 'Revenue (Today)' :
-                                            dateFilter === 'yesterday' ? 'Revenue (Yesterday)' :
-                                                dateFilter === 'thisWeek' ? 'Revenue (This Week)' :
-                                                    dateFilter === 'thisMonth' ? 'Revenue (This Month)' :
-                                                        'Revenue (Custom)'}
-                                    </p>
-                                    <h2 className="text-3xl font-bold text-white tracking-tight">
-                                        <span className="text-lg align-top opacity-50 font-normal mr-0.5">₹</span>
-                                        {stats.revenue.toLocaleString()}
-                                    </h2>
-                                </div>
-                                <div className="space-y-2">
-                                    <p className="text-white/50 font-medium text-[10px] uppercase tracking-wider">Net Profit</p>
-                                    <h2 className={cn(
-                                        "text-3xl font-bold tracking-tight flex items-center gap-1",
-                                        stats.profit >= 0 ? "text-emerald-400" : "text-rose-400"
-                                    )}>
-                                        {stats.profit >= 0 ? <Plus size={22} strokeWidth={2.5} /> : <Minus size={22} strokeWidth={2.5} />}
-                                        <span>
-                                            <span className="text-lg align-top opacity-60 font-normal mr-0.5">₹</span>
-                                            {Math.abs(stats.profit).toLocaleString()}
-                                        </span>
-                                    </h2>
-                                </div>
-                            </div>
-
-                            <Link
-                                to="/reports"
-                                className="group flex items-center justify-center w-full py-4 md:py-3.5 bg-white/10 hover:bg-white/15 active:bg-white/20 active:scale-[0.98] backdrop-blur-sm border border-white/10 hover:border-white/20 text-white rounded-xl text-xs font-semibold tracking-wide transition-all duration-200 focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                            >
-                                View Detailed Report
-                                <ChevronRight className="ml-1.5 opacity-60 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all duration-200" size={14} strokeWidth={2.5} />
-                            </Link>
-                        </>
                     )}
                 </div>
+
+                {/* Main Stats Card - Dark Mode Grayscale */}
+                <div className="relative bg-gradient-to-br from-slate-700 to-slate-900 dark:from-zinc-800 dark:to-zinc-950 rounded-[1.75rem] shadow-2xl shadow-black/40 ring-1 ring-white/5 transition-all duration-300 hover:shadow-3xl hover:shadow-black/50 hover:ring-white/10">
+                    {/* Decorative Background Layer - Clipped */}
+                    <div className="absolute inset-0 overflow-hidden rounded-[1.75rem] pointer-events-none">
+                        {/* Background Icon */}
+                        <div className="absolute top-0 right-0 p-6 opacity-[0.06] text-white">
+                            <TrendingUp size={120} strokeWidth={1.5} />
+                        </div>
+
+                        {/* Decorative elements */}
+                        <div className="absolute -top-12 -left-12 w-36 h-36 bg-white/5 rounded-full blur-3xl" />
+                        <div className="absolute bottom-0 right-0 w-44 h-44 bg-white/3 rounded-full blur-3xl" />
+                    </div>
+
+
+                    <div className="relative z-10 space-y-6  p-6 md:p-7">
+                        {isLoadingStats ? (
+                            // Loading Skeleton
+                            <div className="space-y-5 animate-pulse">
+                                <div className="grid grid-cols-2 gap-4 md:gap-5">
+                                    <div className="space-y-2">
+                                        <div className="h-3 w-20 bg-white/20 rounded" />
+                                        <div className="h-9 w-32 bg-white/30 rounded" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <div className="h-3 w-20 bg-white/20 rounded" />
+                                        <div className="h-9 w-32 bg-white/30 rounded" />
+                                    </div>
+                                </div>
+                                <div className="h-12 w-full bg-white/10 rounded-xl" />
+                            </div>
+                        ) : statsError ? (
+                            // Error State
+                            <div className="space-y-4 text-center py-4">
+                                <div className="text-rose-400 text-sm font-medium">{statsError}</div>
+                                <button
+                                    onClick={fetchStats}
+                                    className="px-4 py-2 bg-white/10 hover:bg-white/15 active:bg-white/20 active:scale-[0.98] text-white text-sm font-semibold rounded-lg transition-all duration-200"
+                                >
+                                    Retry
+                                </button>
+                            </div>
+                        ) : (
+                            // Stats Content
+                            <>
+                                <div className="grid grid-cols-2 gap-5 md:gap-6">
+                                    <div className="space-y-2">
+                                        <p className="text-white/50 font-medium text-[10px] uppercase tracking-wider">
+                                            {dateFilter === 'today' ? 'Revenue (Today)' :
+                                                dateFilter === 'yesterday' ? 'Revenue (Yesterday)' :
+                                                    dateFilter === 'thisWeek' ? 'Revenue (This Week)' :
+                                                        dateFilter === 'thisMonth' ? 'Revenue (This Month)' :
+                                                            'Revenue (Custom)'}
+                                        </p>
+                                        <h2 className="text-3xl font-bold text-white tracking-tight">
+                                            <span className="text-lg align-top opacity-50 font-normal mr-0.5">₹</span>
+                                            {stats.revenue.toLocaleString()}
+                                        </h2>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <p className="text-white/50 font-medium text-[10px] uppercase tracking-wider">Net Profit</p>
+                                        <h2 className={cn(
+                                            "text-3xl font-bold tracking-tight flex items-center gap-1",
+                                            stats.profit >= 0 ? "text-emerald-400" : "text-rose-400"
+                                        )}>
+                                            {stats.profit >= 0 ? <Plus size={22} strokeWidth={2.5} /> : <Minus size={22} strokeWidth={2.5} />}
+                                            <span>
+                                                <span className="text-lg align-top opacity-60 font-normal mr-0.5">₹</span>
+                                                {Math.abs(stats.profit).toLocaleString()}
+                                            </span>
+                                        </h2>
+                                    </div>
+                                </div>
+
+                                <Link
+                                    to="/reports"
+                                    className="group flex items-center justify-center w-full py-4 md:py-3.5 bg-white/10 hover:bg-white/15 active:bg-white/20 active:scale-[0.98] backdrop-blur-sm border border-white/10 hover:border-white/20 text-white rounded-xl text-xs font-semibold tracking-wide transition-all duration-200 focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                                >
+                                    View Detailed Report
+                                    <ChevronRight className="ml-1.5 opacity-60 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all duration-200" size={14} strokeWidth={2.5} />
+                                </Link>
+                            </>
+                        )}
+                    </div>
+                </div>
             </div>
+
 
             {/* Quick Actions - Dark Mode Grayscale */}
             <div className="grid grid-cols-2 gap-3">
