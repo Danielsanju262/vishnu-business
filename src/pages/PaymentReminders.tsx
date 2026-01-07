@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../lib/supabase";
 import { Button } from "../components/ui/Button";
-import { ArrowLeft, Plus, Trash2, CheckCircle2, Search, IndianRupee, Calendar, Receipt, X, Check, XCircle, WifiOff, History } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Search, IndianRupee, Calendar, Receipt, X, Check, XCircle, WifiOff, History } from "lucide-react";
 import { useToast } from "../components/toast-provider";
 import { cn } from "../lib/utils";
 import { Link } from "react-router-dom";
@@ -274,20 +274,7 @@ export default function PaymentReminders() {
         setIsAdding(true);
     };
 
-    const toggleStatus = async (id: string, currentStatus: 'pending' | 'paid') => {
-        if (currentStatus === 'paid') return;
 
-        const { error } = await supabase
-            .from('payment_reminders')
-            .update({ status: 'paid' })
-            .eq('id', id);
-
-        if (error) {
-            toast("Failed to update status", "error");
-        } else {
-            toast("Marked as paid", "success");
-        }
-    };
 
     const handleDelete = async (id: string) => {
         if (!await confirm("Delete this reminder?")) return;
