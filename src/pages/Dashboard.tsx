@@ -324,7 +324,7 @@ export default function Dashboard() {
                         ) : (
                             // Stats Content
                             <>
-                                <div className="grid grid-cols-2 gap-5 md:gap-6">
+                                <div className="flex justify-center gap-5 md:gap-12 text-center text-left md:text-left">
                                     <div className="space-y-2">
                                         <p className="text-white/50 font-medium text-[10px] uppercase tracking-wider">
                                             {dateFilter === 'today' ? 'Revenue (Today)' :
