@@ -791,7 +791,7 @@ export default function NewSale() {
                                     <p className="text-sm opacity-70">Tap anywhere to add products</p>
                                 </button>
                             ) : (
-                                <div className="space-y-3 mb-6 relative z-0">
+                                <div className="space-y-3 relative z-0">
                                     {cart.map((item, idx) => (
                                         <div
                                             key={idx}
@@ -924,7 +924,7 @@ export default function NewSale() {
                         </div>
 
                         {/* --- NEW SECTION: Supplier Payment (Payable) --- */}
-                        <div className="mb-6 bg-card border border-border rounded-xl p-4 shadow-sm">
+                        <div className="mt-4 bg-card border border-border rounded-xl p-4 shadow-sm">
                             <button
                                 onClick={() => setIsLinkedPayable(!isLinkedPayable)}
                                 onKeyDown={(e) => {
@@ -1034,7 +1034,7 @@ export default function NewSale() {
                         </div>
 
                         {/* Summary Footer */}
-                        <div className="bg-card border border-border rounded-t-3xl shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.1)] -mx-4 -mb-4 p-6 space-y-5 animate-in slide-in-from-bottom-6">
+                        <div className="mt-6 bg-card border border-border rounded-3xl shadow-lg p-5 space-y-5 animate-in slide-in-from-bottom-6">
                             <div className="flex justify-between items-end gap-8">
                                 <div className="flex-1">
                                     <p className="text-sm text-muted-foreground font-medium mb-1">Total Amount</p>
@@ -1291,7 +1291,7 @@ export default function NewSale() {
                                         <div>
                                             <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2 block ml-1">Selling Rate</label>
                                             <div className="relative">
-                                                <span className="absolute left-4 top-4 text-muted-foreground font-bold">₹</span>
+                                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">₹</span>
                                                 <input
                                                     type="number"
                                                     className="w-full bg-accent/50 border border-border/50 rounded-2xl py-3.5 pl-10 pr-4 text-xl font-bold text-foreground outline-none focus:ring-2 focus:ring-primary focus:bg-background transition-all"
@@ -1304,7 +1304,7 @@ export default function NewSale() {
                                         <div className={tempProd.category === 'ghee' ? "opacity-50 pointer-events-none" : ""}>
                                             <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2 block ml-1">{tempProd.category === 'ghee' ? "Auto Calc" : "Buying Rate"}</label>
                                             <div className="relative">
-                                                <span className="absolute left-4 top-4 text-muted-foreground font-bold">₹</span>
+                                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">₹</span>
                                                 <input
                                                     type="number"
                                                     className="w-full bg-accent/50 border border-border/50 rounded-2xl py-3.5 pl-10 pr-4 text-xl font-bold text-foreground outline-none focus:ring-2 focus:ring-primary focus:bg-background transition-all"
