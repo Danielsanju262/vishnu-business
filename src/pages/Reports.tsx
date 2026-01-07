@@ -970,7 +970,7 @@ export default function Reports() {
                                 </h3>
                                 <div className="text-right">
                                     <p className="text-[10px] font-bold text-muted-foreground uppercase">Total Sales</p>
-                                    <p className="text-lg font-black text-emerald-600">₹{totalSales.toLocaleString()}</p>
+                                    <p className="text-lg font-black text-emerald-500 dark:text-emerald-400">₹{totalSales.toLocaleString()}</p>
                                 </div>
                             </div>
 
@@ -1074,8 +1074,8 @@ export default function Reports() {
                                                             </div>
                                                         </div>
                                                     </div>
-                                                    <div className="text-right flex items-center gap-3 md:gap-4 flex-shrink-0">
-                                                        <div className="font-black text-emerald-600 dark:text-emerald-400 text-base md:text-lg whitespace-nowrap">₹{(t.quantity * t.sell_price).toLocaleString()}</div>
+                                                    <div className="text-right flex items-center gap-0 md:gap-1 flex-shrink-0">
+                                                        <div className="font-black text-emerald-500 text-base md:text-lg whitespace-nowrap">₹{(t.quantity * t.sell_price).toLocaleString()}</div>
                                                         <div className="relative">
                                                             <button
                                                                 onClick={(e) => { e.stopPropagation(); setActiveMenuId(activeMenuId === t.id ? null : t.id); }}
