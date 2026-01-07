@@ -602,7 +602,17 @@ export default function NewSale() {
             <div className="fixed top-0 left-0 right-0 md:mx-auto w-full md:max-w-lg z-50 bg-white dark:bg-gray-900 border-b border-border shadow-sm px-3 py-3 md:px-4 flex items-center justify-between transition-all mb-4">
                 <button
                     onClick={() => {
-                        if (step === "details") { setStep("product"); return; }
+                        if (step === "details") {
+                            if (editingIndex !== null) {
+                                // Cancel edit and go back to cart
+                                setEditingIndex(null);
+                                setTempProd(null);
+                                setStep("cart");
+                                return;
+                            }
+                            setStep("product");
+                            return;
+                        }
                         if (step === "product") { setStep("cart"); return; }
                         if (step === "cart") { setStep("customer"); return; }
                         navigate("/");
@@ -620,7 +630,7 @@ export default function NewSale() {
                     className="p-3 -ml-2 rounded-full hover:bg-accent hover:text-foreground text-muted-foreground transition interactive active:scale-95 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
                     aria-label="Go back"
                 >
-                    <ArrowLeft size={20} />
+                    {step === "details" && editingIndex !== null ? <X size={30} strokeWidth={2.5} /> : <ArrowLeft size={20} />}
                 </button>
                 <div className="font-black text-foreground text-base md:text-lg tracking-tight">
                     {step === "customer" && "Select Customer"}
@@ -636,9 +646,8 @@ export default function NewSale() {
                 {step === "customer" && (
                     <div className="flex-1 flex flex-col animate-in slide-in-from-right-4 duration-300">
                         <div className="relative mb-6">
-                            <Search className="absolute left-4 top-3.5 text-muted-foreground" size={20} />
                             <input
-                                className="w-full bg-accent/30 border border-border/30 pl-10 pr-3 py-3 md:py-2.5 rounded-xl focus:ring-2 focus:ring-primary focus:bg-background outline-none text-base text-foreground transition-all h-12 md:h-auto"
+                                className="w-full bg-accent/30 border border-border/30 px-4 py-3 md:py-2.5 rounded-xl focus:ring-2 focus:ring-primary focus:bg-background outline-none text-base text-foreground transition-all h-12 md:h-auto"
                                 placeholder="Search customer..."
                                 value={search}
                                 onChange={e => setSearch(e.target.value)}
@@ -747,7 +756,7 @@ export default function NewSale() {
                             </button>
                         </div>
 
-                        <div className="flex-1 flex flex-col">
+                        <div className="flex flex-col">
                             <div className="flex items-center justify-between mb-3 px-1">
                                 <h3 className="font-bold text-foreground flex items-center gap-2">
                                     <ShoppingCart size={18} className="text-primary" />
@@ -913,7 +922,7 @@ export default function NewSale() {
                                     }
                                 }}
                                 tabIndex={0}
-                                className="w-full py-3 rounded-xl border-2 border-dashed border-primary/30 text-primary font-bold flex items-center justify-center hover:bg-primary/5 transition interactive active:scale-95 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+                                className="w-full mt-3 py-3 rounded-xl border-2 border-dashed border-primary/30 text-primary font-bold flex items-center justify-center hover:bg-primary/5 transition interactive active:scale-95 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
                                 aria-label="Add another item"
                             >
                                 <div className="p-1 bg-primary/20 rounded-full mr-2">
@@ -924,7 +933,7 @@ export default function NewSale() {
                         </div>
 
                         {/* --- NEW SECTION: Supplier Payment (Payable) --- */}
-                        <div className="mt-4 bg-card border border-border rounded-xl p-4 shadow-sm">
+                        <div className="mt-6 bg-card border border-border rounded-xl p-4 shadow-sm">
                             <button
                                 onClick={() => setIsLinkedPayable(!isLinkedPayable)}
                                 onKeyDown={(e) => {
@@ -1182,9 +1191,8 @@ export default function NewSale() {
                     step === "product" && (
                         <div className="flex-1 flex flex-col animate-in slide-in-from-right-4 duration-300">
                             <div className="relative mb-6">
-                                <Search className="absolute left-4 top-3.5 text-muted-foreground" size={20} />
                                 <input
-                                    className="w-full bg-accent/50 border border-border/50 pl-12 pr-4 py-3.5 rounded-2xl focus:ring-2 focus:ring-primary focus:bg-background outline-none text-lg text-foreground transition-all shadow-sm"
+                                    className="w-full bg-accent/50 border border-border/50 px-4 py-3.5 rounded-2xl focus:ring-2 focus:ring-primary focus:bg-background outline-none text-lg text-foreground transition-all shadow-sm"
                                     placeholder="Search product..."
                                     value={search}
                                     onChange={e => setSearch(e.target.value)}
@@ -1265,7 +1273,19 @@ export default function NewSale() {
                 {
                     step === "details" && tempProd && (
                         <div className="flex-1 flex flex-col animate-in slide-in-from-right-8 duration-300 items-center justify-center -mt-10">
-                            <div className="w-full max-w-sm">
+                            <div className="w-full max-w-sm relative">
+                                {editingIndex !== null && (
+                                    <button
+                                        onClick={() => {
+                                            setEditingIndex(null);
+                                            setTempProd(null);
+                                            setStep("cart");
+                                        }}
+                                        className="absolute right-0 top-0 p-3 -mr-3 -mt-3 text-muted-foreground hover:text-destructive transition-colors bg-accent/50 rounded-full"
+                                    >
+                                        <X size={30} strokeWidth={2.5} />
+                                    </button>
+                                )}
                                 <div className="text-center mb-8">
                                     <div className="inline-flex p-6 rounded-3xl bg-gradient-to-br from-primary/10 to-primary/5 text-primary mb-4 shadow-inner ring-1 ring-primary/20">
                                         <Package size={48} />
@@ -1291,10 +1311,10 @@ export default function NewSale() {
                                         <div>
                                             <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2 block ml-1">Selling Rate</label>
                                             <div className="relative">
-                                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">₹</span>
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-bold text-lg">₹</span>
                                                 <input
                                                     type="number"
-                                                    className="w-full bg-accent/50 border border-border/50 rounded-2xl py-3.5 pl-10 pr-4 text-xl font-bold text-foreground outline-none focus:ring-2 focus:ring-primary focus:bg-background transition-all"
+                                                    className="w-full bg-accent/50 border border-border/50 rounded-2xl py-3.5 pl-10 pr-3 text-xl font-bold text-center text-foreground outline-none focus:ring-2 focus:ring-primary focus:bg-background transition-all"
                                                     placeholder="0"
                                                     value={sellPrice}
                                                     onChange={e => setSellPrice(e.target.value)}
@@ -1304,10 +1324,10 @@ export default function NewSale() {
                                         <div className={tempProd.category === 'ghee' ? "opacity-50 pointer-events-none" : ""}>
                                             <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2 block ml-1">{tempProd.category === 'ghee' ? "Auto Calc" : "Buying Rate"}</label>
                                             <div className="relative">
-                                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">₹</span>
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-bold text-lg">₹</span>
                                                 <input
                                                     type="number"
-                                                    className="w-full bg-accent/50 border border-border/50 rounded-2xl py-3.5 pl-10 pr-4 text-xl font-bold text-foreground outline-none focus:ring-2 focus:ring-primary focus:bg-background transition-all"
+                                                    className="w-full bg-accent/50 border border-border/50 rounded-2xl py-3.5 pl-10 pr-3 text-xl font-bold text-center text-foreground outline-none focus:ring-2 focus:ring-primary focus:bg-background transition-all"
                                                     placeholder="0"
                                                     value={buyPrice}
                                                     onChange={e => setBuyPrice(e.target.value)}
