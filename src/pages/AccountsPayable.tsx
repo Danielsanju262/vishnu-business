@@ -404,9 +404,17 @@ export default function AccountsPayable() {
                     </div>
                     <button
                         onClick={() => setShowNewPayable(true)}
-                        className="p-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white transition-all duration-150 active:scale-95"
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                setShowNewPayable(true);
+                            }
+                        }}
+                        tabIndex={0}
+                        className="p-3 rounded-xl bg-orange-500 hover:bg-orange-600 text-white transition-all duration-150 active:scale-95 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                        aria-label="Add new payable"
                     >
-                        <Plus size={18} strokeWidth={2.5} />
+                        <Plus size={20} strokeWidth={2.5} />
                     </button>
                 </div>
             </div>
@@ -455,7 +463,16 @@ export default function AccountsPayable() {
                                 <div
                                     key={supplier.supplierId}
                                     onClick={() => navigate(`/accounts-payable/${supplier.supplierId}`)}
-                                    className="bg-white dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-lg transition-all cursor-pointer active:scale-[0.99]"
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter" || e.key === " ") {
+                                            e.preventDefault();
+                                            navigate(`/accounts-payable/${supplier.supplierId}`);
+                                        }
+                                    }}
+                                    tabIndex={0}
+                                    role="button"
+                                    className="bg-white dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-lg transition-all cursor-pointer active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                                    aria-label={`View payment details for ${supplier.supplierName}`}
                                 >
                                     {/* Supplier Info */}
                                     <div className="flex justify-between items-start mb-3">
@@ -473,9 +490,18 @@ export default function AccountsPayable() {
                                                         setEditDateSupplier({ id: supplier.supplierId, name: supplier.supplierName });
                                                         setEditDateValue(supplier.earliestDueDate);
                                                     }}
-                                                    className="p-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === "Enter" || e.key === " ") {
+                                                            e.preventDefault();
+                                                            e.stopPropagation();
+                                                            setEditDateSupplier({ id: supplier.supplierId, name: supplier.supplierName });
+                                                            setEditDateValue(supplier.earliestDueDate);
+                                                        }
+                                                    }}
+                                                    className="p-2.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-1"
+                                                    aria-label="Edit due date"
                                                 >
-                                                    <Edit2 size={12} strokeWidth={2.5} />
+                                                    <Edit2 size={14} strokeWidth={2.5} />
                                                 </button>
                                             </div>
                                         </div>
@@ -498,7 +524,7 @@ export default function AccountsPayable() {
                                                 setQuickActionSupplier({ id: supplier.supplierId, name: supplier.supplierName, payable: supplier.primaryPayable, totalBalance: supplier.totalBalance });
                                                 setActionType('add');
                                             }}
-                                            className="flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white py-2 px-3 rounded-xl text-xs font-bold transition-all active:scale-95"
+                                            className="flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white py-3 px-3 rounded-xl text-xs font-bold transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-orange-300 focus-visible:ring-offset-1"
                                         >
                                             <Plus size={14} strokeWidth={2.5} />
                                             Add Payable
@@ -509,7 +535,7 @@ export default function AccountsPayable() {
                                                 setQuickActionSupplier({ id: supplier.supplierId, name: supplier.supplierName, payable: supplier.primaryPayable, totalBalance: supplier.totalBalance });
                                                 setActionType('pay');
                                             }}
-                                            className="flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white py-2 px-3 rounded-xl text-xs font-bold transition-all active:scale-95"
+                                            className="flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white py-3 px-3 rounded-xl text-xs font-bold transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-1"
                                         >
                                             <Wallet size={14} strokeWidth={2.5} />
                                             Pay
@@ -559,7 +585,7 @@ export default function AccountsPayable() {
                             <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Due Date (Optional)</label>
                             <input
                                 type="date"
-                                className="w-full bg-zinc-50 dark:bg-zinc-800 border-2 border-zinc-200 dark:border-zinc-700 focus:border-orange-500 rounded-xl px-4 h-12 text-sm font-bold outline-none transition-all mt-1"
+                                className="w-full bg-zinc-50 dark:bg-zinc-800 border-2 border-zinc-200 dark:border-zinc-700 focus:border-orange-500 rounded-xl px-4 h-14 md:h-12 text-sm font-bold outline-none transition-all mt-1"
                                 value={dueDate}
                                 onChange={e => setDueDate(e.target.value)}
                             />
@@ -610,6 +636,7 @@ export default function AccountsPayable() {
                                     setShowSupplierList(true);
                                 }}
                                 onFocus={() => setShowSupplierList(true)}
+                                autoFocus
                             />
                         </div>
                         {showSupplierList && newPayableSupplierSearch && (
@@ -658,7 +685,7 @@ export default function AccountsPayable() {
                         <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Due Date *</label>
                         <input
                             type="date"
-                            className="w-full bg-zinc-50 dark:bg-zinc-800 border-2 border-zinc-200 dark:border-zinc-700 focus:border-emerald-500 rounded-xl px-4 h-12 text-sm font-bold outline-none transition-all mt-1"
+                            className="w-full bg-zinc-50 dark:bg-zinc-800 border-2 border-zinc-200 dark:border-zinc-700 focus:border-emerald-500 rounded-xl px-4 h-14 md:h-12 text-sm font-bold outline-none transition-all mt-1"
                             value={newPayableDueDate}
                             onChange={e => setNewPayableDueDate(e.target.value)}
                         />
@@ -703,7 +730,7 @@ export default function AccountsPayable() {
                         <input
                             type="date"
                             autoFocus
-                            className="w-full bg-zinc-50 dark:bg-zinc-800 border-2 border-zinc-200 dark:border-zinc-700 focus:border-emerald-500 rounded-xl px-4 h-12 text-sm font-bold outline-none transition-all mt-1"
+                            className="w-full bg-zinc-50 dark:bg-zinc-800 border-2 border-zinc-200 dark:border-zinc-700 focus:border-emerald-500 rounded-xl px-4 h-14 md:h-12 text-sm font-bold outline-none transition-all mt-1"
                             value={editDateValue}
                             onChange={e => setEditDateValue(e.target.value)}
                         />

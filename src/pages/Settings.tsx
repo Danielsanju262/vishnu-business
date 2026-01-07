@@ -30,7 +30,13 @@ const CollapsibleSection = ({
         <div className="bg-white dark:bg-neutral-900/80 border border-neutral-200 dark:border-neutral-800 rounded-2xl overflow-hidden shadow-sm transition-all duration-200">
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="w-full flex items-center justify-between p-4 md:p-5 text-left bg-transparent hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors"
+                onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setIsOpen(!isOpen);
+                    }
+                }}
+                className="w-full flex items-center justify-between p-4 md:p-5 text-left bg-transparent hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
             >
                 <div className="flex items-center gap-3">
                     <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center transition-colors", headerClassName)}>
@@ -121,6 +127,9 @@ export default function Settings() {
     const [revokeSuperAdminPin, setRevokeSuperAdminPin] = useState('');
     const [isRevoking, setIsRevoking] = useState(false);
     const [revokeError, setRevokeError] = useState('');
+
+    // Deauthorize Confirmation State
+    const [showDeauthConfirm, setShowDeauthConfirm] = useState(false);
 
     const resetPinState = () => {
         setIsChangePinOpen(false);
@@ -773,6 +782,39 @@ export default function Settings() {
                     <Button
                         variant="outline"
                         className="w-full h-11 md:h-12 border-neutral-300 dark:border-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 font-medium transition-all duration-200"
+                        onClick={() => setShowDeauthConfirm(true)}
+                    >
+                        <LogOut size={16} className="mr-2" />
+                        Deauthorize Device
+                    </Button>
+                </div>
+            </div>
+
+            {/* Deauthorize Confirmation Modal */}
+            <Modal
+                isOpen={showDeauthConfirm}
+                onClose={() => setShowDeauthConfirm(false)}
+            >
+                <div className="text-center space-y-2 mb-6">
+                    <div className="w-14 h-14 rounded-2xl bg-amber-500/10 flex items-center justify-center mx-auto text-amber-500">
+                        <AlertTriangle size={28} />
+                    </div>
+                    <h2 className="text-xl font-bold">Deauthorize This Device?</h2>
+                    <p className="text-sm text-muted-foreground">
+                        You'll need to enter your Master PIN again to access the app on this device.
+                    </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                    <Button
+                        variant="outline"
+                        className="h-12"
+                        onClick={() => setShowDeauthConfirm(false)}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        className="h-12 bg-amber-500 hover:bg-amber-600 text-white font-bold"
                         onClick={() => {
                             localStorage.removeItem('device_authorized');
                             localStorage.removeItem('bio_credential_id');
@@ -781,11 +823,10 @@ export default function Settings() {
                             window.location.reload();
                         }}
                     >
-                        <LogOut size={16} className="mr-2" />
-                        Deauthorize Device
+                        Deauthorize
                     </Button>
                 </div>
-            </div>
+            </Modal>
 
             {/* Export Modal */}
             {/* Export Modal */}
@@ -806,27 +847,21 @@ export default function Settings() {
                 <div className="space-y-4">
                     <div className="space-y-2">
                         <label className="text-xs font-semibold text-muted-foreground">Start Date</label>
-                        <div className="relative">
-                            <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none z-10" size={16} />
-                            <Input
-                                type="date"
-                                value={exportStartDate}
-                                onChange={(e) => setExportStartDate(e.target.value)}
-                                className="pl-12 h-12 bg-white dark:bg-zinc-900"
-                            />
-                        </div>
+                        <Input
+                            type="date"
+                            value={exportStartDate}
+                            onChange={(e) => setExportStartDate(e.target.value)}
+                            className="h-12 md:h-14 bg-white dark:bg-zinc-900"
+                        />
                     </div>
                     <div className="space-y-2">
                         <label className="text-xs font-semibold text-muted-foreground">End Date</label>
-                        <div className="relative">
-                            <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none z-10" size={16} />
-                            <Input
-                                type="date"
-                                value={exportEndDate}
-                                onChange={(e) => setExportEndDate(e.target.value)}
-                                className="pl-12 h-12 bg-white dark:bg-zinc-900"
-                            />
-                        </div>
+                        <Input
+                            type="date"
+                            value={exportEndDate}
+                            onChange={(e) => setExportEndDate(e.target.value)}
+                            className="h-12 md:h-14 bg-white dark:bg-zinc-900"
+                        />
                     </div>
 
                     <Button
@@ -879,8 +914,9 @@ export default function Settings() {
                             inputMode="numeric"
                             value={superAdminPin}
                             onChange={(e) => setSuperAdminPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                            onPaste={(e) => e.preventDefault()}
                             placeholder="Enter Super Admin PIN"
-                            className="text-center text-lg font-semibold tracking-widest h-14"
+                            className="text-center text-lg font-semibold tracking-widest h-14 md:h-16"
                             required
                         />
                     </div>
@@ -894,8 +930,9 @@ export default function Settings() {
                             inputMode="numeric"
                             value={confirmSuperAdminPin}
                             onChange={(e) => setConfirmSuperAdminPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                            onPaste={(e) => e.preventDefault()}
                             placeholder="Confirm PIN"
-                            className="text-center text-lg font-semibold tracking-widest h-14"
+                            className="text-center text-lg font-semibold tracking-widest h-14 md:h-16"
                             required
                         />
                     </div>
@@ -974,8 +1011,9 @@ ADD COLUMN IF NOT EXISTS super_admin_email TEXT;`}
                             inputMode="numeric"
                             value={superAdminPinInput}
                             onChange={(e) => setSuperAdminPinInput(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                            onPaste={(e) => e.preventDefault()}
                             placeholder="Enter Super Admin PIN"
-                            className="text-center text-lg font-semibold tracking-widest h-14 bg-accent/50 focus:bg-background transition-colors placeholder:text-muted-foreground/50 placeholder:font-normal placeholder:tracking-normal"
+                            className="text-center text-lg font-semibold tracking-widest h-14 md:h-16 bg-accent/50 focus:bg-background transition-colors placeholder:text-muted-foreground/50 placeholder:font-normal placeholder:tracking-normal"
                             autoFocus
                         />
                         <Button type="submit" className="w-full h-12 text-white font-bold shadow-lg shadow-primary/25" disabled={isLoading || superAdminPinInput.length < 6}>
@@ -993,8 +1031,9 @@ ADD COLUMN IF NOT EXISTS super_admin_email TEXT;`}
                                     inputMode="numeric"
                                     value={newPin}
                                     onChange={(e) => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                    onPaste={(e) => e.preventDefault()}
                                     placeholder="New Master PIN"
-                                    className="text-center text-lg font-semibold tracking-widest h-14 bg-accent/50 focus:bg-background transition-colors placeholder:text-muted-foreground/50 placeholder:font-normal placeholder:tracking-normal"
+                                    className="text-center text-lg font-semibold tracking-widest h-14 md:h-16 bg-accent/50 focus:bg-background transition-colors placeholder:text-muted-foreground/50 placeholder:font-normal placeholder:tracking-normal"
                                     autoFocus
                                 />
                                 <Button
@@ -1013,8 +1052,9 @@ ADD COLUMN IF NOT EXISTS super_admin_email TEXT;`}
                                     inputMode="numeric"
                                     value={confirmNewPin}
                                     onChange={(e) => setConfirmNewPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                    onPaste={(e) => e.preventDefault()}
                                     placeholder="Confirm New PIN"
-                                    className="text-center text-lg font-semibold tracking-widest h-14 bg-accent/50 focus:bg-background transition-colors placeholder:text-muted-foreground/50 placeholder:font-normal placeholder:tracking-normal"
+                                    className="text-center text-lg font-semibold tracking-widest h-14 md:h-16 bg-accent/50 focus:bg-background transition-colors placeholder:text-muted-foreground/50 placeholder:font-normal placeholder:tracking-normal"
                                     autoFocus
                                 />
 
@@ -1072,8 +1112,9 @@ ADD COLUMN IF NOT EXISTS super_admin_email TEXT;`}
                         inputMode="numeric"
                         value={revokeSuperAdminPin}
                         onChange={(e) => setRevokeSuperAdminPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                        onPaste={(e) => e.preventDefault()}
                         placeholder="Enter Super Admin PIN"
-                        className="text-center text-lg font-semibold tracking-widest h-14 bg-accent/50 focus:bg-background transition-colors placeholder:text-muted-foreground/50 placeholder:font-normal placeholder:tracking-normal"
+                        className="text-center text-lg font-semibold tracking-widest h-14 md:h-16 bg-accent/50 focus:bg-background transition-colors placeholder:text-muted-foreground/50 placeholder:font-normal placeholder:tracking-normal"
                         autoFocus
                     />
 

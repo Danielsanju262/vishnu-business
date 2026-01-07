@@ -204,7 +204,7 @@ export default function Customers() {
                 </div>
             ) : (
                 <div className="fixed top-0 left-0 right-0 z-40 bg-white dark:bg-gray-900 border-b border-border shadow-sm px-3 py-3 md:px-4 flex items-center justify-between gap-4">
-                    <Link to="/" className="p-2.5 -ml-2 rounded-full hover:bg-accent hover:text-foreground text-muted-foreground transition interactive active:scale-95">
+                    <Link to="/" className="p-3 -ml-2 rounded-full hover:bg-accent hover:text-foreground text-muted-foreground transition interactive active:scale-95 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1">
                         <ArrowLeft size={20} />
                     </Link>
                     <div className="flex-1">
@@ -219,8 +219,17 @@ export default function Customers() {
                     <Button
                         size="sm"
                         onClick={() => { setIsAdding(!isAdding); setNewName(""); setEditingId(null); }}
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                setIsAdding(!isAdding);
+                                setNewName("");
+                                setEditingId(null);
+                            }
+                        }}
+                        tabIndex={0}
                         className={cn(
-                            "rounded-full px-5 font-bold shadow-lg transition-all interactive",
+                            "rounded-full px-5 font-bold shadow-lg transition-all interactive focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2",
                             isAdding ? "bg-muted text-foreground hover:bg-muted/80" : "bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-primary/20"
                         )}
                     >
@@ -241,7 +250,7 @@ export default function Customers() {
                             <input
                                 type="text"
                                 placeholder="Search customers..."
-                                className="w-full pl-10 h-10 md:h-12 rounded-xl bg-accent/50 border-transparent focus:bg-background focus:border-ring transition-all"
+                                className="w-full pl-10 h-12 rounded-xl bg-accent/50 border-transparent focus:bg-background focus:border-ring transition-all"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                             />
@@ -259,7 +268,7 @@ export default function Customers() {
                                 <div>
                                     <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">Customer Name</label>
                                     <input
-                                        className="w-full bg-background border border-border rounded-xl px-4 py-3 text-lg font-semibold text-foreground focus:ring-2 focus:ring-primary outline-none shadow-sm placeholder:font-normal placeholder:text-muted-foreground/50 transition-all"
+                                        className="w-full bg-background border border-border rounded-xl px-4 py-3.5 md:py-3 text-lg font-semibold text-foreground focus:ring-2 focus:ring-primary outline-none shadow-sm placeholder:font-normal placeholder:text-muted-foreground/50 transition-all h-14 md:h-auto"
                                         placeholder="e.g. Hotel Woodlands"
                                         value={newName}
                                         onChange={(e) => setNewName(e.target.value)}
@@ -301,11 +310,11 @@ export default function Customers() {
                                 )}>
                                     {isSelectionMode ? (
                                         <div className="flex items-center gap-4 cursor-pointer" onClick={() => toggleSelection(c.id)}>
-                                            <div className="mr-1">
+                                            <div className="flex items-center justify-center w-10 h-10 mr-1">
                                                 {selectedIds.has(c.id) ? (
-                                                    <CheckCircle2 className="text-primary fill-primary/20" />
+                                                    <CheckCircle2 className="text-primary fill-primary/20" size={24} strokeWidth={2.5} />
                                                 ) : (
-                                                    <Circle className="text-muted-foreground" />
+                                                    <Circle className="text-muted-foreground" size={24} strokeWidth={2} />
                                                 )}
                                             </div>
                                             <div className="bg-gradient-to-br from-indigo-100 to-blue-100 dark:from-indigo-500/20 dark:to-blue-500/20 text-indigo-600 dark:text-indigo-300 w-10 h-10 rounded-full flex items-center justify-center shadow-sm">
@@ -324,7 +333,19 @@ export default function Customers() {
                                             onMouseUp={handleTouchEnd}
                                             onMouseLeave={handleTouchEnd}
                                         >
-                                            <div className="flex items-center gap-3 md:gap-4 flex-1 cursor-pointer" onClick={() => startEdit(c)}>
+                                            <div
+                                                className="flex items-center gap-3 md:gap-4 flex-1 cursor-pointer"
+                                                onClick={() => startEdit(c)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === "Enter" || e.key === " ") {
+                                                        e.preventDefault();
+                                                        startEdit(c);
+                                                    }
+                                                }}
+                                                tabIndex={0}
+                                                role="button"
+                                                aria-label={`Edit ${c.name}`}
+                                            >
                                                 <div className="bg-gradient-to-br from-indigo-100 to-blue-100 dark:from-indigo-500/20 dark:to-blue-500/20 text-indigo-600 dark:text-indigo-300 w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform select-none">
                                                     <span className="text-base md:text-lg font-black">{c.name.charAt(0).toUpperCase()}</span>
                                                 </div>
@@ -337,7 +358,16 @@ export default function Customers() {
                                             <div className="relative">
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); setActiveMenuId(activeMenuId === c.id ? null : c.id); }}
-                                                    className="p-2 text-muted-foreground hover:bg-accent rounded-xl transition"
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === "Enter" || e.key === " ") {
+                                                            e.preventDefault();
+                                                            e.stopPropagation();
+                                                            setActiveMenuId(activeMenuId === c.id ? null : c.id);
+                                                        }
+                                                    }}
+                                                    tabIndex={0}
+                                                    className="p-2.5 text-muted-foreground hover:bg-accent rounded-xl transition focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+                                                    aria-label="More options"
                                                 >
                                                     <MoreVertical size={20} />
                                                 </button>

@@ -789,8 +789,29 @@ export default function SupplierPaymentDetail() {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-background flex items-center justify-center">
-                <div className="text-muted-foreground">Loading...</div>
+            <div className="min-h-screen bg-background px-3 md:px-4 pb-32 w-full md:max-w-2xl md:mx-auto">
+                <div className="fixed top-0 left-0 right-0 z-50 bg-white dark:bg-zinc-900 border-b border-border px-3 py-3 md:px-4 md:py-4">
+                    <div className="w-full md:max-w-2xl md:mx-auto">
+                        <div className="h-8 bg-muted/50 rounded-lg animate-pulse w-48" />
+                    </div>
+                </div>
+                <div className="h-24 md:h-28" />
+                <div className="space-y-4">
+                    {/* Balance Card Skeleton */}
+                    <div className="h-32 bg-muted/50 rounded-2xl animate-pulse" />
+                    {/* Action Buttons Skeleton */}
+                    <div className="grid grid-cols-2 gap-3">
+                        <div className="h-12 bg-muted/50 rounded-xl animate-pulse" />
+                        <div className="h-12 bg-muted/50 rounded-xl animate-pulse" />
+                    </div>
+                    {/* Transaction List Skeleton */}
+                    <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+                        <div className="h-12 bg-muted/50 animate-pulse" />
+                        {[1, 2, 3, 4, 5].map((i) => (
+                            <div key={i} className="h-20 bg-muted/30 border-t border-zinc-200 dark:border-zinc-800 animate-pulse" />
+                        ))}
+                    </div>
+                </div>
             </div>
         );
     }
@@ -844,7 +865,15 @@ export default function SupplierPaymentDetail() {
                                 <div className="relative">
                                     <button
                                         onClick={() => setShowMenu(!showMenu)}
-                                        className="p-2 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400 transition-colors"
+                                        onKeyDown={(e) => {
+                                            if (e.key === "Enter" || e.key === " ") {
+                                                e.preventDefault();
+                                                setShowMenu(!showMenu);
+                                            }
+                                        }}
+                                        tabIndex={0}
+                                        className="p-2.5 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 dark:text-zinc-400 transition-colors focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-1"
+                                        aria-label="More options"
                                     >
                                         <MoreVertical size={18} strokeWidth={2.5} />
                                     </button>
@@ -892,9 +921,10 @@ export default function SupplierPaymentDetail() {
                         <p className="text-xs opacity-75">Due: {earliestDueDate ? new Date(earliestDueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A'}</p>
                         <button
                             onClick={() => { setNewDueDate(earliestDueDate || ''); setShowEditDate(true); }}
-                            className="p-1 rounded hover:bg-white/20 transition-colors"
+                            className="p-1.5 rounded hover:bg-white/20 transition-colors"
+                            aria-label="Edit due date"
                         >
-                            <Edit2 size={12} />
+                            <Edit2 size={14} />
                         </button>
                     </div>
                 </div>
@@ -903,14 +933,14 @@ export default function SupplierPaymentDetail() {
                 <div className="grid grid-cols-2 gap-3 mb-6">
                     <button
                         onClick={() => { setPayableAmount(""); setDueDate(""); setShowAddPayable(true); }}
-                        className="flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-xl font-bold transition-all active:scale-95"
+                        className="flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white py-3.5 rounded-xl font-bold transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-orange-300 focus-visible:ring-offset-1"
                     >
                         <Plus size={18} strokeWidth={2.5} />
                         Add Payable
                     </button>
                     <button
                         onClick={() => { setPaymentAmount(""); setShowMakePayment(true); }}
-                        className="flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-xl font-bold transition-all active:scale-95"
+                        className="flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white py-3.5 rounded-xl font-bold transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-1"
                     >
                         <Wallet size={18} strokeWidth={2.5} />
                         Make Payment
@@ -978,11 +1008,11 @@ export default function SupplierPaymentDetail() {
                                     >
                                         <div className="flex items-start gap-4">
                                             {isSelectionMode && (
-                                                <div className="pt-1">
+                                                <div className="flex items-center justify-center w-10 h-10 pt-1">
                                                     {selectedIndices.has(actualIndex) ? (
-                                                        <CheckCircle2 className="text-emerald-500 fill-emerald-100 dark:fill-emerald-900" size={20} />
+                                                        <CheckCircle2 className="text-emerald-500 fill-emerald-100 dark:fill-emerald-900" size={24} strokeWidth={2.5} />
                                                     ) : (
-                                                        <Circle className="text-zinc-300 dark:text-zinc-600" size={20} />
+                                                        <Circle className="text-zinc-300 dark:text-zinc-600" size={24} strokeWidth={2} />
                                                     )}
                                                 </div>
                                             )}
@@ -1001,17 +1031,19 @@ export default function SupplierPaymentDetail() {
                                                     {!isSelectionMode && isEditable && (
                                                         <button
                                                             onClick={(e) => { e.stopPropagation(); setEditingIndex(actualIndex); }}
-                                                            className="p-1 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded transition-colors"
+                                                            className="p-2 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-1"
+                                                            aria-label="Edit transaction"
                                                         >
-                                                            <Edit2 size={12} className="text-zinc-400" />
+                                                            <Edit2 size={14} className="text-zinc-400" strokeWidth={2.5} />
                                                         </button>
                                                     )}
                                                     {!isSelectionMode && (
                                                         <button
                                                             onClick={(e) => { e.stopPropagation(); handleDeleteTransaction(actualIndex); }}
-                                                            className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
+                                                            className="p-2 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-1"
+                                                            aria-label="Delete transaction"
                                                         >
-                                                            <Trash2 size={12} className="text-zinc-400 hover:text-red-500" />
+                                                            <Trash2 size={14} className="text-zinc-400 hover:text-red-500" strokeWidth={2.5} />
                                                         </button>
                                                     )}
                                                 </div>

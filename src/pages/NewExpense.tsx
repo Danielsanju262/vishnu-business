@@ -288,11 +288,33 @@ export default function NewExpense() {
             ) : (
                 <div className="fixed top-0 left-0 right-0 z-50 bg-white dark:bg-gray-900 border-b border-border shadow-sm px-3 py-3 md:px-4 flex items-center justify-between transition-all w-full mb-4">
                     {isManageMode ? (
-                        <button onClick={() => setIsManageMode(false)} className="p-2 -ml-2 rounded-full hover:bg-accent hover:text-foreground text-muted-foreground transition interactive active:scale-95">
+                        <button
+                            onClick={() => setIsManageMode(false)}
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                    e.preventDefault();
+                                    setIsManageMode(false);
+                                }
+                            }}
+                            tabIndex={0}
+                            className="p-3 -ml-2 rounded-full hover:bg-accent hover:text-foreground text-muted-foreground transition interactive active:scale-95 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+                            aria-label="Back to expense form"
+                        >
                             <ArrowLeft size={20} />
                         </button>
                     ) : (
-                        <button onClick={() => navigate("/")} className="p-2 -ml-2 rounded-full hover:bg-accent hover:text-foreground text-muted-foreground transition interactive active:scale-95">
+                        <button
+                            onClick={() => navigate("/")}
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                    e.preventDefault();
+                                    navigate("/");
+                                }
+                            }}
+                            tabIndex={0}
+                            className="p-3 -ml-2 rounded-full hover:bg-accent hover:text-foreground text-muted-foreground transition interactive active:scale-95 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+                            aria-label="Go back to dashboard"
+                        >
                             <ArrowLeft size={20} />
                         </button>
                     )}
@@ -301,11 +323,35 @@ export default function NewExpense() {
 
                     {/* Right Action Button */}
                     {isManageMode ? (
-                        <button onClick={() => { setIsAddingPreset(true); setPresetName(""); setEditingPresetId(null); }} className="p-2.5 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-all duration-200 active:scale-95">
+                        <button
+                            onClick={() => { setIsAddingPreset(true); setPresetName(""); setEditingPresetId(null); }}
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                    e.preventDefault();
+                                    setIsAddingPreset(true);
+                                    setPresetName("");
+                                    setEditingPresetId(null);
+                                }
+                            }}
+                            tabIndex={0}
+                            className="p-3 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-all duration-200 active:scale-95 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-1"
+                            aria-label="Add new expense type"
+                        >
                             <Plus size={20} />
                         </button>
                     ) : (
-                        <button onClick={() => setIsManageMode(true)} className="p-2.5 rounded-full bg-accent hover:bg-accent/80 text-muted-foreground transition-all duration-200 active:scale-95">
+                        <button
+                            onClick={() => setIsManageMode(true)}
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                    e.preventDefault();
+                                    setIsManageMode(true);
+                                }
+                            }}
+                            tabIndex={0}
+                            className="p-3 rounded-full bg-accent hover:bg-accent/80 text-muted-foreground transition-all duration-200 active:scale-95 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+                            aria-label="Manage quick expenses"
+                        >
                             <Settings2 size={20} />
                         </button>
                     )}
@@ -364,11 +410,11 @@ export default function NewExpense() {
                                                     >
                                                         <div className="flex items-center gap-4 flex-1 cursor-pointer" onClick={() => isSelectionMode ? toggleSelection(item.id) : null}>
                                                             {isSelectionMode && (
-                                                                <div className="mr-1">
+                                                                <div className="flex items-center justify-center w-10 h-10 mr-1">
                                                                     {selectedIds.has(item.id) ? (
-                                                                        <CheckCircle2 className="text-primary fill-primary/20" size={20} />
+                                                                        <CheckCircle2 className="text-primary fill-primary/20" size={24} strokeWidth={2.5} />
                                                                     ) : (
-                                                                        <Circle className="text-muted-foreground" size={20} />
+                                                                        <Circle className="text-muted-foreground" size={24} strokeWidth={2} />
                                                                     )}
                                                                 </div>
                                                             )}
@@ -381,8 +427,12 @@ export default function NewExpense() {
                                                         </div>
                                                         {!isSelectionMode && (
                                                             <div className="flex items-center gap-2">
-                                                                <button onClick={(e) => editPreset(item, e)} className="p-2 text-muted-foreground hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all active:scale-95"><Edit2 size={18} /></button>
-                                                                <button onClick={(e) => deletePreset(item.id, e)} className="p-2 text-muted-foreground hover:text-red-600 hover:bg-red-50 rounded-xl transition-all active:scale-95"><Trash2 size={18} /></button>
+                                                                <button onClick={(e) => editPreset(item, e)} className="p-2.5 text-muted-foreground hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-xl transition-all active:scale-95" aria-label="Edit preset">
+                                                                    <Edit2 size={18} />
+                                                                </button>
+                                                                <button onClick={(e) => deletePreset(item.id, e)} className="p-2.5 text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl transition-all active:scale-95" aria-label="Delete preset">
+                                                                    <Trash2 size={18} />
+                                                                </button>
                                                             </div>
                                                         )}
                                                     </div>
@@ -406,17 +456,26 @@ export default function NewExpense() {
                                                 onClick={() => {
                                                     setTitle(item.label);
                                                 }}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === "Enter" || e.key === " ") {
+                                                        e.preventDefault();
+                                                        setTitle(item.label);
+                                                    }
+                                                }}
+                                                tabIndex={0}
+                                                role="button"
                                                 onTouchStart={() => handleTouchStart(item.id)}
                                                 onTouchEnd={handleTouchEnd}
                                                 onMouseDown={() => handleTouchStart(item.id)}
                                                 onMouseUp={handleTouchEnd}
                                                 onMouseLeave={handleTouchEnd}
                                                 className={cn(
-                                                    "relative flex flex-col items-center gap-2 md:gap-3 p-3 md:p-4 rounded-2xl border-2 transition-all duration-200 group min-h-[100px] md:min-h-[110px] justify-center active:scale-95 shadow-sm cursor-pointer select-none",
+                                                    "relative flex flex-col items-center gap-2 md:gap-3 p-3 md:p-4 rounded-2xl border-2 transition-all duration-200 group min-h-[100px] md:min-h-[110px] justify-center active:scale-95 shadow-sm cursor-pointer select-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1",
                                                     selected
                                                         ? "border-primary bg-primary/10 text-primary shadow-primary/20"
                                                         : "border-border/60 bg-card text-muted-foreground hover:border-primary/30 hover:bg-accent/50 hover:text-foreground"
                                                 )}
+                                                aria-label={`Select ${item.label}`}
                                             >
                                                 <div className={cn("p-2 rounded-xl transition-colors", selected ? "bg-primary/20" : "bg-accent group-hover:bg-background")}>
                                                     <Icon size={24} />
@@ -446,7 +505,7 @@ export default function NewExpense() {
                                     }}
                                     onFocus={() => setShowSuggestions(title.length > 0)}
                                     placeholder="Expense Name"
-                                    className="bg-accent/50 border-border/50 text-foreground placeholder:text-muted-foreground/50 font-bold h-11 md:h-12 rounded-xl focus:bg-background transition-all"
+                                    className="bg-accent/50 border-border/50 text-foreground placeholder:text-muted-foreground/50 font-bold h-14 md:h-12 rounded-xl focus:bg-background transition-all"
                                 />
 
                                 {/* Suggestions Dropdown */}
@@ -486,7 +545,9 @@ export default function NewExpense() {
                                         <span className="absolute left-3.5 top-2.5 md:top-3.5 text-muted-foreground font-bold">₹</span>
                                         <input
                                             type="number"
-                                            className="w-full bg-accent/50 border border-border/50 rounded-xl py-2.5 md:py-3 pl-8 pr-4 text-base md:text-lg font-bold text-foreground outline-none focus:ring-2 focus:ring-primary focus:bg-background transition-all"
+                                            min="0"
+                                            step="0.01"
+                                            className="w-full bg-accent/50 border border-border/50 rounded-xl py-3 md:py-3 pl-8 pr-4 text-base md:text-lg font-bold text-foreground outline-none focus:ring-2 focus:ring-primary focus:bg-background transition-all h-14 md:h-12"
                                             placeholder="0"
                                             value={amount}
                                             onChange={e => setAmount(e.target.value)}
@@ -497,7 +558,7 @@ export default function NewExpense() {
                                     <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5 block ml-1">Date</label>
                                     <input
                                         type="date"
-                                        className="w-full bg-accent/50 border border-border/50 rounded-xl py-2.5 md:py-3 px-3 text-xs md:text-sm font-bold text-foreground outline-none focus:ring-2 focus:ring-primary focus:bg-background transition-all"
+                                        className="w-full bg-accent/50 border border-border/50 rounded-xl py-3 md:py-3 px-3 text-xs md:text-sm font-bold text-foreground outline-none focus:ring-2 focus:ring-primary focus:bg-background transition-all h-14 md:h-12"
                                         value={date}
                                         onChange={e => setDate(e.target.value)}
                                     />

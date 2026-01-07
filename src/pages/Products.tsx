@@ -229,7 +229,7 @@ export default function Products() {
                 </div>
             ) : (
                 <div className="fixed top-0 left-0 right-0 z-40 bg-white dark:bg-gray-900 px-3 md:px-4 py-3 md:py-4 border-b border-border shadow-sm flex items-center gap-3 md:gap-4">
-                    <Link to="/" className="p-2.5 -ml-2 rounded-full hover:bg-accent hover:text-foreground text-muted-foreground transition interactive active:scale-95">
+                    <Link to="/" className="p-3 -ml-2 rounded-full hover:bg-accent hover:text-foreground text-muted-foreground transition interactive active:scale-95 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1">
                         <ArrowLeft size={20} />
                     </Link>
                     <div className="flex-1">
@@ -254,8 +254,23 @@ export default function Products() {
                                 setIsAdding(true);
                             }
                         }}
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                if (isAdding) {
+                                    cleanForm();
+                                } else {
+                                    setNewName("");
+                                    setNewUnit("kg");
+                                    setNewCategory("general");
+                                    setEditingId(null);
+                                    setIsAdding(true);
+                                }
+                            }
+                        }}
+                        tabIndex={0}
                         className={cn(
-                            "rounded-full px-5 font-bold shadow-lg transition-all interactive",
+                            "rounded-full px-5 font-bold shadow-lg transition-all interactive focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2",
                             isAdding ? "bg-muted text-foreground hover:bg-muted/80" : "bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-primary/20"
                         )}
                     >
@@ -275,7 +290,7 @@ export default function Products() {
                         <input
                             type="text"
                             placeholder="Search products..."
-                            className="w-full pl-10 h-10 md:h-12 rounded-xl bg-accent/50 border-transparent focus:bg-background focus:border-ring transition-all"
+                            className="w-full pl-10 h-12 rounded-xl bg-accent/50 border-transparent focus:bg-background focus:border-ring transition-all"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                         />
@@ -291,7 +306,7 @@ export default function Products() {
                         <div>
                             <label className="text-xs font-bold text-muted-foreground uppercase mb-1.5 block ml-1">Product Name</label>
                             <input
-                                className="w-full bg-background border border-border rounded-xl px-4 py-3 text-lg font-semibold text-foreground focus:ring-2 focus:ring-primary outline-none shadow-sm transition-all"
+                                className="w-full bg-background border border-border rounded-xl px-4 py-3.5 md:py-3 text-lg font-semibold text-foreground focus:ring-2 focus:ring-primary outline-none shadow-sm transition-all h-14 md:h-auto"
                                 placeholder="e.g. Paneer"
                                 value={newName}
                                 onChange={(e) => setNewName(e.target.value)}
@@ -351,11 +366,11 @@ export default function Products() {
                             )}>
                                 {isSelectionMode ? (
                                     <div className="flex items-center gap-4 cursor-pointer" onClick={() => toggleSelection(p.id)}>
-                                        <div className="mr-1">
+                                        <div className="flex items-center justify-center w-10 h-10 mr-1">
                                             {selectedIds.has(p.id) ? (
-                                                <CheckCircle2 className="text-primary fill-primary/20" />
+                                                <CheckCircle2 className="text-primary fill-primary/20" size={24} strokeWidth={2.5} />
                                             ) : (
-                                                <Circle className="text-muted-foreground" />
+                                                <Circle className="text-muted-foreground" size={24} strokeWidth={2} />
                                             )}
                                         </div>
                                         <div className={cn(
@@ -383,7 +398,19 @@ export default function Products() {
 
                                         onMouseLeave={handleTouchEnd}
                                     >
-                                        <div className="flex items-center gap-3 md:gap-4 flex-1 cursor-pointer" onClick={() => startEdit(p)}>
+                                        <div
+                                            className="flex items-center gap-3 md:gap-4 flex-1 cursor-pointer"
+                                            onClick={() => startEdit(p)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === "Enter" || e.key === " ") {
+                                                    e.preventDefault();
+                                                    startEdit(p);
+                                                }
+                                            }}
+                                            tabIndex={0}
+                                            role="button"
+                                            aria-label={`Edit ${p.name}`}
+                                        >
                                             <div className={cn(
                                                 "w-10 h-10 md:w-12 md:h-12 rounded-xl flex items-center justify-center shadow-sm transition-transform group-hover:scale-105",
                                                 p.category === 'ghee' ? "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-500" : "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
@@ -403,7 +430,16 @@ export default function Products() {
                                         <div className="relative">
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); setActiveMenuId(activeMenuId === p.id ? null : p.id); }}
-                                                className="p-2 text-muted-foreground hover:bg-accent rounded-xl transition"
+                                                onKeyDown={(e) => {
+                                                    if (e.key === "Enter" || e.key === " ") {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        setActiveMenuId(activeMenuId === p.id ? null : p.id);
+                                                    }
+                                                }}
+                                                tabIndex={0}
+                                                className="p-2.5 text-muted-foreground hover:bg-accent rounded-xl transition focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+                                                aria-label="More options"
                                             >
                                                 <MoreVertical size={20} />
                                             </button>

@@ -607,7 +607,18 @@ export default function NewSale() {
                         if (step === "cart") { setStep("customer"); return; }
                         navigate("/");
                     }}
-                    className="p-2 -ml-2 rounded-full hover:bg-accent hover:text-foreground text-muted-foreground transition interactive active:scale-95"
+                    onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            if (step === "details") { setStep("product"); return; }
+                            if (step === "product") { setStep("cart"); return; }
+                            if (step === "cart") { setStep("customer"); return; }
+                            navigate("/");
+                        }
+                    }}
+                    tabIndex={0}
+                    className="p-3 -ml-2 rounded-full hover:bg-accent hover:text-foreground text-muted-foreground transition interactive active:scale-95 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+                    aria-label="Go back"
                 >
                     <ArrowLeft size={20} />
                 </button>
@@ -627,7 +638,7 @@ export default function NewSale() {
                         <div className="relative mb-6">
                             <Search className="absolute left-4 top-3.5 text-muted-foreground" size={20} />
                             <input
-                                className="w-full bg-accent/30 border border-border/30 pl-10 pr-3 py-2.5 rounded-xl focus:ring-2 focus:ring-primary focus:bg-background outline-none text-base text-foreground transition-all"
+                                className="w-full bg-accent/30 border border-border/30 pl-10 pr-3 py-3 md:py-2.5 rounded-xl focus:ring-2 focus:ring-primary focus:bg-background outline-none text-base text-foreground transition-all h-12 md:h-auto"
                                 placeholder="Search customer..."
                                 value={search}
                                 onChange={e => setSearch(e.target.value)}
@@ -643,7 +654,7 @@ export default function NewSale() {
                                 </h3>
                                 <div className="flex gap-2">
                                     <input
-                                        className="flex-1 bg-background border border-border/50 rounded-xl px-4 py-3 outline-none focus:border-primary font-medium"
+                                        className="flex-1 bg-background border border-border/50 rounded-xl px-4 py-3.5 md:py-3 outline-none focus:border-primary font-medium h-14 md:h-auto"
                                         placeholder="Enter Name"
                                         value={newItemName}
                                         onChange={e => setNewItemName(e.target.value)}
@@ -654,7 +665,18 @@ export default function NewSale() {
                                 </div>
                             </div>
                         ) : (
-                            <button onClick={() => { setIsAddingNew(true); setNewItemName(search); }} className="w-full p-4 mb-4 border-2 border-dashed border-border/60 rounded-2xl flex items-center justify-center text-primary font-bold hover:bg-primary/5 hover:border-primary/30 transition interactive text-sm group">
+                            <button
+                                onClick={() => { setIsAddingNew(true); setNewItemName(search); }}
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter" || e.key === " ") {
+                                        e.preventDefault();
+                                        setIsAddingNew(true);
+                                        setNewItemName(search);
+                                    }
+                                }}
+                                tabIndex={0}
+                                className="w-full p-4 mb-4 border-2 border-dashed border-border/60 rounded-2xl flex items-center justify-center text-primary font-bold hover:bg-primary/5 hover:border-primary/30 transition interactive text-sm group focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+                            >
                                 <div className="p-1 bg-primary/10 rounded-full mr-3 group-hover:bg-primary group-hover:text-white transition-colors">
                                     <Plus size={16} />
                                 </div>
@@ -667,7 +689,17 @@ export default function NewSale() {
                                 <button
                                     key={c.id}
                                     onClick={() => { setSelectedCust(c); setSearch(""); setStep("cart"); }}
-                                    className="w-full bg-card p-3 rounded-xl border border-border/30 flex items-center justify-between shadow-sm hover:shadow-md hover:border-primary/30 hover:bg-accent/30 transition-all interactive group text-left"
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter" || e.key === " ") {
+                                            e.preventDefault();
+                                            setSelectedCust(c);
+                                            setSearch("");
+                                            setStep("cart");
+                                        }
+                                    }}
+                                    tabIndex={0}
+                                    className="w-full bg-card p-3 rounded-xl border border-border/30 flex items-center justify-between shadow-sm hover:shadow-md hover:border-primary/30 hover:bg-accent/30 transition-all interactive group text-left focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+                                    aria-label={`Select ${c.name}`}
                                 >
                                     <div className="flex items-center gap-4">
                                         <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center font-bold text-sm shadow-md shadow-blue-500/20 group-hover:scale-110 transition-transform">
@@ -699,7 +731,18 @@ export default function NewSale() {
                                 <p className="text-[10px] md:text-xs text-slate-300 uppercase font-bold tracking-wider mb-0.5 md:mb-1">Billing To</p>
                                 <p className="text-lg md:text-xl font-black">{selectedCust.name}</p>
                             </div>
-                            <button onClick={() => setStep("customer")} className="relative z-10 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-full text-[10px] md:text-xs font-bold backdrop-blur-md transition border border-white/10">
+                            <button
+                                onClick={() => setStep("customer")}
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter" || e.key === " ") {
+                                        e.preventDefault();
+                                        setStep("customer");
+                                    }
+                                }}
+                                tabIndex={0}
+                                className="relative z-10 px-4 py-2.5 bg-white/10 hover:bg-white/20 rounded-full text-[10px] md:text-xs font-bold backdrop-blur-md transition border border-white/10 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-1"
+                                aria-label="Change customer"
+                            >
                                 Change
                             </button>
                         </div>
@@ -716,12 +759,12 @@ export default function NewSale() {
                             {isSelectionMode && (
                                 <div className="flex justify-between items-center gap-3 mb-3 bg-card px-3 py-2 rounded-xl border border-primary/20 shadow-lg animate-in fade-in sticky top-2 z-20">
                                     <div className="flex items-center gap-3">
-                                        <Button size="icon" variant="ghost" onClick={toggleSelectionMode} className="h-8 w-8">
+                                        <Button size="icon" variant="ghost" onClick={toggleSelectionMode} className="h-10 w-10 focus-visible:ring-2 focus-visible:ring-primary">
                                             <X size={18} />
                                         </Button>
                                         <span className="font-bold text-foreground">{selectedIndices.size} Selected</span>
                                     </div>
-                                    <Button size="sm" variant="destructive" onClick={deleteSelected} disabled={selectedIndices.size === 0} className="h-8 text-xs px-3">
+                                    <Button size="sm" variant="destructive" onClick={deleteSelected} disabled={selectedIndices.size === 0} className="h-10 text-xs px-3 focus-visible:ring-2 focus-visible:ring-white">
                                         <Trash2 size={14} className="mr-1.5" /> Delete
                                     </Button>
                                 </div>
@@ -730,7 +773,16 @@ export default function NewSale() {
                             {cart.length === 0 ? (
                                 <button
                                     onClick={() => { setStep("product"); setSearch(""); }}
-                                    className="flex-1 flex flex-col items-center justify-center text-center p-8 text-muted-foreground bg-accent/30 rounded-3xl border-2 border-dashed border-border/60 mb-4 hover:bg-accent/50 hover:border-primary/50 transition-all cursor-pointer w-full group outline-none focus:ring-2 focus:ring-primary min-h-[300px]"
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter" || e.key === " ") {
+                                            e.preventDefault();
+                                            setStep("product");
+                                            setSearch("");
+                                        }
+                                    }}
+                                    tabIndex={0}
+                                    className="flex-1 flex flex-col items-center justify-center text-center p-8 text-muted-foreground bg-accent/30 rounded-3xl border-2 border-dashed border-border/60 mb-4 hover:bg-accent/50 hover:border-primary/50 transition-all cursor-pointer w-full group focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 min-h-[300px]"
+                                    aria-label="Add first item to cart"
                                 >
                                     <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mb-4 opacity-50 group-hover:bg-primary/20 group-hover:text-primary transition-all group-hover:scale-110 duration-300">
                                         <Plus size={32} />
@@ -766,11 +818,11 @@ export default function NewSale() {
                                                     }}
                                                 >
                                                     {isSelectionMode ? (
-                                                        <div className="mr-1">
+                                                        <div className="flex items-center justify-center w-10 h-10 mr-1">
                                                             {selectedIndices.has(idx) ? (
-                                                                <CheckCircle2 className="text-primary fill-primary/20" />
+                                                                <CheckCircle2 className="text-primary fill-primary/20" size={24} strokeWidth={2.5} />
                                                             ) : (
-                                                                <Circle className="text-muted-foreground" />
+                                                                <Circle className="text-muted-foreground" size={24} strokeWidth={2} />
                                                             )}
                                                         </div>
                                                     ) : null}
@@ -795,7 +847,16 @@ export default function NewSale() {
                                                         <div className="relative">
                                                             <button
                                                                 onClick={(e) => { e.stopPropagation(); setActiveMenuIndex(activeMenuIndex === idx ? null : idx); }}
-                                                                className="menu-trigger p-2 text-muted-foreground hover:bg-accent rounded-xl transition"
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key === "Enter" || e.key === " ") {
+                                                                        e.preventDefault();
+                                                                        e.stopPropagation();
+                                                                        setActiveMenuIndex(activeMenuIndex === idx ? null : idx);
+                                                                    }
+                                                                }}
+                                                                tabIndex={0}
+                                                                className="menu-trigger p-2.5 text-muted-foreground hover:bg-accent rounded-xl transition focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+                                                                aria-label="More options"
                                                             >
                                                                 <MoreVertical size={18} />
                                                             </button>
@@ -844,7 +905,16 @@ export default function NewSale() {
 
                             <button
                                 onClick={() => { setStep("product"); setSearch(""); }}
-                                className="w-full py-3 rounded-xl border-2 border-dashed border-primary/30 text-primary font-bold flex items-center justify-center hover:bg-primary/5 transition interactive active:scale-95 mb-4"
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter" || e.key === " ") {
+                                        e.preventDefault();
+                                        setStep("product");
+                                        setSearch("");
+                                    }
+                                }}
+                                tabIndex={0}
+                                className="w-full py-3 rounded-xl border-2 border-dashed border-primary/30 text-primary font-bold flex items-center justify-center hover:bg-primary/5 transition interactive active:scale-95 mb-4 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+                                aria-label="Add another item"
                             >
                                 <div className="p-1 bg-primary/20 rounded-full mr-2">
                                     <Plus size={16} />
@@ -855,7 +925,18 @@ export default function NewSale() {
 
                         {/* --- NEW SECTION: Supplier Payment (Payable) --- */}
                         <div className="mb-6 bg-card border border-border rounded-xl p-4 shadow-sm">
-                            <div className="flex justify-between items-center mb-2 cursor-pointer" onClick={() => setIsLinkedPayable(!isLinkedPayable)}>
+                            <button
+                                onClick={() => setIsLinkedPayable(!isLinkedPayable)}
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter" || e.key === " ") {
+                                        e.preventDefault();
+                                        setIsLinkedPayable(!isLinkedPayable);
+                                    }
+                                }}
+                                tabIndex={0}
+                                className="flex justify-between items-center mb-2 cursor-pointer w-full text-left focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 rounded-lg p-1 -m-1"
+                                aria-label={`${isLinkedPayable ? 'Disable' : 'Enable'} linked supplier payment`}
+                            >
                                 <div>
                                     <h4 className="font-bold text-foreground text-sm flex items-center gap-2">
                                         <Truck size={16} className="text-indigo-500" />
@@ -872,7 +953,7 @@ export default function NewSale() {
                                         isLinkedPayable ? "translate-x-4" : "translate-x-0"
                                     )} />
                                 </div>
-                            </div>
+                            </button>
 
                             {isLinkedPayable && (
                                 <div className="mt-4 space-y-3 animate-in slide-in-from-top-2 border-t border-border pt-4">
@@ -884,7 +965,7 @@ export default function NewSale() {
                                             <input
                                                 type="text"
                                                 placeholder="Search supplier..."
-                                                className="w-full bg-accent/50 border border-border/50 rounded-xl pl-9 pr-4 h-9 md:h-10 text-xs md:text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-background transition-all"
+                                                className="w-full bg-accent/50 border border-border/50 rounded-xl pl-9 pr-4 h-12 text-xs md:text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-background transition-all"
                                                 value={payableSupplierSearch}
                                                 onChange={e => {
                                                     setPayableSupplierSearch(e.target.value);
@@ -906,7 +987,7 @@ export default function NewSale() {
                                                                 setShowPayableSupplierList(false);
                                                             }}
                                                             className={cn(
-                                                                "w-full text-left px-4 py-2.5 text-xs font-bold transition-colors hover:bg-accent",
+                                                                "w-full text-left px-4 py-3 text-xs font-bold transition-colors hover:bg-accent",
                                                                 payableSelectedSupplierId === s.id ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400" : "text-foreground"
                                                             )}
                                                         >
@@ -929,7 +1010,9 @@ export default function NewSale() {
                                                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-bold text-xs">₹</span>
                                                 <input
                                                     type="number"
-                                                    className="w-full bg-accent/50 border border-border/50 rounded-xl pl-6 pr-3 h-9 md:h-10 text-xs md:text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-background transition-all"
+                                                    min="0"
+                                                    step="0.01"
+                                                    className="w-full bg-accent/50 border border-border/50 rounded-xl pl-6 pr-3 h-12 text-xs md:text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-background transition-all"
                                                     placeholder="0"
                                                     value={payableAmount}
                                                     onChange={e => setPayableAmount(e.target.value)}
@@ -940,7 +1023,7 @@ export default function NewSale() {
                                             <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Due Date</label>
                                             <input
                                                 type="date"
-                                                className="w-full bg-accent/50 border border-border/50 rounded-xl px-3 h-10 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-background transition-all"
+                                                className="w-full bg-accent/50 border border-border/50 rounded-xl px-3 h-12 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-background transition-all"
                                                 value={payableDueDate}
                                                 onChange={e => setPayableDueDate(e.target.value)}
                                             />
@@ -963,7 +1046,7 @@ export default function NewSale() {
                                     </label>
                                     <input
                                         type="date"
-                                        className="bg-accent/50 border border-border rounded-xl py-2.5 px-3 text-sm font-bold text-foreground outline-none focus:ring-2 focus:ring-primary focus:bg-background transition-all text-right min-w-[140px] shadow-sm appearance-none"
+                                        className="bg-accent/50 border border-border rounded-xl py-3 md:py-2.5 px-3 text-sm font-bold text-foreground outline-none focus:ring-2 focus:ring-primary focus:bg-background transition-all text-right min-w-[140px] shadow-sm appearance-none h-14 md:h-auto"
                                         value={date}
                                         onChange={e => setDate(e.target.value)}
                                     />
@@ -974,7 +1057,7 @@ export default function NewSale() {
                                 disabled={cart.length === 0}
                                 onClick={() => setIsPaymentModalOpen(true)}
                                 className={cn(
-                                    "w-full h-14 text-lg font-bold rounded-2xl shadow-xl transition-all transform active:scale-[0.98]",
+                                    "w-full h-14 text-lg font-bold rounded-2xl shadow-xl transition-all transform active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2",
                                     cart.length > 0
                                         ? "bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white shadow-emerald-500/25"
                                         : "bg-muted text-muted-foreground shadow-none"
@@ -1006,14 +1089,22 @@ export default function NewSale() {
                                 </div>
 
                                 {/* Toggle Credit */}
-                                <div
+                                <button
                                     onClick={() => setAddToOutstanding(!addToOutstanding)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter" || e.key === " ") {
+                                            e.preventDefault();
+                                            setAddToOutstanding(!addToOutstanding);
+                                        }
+                                    }}
+                                    tabIndex={0}
                                     className={cn(
-                                        "flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all",
+                                        "flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1",
                                         addToOutstanding
                                             ? "border-amber-500 bg-amber-50 dark:bg-amber-900/10"
                                             : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
                                     )}
+                                    aria-label={`${addToOutstanding ? 'Disable' : 'Enable'} credit sale`}
                                 >
                                     <div className="flex flex-col">
                                         <span className="font-bold text-sm">Add to Outstanding?</span>
@@ -1028,7 +1119,7 @@ export default function NewSale() {
                                             addToOutstanding ? "translate-x-5" : "translate-x-0"
                                         )} />
                                     </div>
-                                </div>
+                                </button>
 
                                 {/* Credit Details */}
                                 {addToOutstanding && (
@@ -1039,8 +1130,10 @@ export default function NewSale() {
                                                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold text-lg">₹</span>
                                                 <input
                                                     type="number"
+                                                    min="0"
+                                                    step="0.01"
                                                     autoFocus
-                                                    className="w-full bg-background border-2 border-zinc-200 dark:border-zinc-700 focus:border-amber-500 dark:focus:border-amber-500 rounded-xl pl-9 pr-4 h-12 text-xl font-bold outline-none transition-all placeholder:text-muted-foreground/30"
+                                                    className="w-full bg-background border-2 border-zinc-200 dark:border-zinc-700 focus:border-amber-500 dark:focus:border-amber-500 rounded-xl pl-9 pr-4 h-14 text-xl font-bold outline-none transition-all placeholder:text-muted-foreground/30"
                                                     placeholder="0"
                                                     value={paidNowAmount}
                                                     onChange={e => setPaidNowAmount(e.target.value)}
@@ -1058,7 +1151,7 @@ export default function NewSale() {
                                                 <label className="text-xs font-bold text-muted-foreground ml-1 uppercase tracking-wider">Due Date (Optional)</label>
                                                 <input
                                                     type="date"
-                                                    className="w-full mt-1 bg-background border-2 border-zinc-200 dark:border-zinc-700 focus:border-amber-500 dark:focus:border-amber-500 rounded-xl px-4 h-12 text-sm font-bold outline-none transition-all cursor-pointer"
+                                                    className="w-full mt-1 bg-background border-2 border-zinc-200 dark:border-zinc-700 focus:border-amber-500 dark:focus:border-amber-500 rounded-xl px-4 h-14 md:h-12 text-sm font-bold outline-none transition-all cursor-pointer"
                                                     value={outstandingDueDate}
                                                     onChange={e => setOutstandingDueDate(e.target.value)}
                                                 />
@@ -1085,150 +1178,154 @@ export default function NewSale() {
                         );
                     })()}
                 </Modal>
-                {step === "product" && (
-                    <div className="flex-1 flex flex-col animate-in slide-in-from-right-4 duration-300">
-                        <div className="relative mb-6">
-                            <Search className="absolute left-4 top-3.5 text-muted-foreground" size={20} />
-                            <input
-                                className="w-full bg-accent/50 border border-border/50 pl-12 pr-4 py-3.5 rounded-2xl focus:ring-2 focus:ring-primary focus:bg-background outline-none text-lg text-foreground transition-all shadow-sm"
-                                placeholder="Search product..."
-                                value={search}
-                                onChange={e => setSearch(e.target.value)}
-                                autoFocus
-                            />
-                        </div>
-
-                        {isAddingNew ? (
-                            <div className="bg-primary/5 p-5 rounded-3xl border border-primary/20 mb-6 animate-in zoom-in-95">
-                                <h3 className="font-bold text-sm text-foreground mb-4 flex items-center gap-2">
-                                    <Package size={16} className="text-primary" />
-                                    Add New Product
-                                </h3>
-                                <div className="space-y-4">
-                                    <input
-                                        className="w-full bg-background border border-border/50 rounded-xl px-4 py-3 outline-none focus:border-primary font-medium"
-                                        placeholder="Product Name"
-                                        value={newItemName}
-                                        onChange={e => setNewItemName(e.target.value)}
-                                        autoFocus
-                                    />
-                                    <div className="flex gap-3">
-                                        <div className="relative w-1/3">
-                                            <select
-                                                className="w-full bg-background border border-border/50 rounded-xl px-4 py-3 appearance-none outline-none focus:border-primary font-bold text-sm"
-                                                value={newItemUnit}
-                                                onChange={e => setNewItemUnit(e.target.value)}
-                                            >
-                                                <option value="kg">kg</option>
-                                                <option value="ltr">ltr</option>
-                                                <option value="pcs">pcs</option>
-                                                <option value="box">box</option>
-                                                <option value="pkt">pkt</option>
-                                            </select>
-                                            <div className="absolute right-3 top-3.5 pointer-events-none opacity-50"><ChevronRight size={14} className="rotate-90" /></div>
-                                        </div>
-                                        <Button size="sm" onClick={handleAddProduct} className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/25 rounded-xl font-bold">Save Product</Button>
-                                    </div>
-                                    <button onClick={() => setIsAddingNew(false)} className="mx-auto block text-xs font-bold text-muted-foreground hover:text-destructive transition mt-2">Cancel</button>
-                                </div>
+                {
+                    step === "product" && (
+                        <div className="flex-1 flex flex-col animate-in slide-in-from-right-4 duration-300">
+                            <div className="relative mb-6">
+                                <Search className="absolute left-4 top-3.5 text-muted-foreground" size={20} />
+                                <input
+                                    className="w-full bg-accent/50 border border-border/50 pl-12 pr-4 py-3.5 rounded-2xl focus:ring-2 focus:ring-primary focus:bg-background outline-none text-lg text-foreground transition-all shadow-sm"
+                                    placeholder="Search product..."
+                                    value={search}
+                                    onChange={e => setSearch(e.target.value)}
+                                    autoFocus
+                                />
                             </div>
-                        ) : (
-                            <button onClick={() => { setIsAddingNew(true); setNewItemName(search); }} className="w-full p-4 mb-4 border-2 border-dashed border-border/60 rounded-2xl flex items-center justify-center text-primary font-bold hover:bg-primary/5 hover:border-primary/30 transition interactive text-sm group">
-                                <div className="p-1 bg-primary/10 rounded-full mr-3 group-hover:bg-primary group-hover:text-white transition-colors">
-                                    <Plus size={16} />
-                                </div>
-                                Add "{search || "New Product"}"
-                            </button>
-                        )}
 
-                        <div className="grid grid-cols-2 gap-4 overflow-y-auto pb-4">
-                            {products.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).map(p => (
-                                <button
-                                    key={p.id}
-                                    onClick={() => { setTempProd(p); setStep("details"); }}
-                                    className="bg-card p-5 rounded-3xl border border-border/60 text-left hover:border-primary/50 hover:bg-accent/40 hover:shadow-lg transition-all shadow-sm h-40 flex flex-col justify-between interactive group relative overflow-hidden"
-                                >
-                                    <div className={cn(
-                                        "w-12 h-12 rounded-2xl flex items-center justify-center mb-2 transition-transform duration-300 group-hover:scale-110",
-                                        p.category === 'ghee' ? "bg-amber-100 dark:bg-amber-900/30 text-amber-600" : "bg-primary/10 text-primary"
-                                    )}>
-                                        <Package size={24} />
+                            {isAddingNew ? (
+                                <div className="bg-primary/5 p-5 rounded-3xl border border-primary/20 mb-6 animate-in zoom-in-95">
+                                    <h3 className="font-bold text-sm text-foreground mb-4 flex items-center gap-2">
+                                        <Package size={16} className="text-primary" />
+                                        Add New Product
+                                    </h3>
+                                    <div className="space-y-4">
+                                        <input
+                                            className="w-full bg-background border border-border/50 rounded-xl px-4 py-3 outline-none focus:border-primary font-medium"
+                                            placeholder="Product Name"
+                                            value={newItemName}
+                                            onChange={e => setNewItemName(e.target.value)}
+                                            autoFocus
+                                        />
+                                        <div className="flex gap-3">
+                                            <div className="relative w-1/3">
+                                                <select
+                                                    className="w-full bg-background border border-border/50 rounded-xl px-4 py-3 appearance-none outline-none focus:border-primary font-bold text-sm"
+                                                    value={newItemUnit}
+                                                    onChange={e => setNewItemUnit(e.target.value)}
+                                                >
+                                                    <option value="kg">kg</option>
+                                                    <option value="ltr">ltr</option>
+                                                    <option value="pcs">pcs</option>
+                                                    <option value="box">box</option>
+                                                    <option value="pkt">pkt</option>
+                                                </select>
+                                                <div className="absolute right-3 top-3.5 pointer-events-none opacity-50"><ChevronRight size={14} className="rotate-90" /></div>
+                                            </div>
+                                            <Button size="sm" onClick={handleAddProduct} className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/25 rounded-xl font-bold">Save Product</Button>
+                                        </div>
+                                        <button onClick={() => setIsAddingNew(false)} className="mx-auto block text-xs font-bold text-muted-foreground hover:text-destructive transition mt-2">Cancel</button>
                                     </div>
-                                    <div className="relative z-10">
-                                        <p className="font-bold text-foreground leading-tight line-clamp-2 text-lg">{p.name}</p>
-                                        <span className="inline-block mt-2 px-2 py-0.5 bg-muted rounded-md text-[10px] font-bold uppercase tracking-wide text-muted-foreground group-hover:bg-background transition-colors">{p.unit}</span>
+                                </div>
+                            ) : (
+                                <button onClick={() => { setIsAddingNew(true); setNewItemName(search); }} className="w-full p-4 mb-4 border-2 border-dashed border-border/60 rounded-2xl flex items-center justify-center text-primary font-bold hover:bg-primary/5 hover:border-primary/30 transition interactive text-sm group">
+                                    <div className="p-1 bg-primary/10 rounded-full mr-3 group-hover:bg-primary group-hover:text-white transition-colors">
+                                        <Plus size={16} />
                                     </div>
-                                    {/* Decorative gradient blob */}
-                                    <div className="absolute -bottom-8 -right-8 w-24 h-24 bg-gradient-to-br from-primary/10 to-transparent rounded-full blur-2xl group-hover:from-primary/20 transition-all opacity-0 group-hover:opacity-100" />
+                                    Add "{search || "New Product"}"
                                 </button>
-                            ))}
+                            )}
+
+                            <div className="grid grid-cols-2 gap-4 overflow-y-auto pb-4">
+                                {products.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).map(p => (
+                                    <button
+                                        key={p.id}
+                                        onClick={() => { setTempProd(p); setStep("details"); }}
+                                        className="bg-card p-5 rounded-3xl border border-border/60 text-left hover:border-primary/50 hover:bg-accent/40 hover:shadow-lg transition-all shadow-sm h-40 flex flex-col justify-between interactive group relative overflow-hidden"
+                                    >
+                                        <div className={cn(
+                                            "w-12 h-12 rounded-2xl flex items-center justify-center mb-2 transition-transform duration-300 group-hover:scale-110",
+                                            p.category === 'ghee' ? "bg-amber-100 dark:bg-amber-900/30 text-amber-600" : "bg-primary/10 text-primary"
+                                        )}>
+                                            <Package size={24} />
+                                        </div>
+                                        <div className="relative z-10">
+                                            <p className="font-bold text-foreground leading-tight line-clamp-2 text-lg">{p.name}</p>
+                                            <span className="inline-block mt-2 px-2 py-0.5 bg-muted rounded-md text-[10px] font-bold uppercase tracking-wide text-muted-foreground group-hover:bg-background transition-colors">{p.unit}</span>
+                                        </div>
+                                        {/* Decorative gradient blob */}
+                                        <div className="absolute -bottom-8 -right-8 w-24 h-24 bg-gradient-to-br from-primary/10 to-transparent rounded-full blur-2xl group-hover:from-primary/20 transition-all opacity-0 group-hover:opacity-100" />
+                                    </button>
+                                ))}
+                            </div>
                         </div>
-                    </div>
-                )}
+                    )
+                }
 
                 {/* STEP 4: ITEM DETAILS */}
-                {step === "details" && tempProd && (
-                    <div className="flex-1 flex flex-col animate-in slide-in-from-right-8 duration-300 items-center justify-center -mt-10">
-                        <div className="w-full max-w-sm">
-                            <div className="text-center mb-8">
-                                <div className="inline-flex p-6 rounded-3xl bg-gradient-to-br from-primary/10 to-primary/5 text-primary mb-4 shadow-inner ring-1 ring-primary/20">
-                                    <Package size={48} />
-                                </div>
-                                <h2 className="text-2xl font-black text-foreground mb-1">{tempProd.name}</h2>
-                                <p className="text-muted-foreground font-medium">Enter details below</p>
-                            </div>
-
-                            <div className="bg-card p-6 rounded-[2rem] border border-border shadow-xl shadow-black/5 space-y-6">
-                                <div>
-                                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 block ml-1">Quantity ({tempProd.unit})</label>
-                                    <input
-                                        type="number"
-                                        className="w-full bg-accent/50 border border-border/50 rounded-2xl py-4 px-6 text-3xl font-black text-center text-foreground outline-none focus:ring-2 focus:ring-primary focus:bg-background transition-all"
-                                        placeholder="0"
-                                        value={qty}
-                                        onChange={e => setQty(e.target.value)}
-                                        autoFocus
-                                    />
+                {
+                    step === "details" && tempProd && (
+                        <div className="flex-1 flex flex-col animate-in slide-in-from-right-8 duration-300 items-center justify-center -mt-10">
+                            <div className="w-full max-w-sm">
+                                <div className="text-center mb-8">
+                                    <div className="inline-flex p-6 rounded-3xl bg-gradient-to-br from-primary/10 to-primary/5 text-primary mb-4 shadow-inner ring-1 ring-primary/20">
+                                        <Package size={48} />
+                                    </div>
+                                    <h2 className="text-2xl font-black text-foreground mb-1">{tempProd.name}</h2>
+                                    <p className="text-muted-foreground font-medium">Enter details below</p>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="bg-card p-6 rounded-[2rem] border border-border shadow-xl shadow-black/5 space-y-6">
                                     <div>
-                                        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2 block ml-1">Selling Rate</label>
-                                        <div className="relative">
-                                            <span className="absolute left-4 top-4 text-muted-foreground font-bold">₹</span>
-                                            <input
-                                                type="number"
-                                                className="w-full bg-accent/50 border border-border/50 rounded-2xl py-3.5 pl-8 pr-4 text-xl font-bold text-foreground outline-none focus:ring-2 focus:ring-primary focus:bg-background transition-all"
-                                                placeholder="0"
-                                                value={sellPrice}
-                                                onChange={e => setSellPrice(e.target.value)}
-                                            />
-                                        </div>
+                                        <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 block ml-1">Quantity ({tempProd.unit})</label>
+                                        <input
+                                            type="number"
+                                            className="w-full bg-accent/50 border border-border/50 rounded-2xl py-4 px-6 text-3xl font-black text-center text-foreground outline-none focus:ring-2 focus:ring-primary focus:bg-background transition-all"
+                                            placeholder="0"
+                                            value={qty}
+                                            onChange={e => setQty(e.target.value)}
+                                            autoFocus
+                                        />
                                     </div>
-                                    <div className={tempProd.category === 'ghee' ? "opacity-50 pointer-events-none" : ""}>
-                                        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2 block ml-1">{tempProd.category === 'ghee' ? "Auto Calc" : "Buying Rate"}</label>
-                                        <div className="relative">
-                                            <span className="absolute left-4 top-4 text-muted-foreground font-bold">₹</span>
-                                            <input
-                                                type="number"
-                                                className="w-full bg-accent/50 border border-border/50 rounded-2xl py-3.5 pl-8 pr-4 text-xl font-bold text-foreground outline-none focus:ring-2 focus:ring-primary focus:bg-background transition-all"
-                                                placeholder="0"
-                                                value={buyPrice}
-                                                onChange={e => setBuyPrice(e.target.value)}
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
 
-                                <Button onClick={addToCart} className="w-full h-16 text-lg bg-primary hover:bg-primary/90 text-primary-foreground mt-4 shadow-xl shadow-primary/20 font-bold rounded-2xl transition-all hover:scale-[1.02] active:scale-[0.98]">
-                                    <span className="mr-2">Add to Bill</span>
-                                    <span className="bg-white/20 px-2 py-1 rounded-lg text-sm font-normal backdrop-blur-sm">₹ {(parseFloat(qty || "0") * parseFloat(sellPrice || "0")).toLocaleString()}</span>
-                                </Button>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2 block ml-1">Selling Rate</label>
+                                            <div className="relative">
+                                                <span className="absolute left-4 top-4 text-muted-foreground font-bold">₹</span>
+                                                <input
+                                                    type="number"
+                                                    className="w-full bg-accent/50 border border-border/50 rounded-2xl py-3.5 pl-8 pr-4 text-xl font-bold text-foreground outline-none focus:ring-2 focus:ring-primary focus:bg-background transition-all"
+                                                    placeholder="0"
+                                                    value={sellPrice}
+                                                    onChange={e => setSellPrice(e.target.value)}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className={tempProd.category === 'ghee' ? "opacity-50 pointer-events-none" : ""}>
+                                            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2 block ml-1">{tempProd.category === 'ghee' ? "Auto Calc" : "Buying Rate"}</label>
+                                            <div className="relative">
+                                                <span className="absolute left-4 top-4 text-muted-foreground font-bold">₹</span>
+                                                <input
+                                                    type="number"
+                                                    className="w-full bg-accent/50 border border-border/50 rounded-2xl py-3.5 pl-8 pr-4 text-xl font-bold text-foreground outline-none focus:ring-2 focus:ring-primary focus:bg-background transition-all"
+                                                    placeholder="0"
+                                                    value={buyPrice}
+                                                    onChange={e => setBuyPrice(e.target.value)}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <Button onClick={addToCart} className="w-full h-16 text-lg bg-primary hover:bg-primary/90 text-primary-foreground mt-4 shadow-xl shadow-primary/20 font-bold rounded-2xl transition-all hover:scale-[1.02] active:scale-[0.98]">
+                                        <span className="mr-2">Add to Bill</span>
+                                        <span className="bg-white/20 px-2 py-1 rounded-lg text-sm font-normal backdrop-blur-sm">₹ {(parseFloat(qty || "0") * parseFloat(sellPrice || "0")).toLocaleString()}</span>
+                                    </Button>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                )}
-            </div>
+                    )
+                }
+            </div >
 
             <ConfirmationModal
                 isOpen={confirmConfig.isOpen}
@@ -1239,6 +1336,6 @@ export default function NewSale() {
                 variant={confirmConfig.variant}
                 confirmText={confirmConfig.confirmText}
             />
-        </div>
+        </div >
     );
 }

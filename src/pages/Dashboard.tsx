@@ -18,6 +18,8 @@ export default function Dashboard() {
 
     const [userName, setUserName] = useState("Vishnu");
     const [isEditingName, setIsEditingName] = useState(false);
+    const [isLoadingStats, setIsLoadingStats] = useState(true);
+    const [statsError, setStatsError] = useState<string | null>(null);
 
     useEffect(() => {
         const storedName = localStorage.getItem("dashboard_username");
@@ -51,25 +53,45 @@ export default function Dashboard() {
     }
 
     const fetchStats = useCallback(async () => {
-        const today = new Date().toISOString().split('T')[0];
-        const yesterday = subDays(new Date(), 1).toISOString().split('T')[0];
+        try {
+            setIsLoadingStats(true);
+            setStatsError(null);
 
-        // Fetch Today
-        const { data: tToday } = await supabase.from('transactions').select('*').is('deleted_at', null).eq('date', today);
-        const { data: eToday } = await supabase.from('expenses').select('*').is('deleted_at', null).eq('date', today);
-        const statToday = calculateProfit(tToday || [], eToday || []);
+            const today = new Date().toISOString().split('T')[0];
+            const yesterday = subDays(new Date(), 1).toISOString().split('T')[0];
 
-        // Fetch Yesterday
-        const { data: tYest } = await supabase.from('transactions').select('*').is('deleted_at', null).eq('date', yesterday);
-        const { data: eYest } = await supabase.from('expenses').select('*').is('deleted_at', null).eq('date', yesterday);
-        const statYest = calculateProfit(tYest || [], eYest || []);
+            // Fetch Today
+            const { data: tToday, error: tTodayError } = await supabase.from('transactions').select('*').is('deleted_at', null).eq('date', today);
+            const { data: eToday, error: eTodayError } = await supabase.from('expenses').select('*').is('deleted_at', null).eq('date', today);
 
-        setStats({
-            todayRevenue: statToday.revenue,
-            todayProfit: statToday.netProfit,
-            yesterdayRevenue: statYest.revenue,
-            yesterdayProfit: statYest.netProfit,
-        });
+            if (tTodayError || eTodayError) {
+                throw new Error('Failed to fetch today\'s data');
+            }
+
+            const statToday = calculateProfit(tToday || [], eToday || []);
+
+            // Fetch Yesterday
+            const { data: tYest, error: tYestError } = await supabase.from('transactions').select('*').is('deleted_at', null).eq('date', yesterday);
+            const { data: eYest, error: eYestError } = await supabase.from('expenses').select('*').is('deleted_at', null).eq('date', yesterday);
+
+            if (tYestError || eYestError) {
+                throw new Error('Failed to fetch yesterday\'s data');
+            }
+
+            const statYest = calculateProfit(tYest || [], eYest || []);
+
+            setStats({
+                todayRevenue: statToday.revenue,
+                todayProfit: statToday.netProfit,
+                yesterdayRevenue: statYest.revenue,
+                yesterdayProfit: statYest.netProfit,
+            });
+        } catch (error) {
+            console.error('Failed to fetch stats:', error);
+            setStatsError('Failed to load statistics. Please try again.');
+        } finally {
+            setIsLoadingStats(false);
+        }
     }, []);
 
     // Real-time sync for transactions and expenses - auto-refreshes stats when data changes on any device
@@ -84,7 +106,7 @@ export default function Dashboard() {
     ];
 
     return (
-        <div className="space-y-6 px-3 pt-6 pb-28 md:px-4 md:pt-8 md:pb-32 w-full md:max-w-lg md:mx-auto animate-in fade-in">
+        <div className="space-y-6 px-4 pt-6 pb-28 md:px-6 md:pt-8 md:pb-32 w-full md:max-w-lg md:mx-auto animate-in fade-in">
             {/* Header */}
             <div className="flex justify-between items-end mb-6 md:mb-8">
                 <div className="flex-1">
@@ -96,13 +118,13 @@ export default function Dashboard() {
                                     autoFocus
                                     value={userName}
                                     onChange={(e) => setUserName(e.target.value)}
-                                    onBlur={() => {
-                                        localStorage.setItem("dashboard_username", userName);
-                                        setIsEditingName(false);
-                                    }}
+                                    maxLength={30}
                                     onKeyDown={(e) => {
                                         if (e.key === "Enter") {
                                             localStorage.setItem("dashboard_username", userName);
+                                            setIsEditingName(false);
+                                        }
+                                        if (e.key === "Escape") {
                                             setIsEditingName(false);
                                         }
                                     }}
@@ -114,7 +136,7 @@ export default function Dashboard() {
                                         localStorage.setItem("dashboard_username", userName);
                                         setIsEditingName(false);
                                     }}
-                                    className="p-2 rounded-full bg-white/10 text-white hover:bg-white/20 active:bg-white/25 transition-all duration-200"
+                                    className="p-3 rounded-full bg-white/10 text-white hover:bg-white/20 active:bg-white/25 transition-all duration-200 focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                                     aria-label="Save name"
                                 >
                                     <Check size={18} strokeWidth={2.5} />
@@ -127,10 +149,17 @@ export default function Dashboard() {
                                 </h1>
                                 <button
                                     onClick={() => setIsEditingName(true)}
-                                    className="p-2 rounded-xl hover:bg-white/10 active:bg-white/15 text-muted-foreground hover:text-white transition-all duration-200"
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter" || e.key === " ") {
+                                            e.preventDefault();
+                                            setIsEditingName(true);
+                                        }
+                                    }}
+                                    tabIndex={0}
+                                    className="p-3 rounded-xl hover:bg-white/10 active:bg-white/15 text-muted-foreground hover:text-white transition-all duration-200 focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                                     aria-label="Edit name"
                                 >
-                                    <Edit3 size={16} strokeWidth={2} />
+                                    <Edit3 size={18} strokeWidth={2} />
                                 </button>
                             </div>
                         )}
@@ -139,18 +168,25 @@ export default function Dashboard() {
                 <div className="flex bg-white/5 p-1 rounded-full backdrop-blur-sm border border-white/10 items-center gap-1">
                     <button
                         onClick={lockApp}
-                        className="p-2 rounded-full hover:bg-white/10 active:bg-white/15 text-muted-foreground hover:text-white transition-all duration-200"
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                lockApp();
+                            }
+                        }}
+                        tabIndex={0}
+                        className="p-3 rounded-full hover:bg-white/10 active:bg-white/15 text-muted-foreground hover:text-white transition-all duration-200 focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                         title="Lock App"
                         aria-label="Lock App"
                     >
-                        <LogOut size={16} strokeWidth={2.5} />
+                        <LogOut size={18} strokeWidth={2.5} />
                     </button>
                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-white/30 to-white/10 border border-white/20" />
                 </div>
             </div>
 
             {/* Main Stats Card - Dark Mode Grayscale */}
-            <div className="relative overflow-hidden bg-gradient-to-br from-slate-700 to-slate-900 dark:from-zinc-800 dark:to-zinc-950 rounded-[1.75rem] p-5 md:p-6 shadow-2xl shadow-black/40 ring-1 ring-white/5">
+            <div className="relative overflow-hidden bg-gradient-to-br from-slate-700 to-slate-900 dark:from-zinc-800 dark:to-zinc-950 rounded-[1.75rem] p-6 md:p-7 shadow-2xl shadow-black/40 ring-1 ring-white/5 transition-all duration-300 hover:shadow-3xl hover:shadow-black/50 hover:ring-white/10">
                 {/* Background Icon */}
                 <div className="absolute top-0 right-0 p-6 opacity-[0.06] text-white pointer-events-none">
                     <TrendingUp size={120} strokeWidth={1.5} />
@@ -160,37 +196,68 @@ export default function Dashboard() {
                 <div className="absolute -top-12 -left-12 w-36 h-36 bg-white/5 rounded-full blur-3xl" />
                 <div className="absolute bottom-0 right-0 w-44 h-44 bg-white/3 rounded-full blur-3xl" />
 
-                <div className="relative z-10 space-y-5">
-                    <div className="grid grid-cols-2 gap-4 md:gap-5">
-                        <div className="space-y-1.5">
-                            <p className="text-white/50 font-medium text-[10px] uppercase tracking-wider">Total Revenue</p>
-                            <h2 className="text-3xl font-bold text-white tracking-tight">
-                                <span className="text-lg align-top opacity-50 font-normal mr-0.5">₹</span>
-                                {stats.todayRevenue.toLocaleString()}
-                            </h2>
+                <div className="relative z-10 space-y-6">
+                    {isLoadingStats ? (
+                        // Loading Skeleton
+                        <div className="space-y-5 animate-pulse">
+                            <div className="grid grid-cols-2 gap-4 md:gap-5">
+                                <div className="space-y-2">
+                                    <div className="h-3 w-20 bg-white/20 rounded" />
+                                    <div className="h-9 w-32 bg-white/30 rounded" />
+                                </div>
+                                <div className="space-y-2">
+                                    <div className="h-3 w-20 bg-white/20 rounded" />
+                                    <div className="h-9 w-32 bg-white/30 rounded" />
+                                </div>
+                            </div>
+                            <div className="h-12 w-full bg-white/10 rounded-xl" />
                         </div>
-                        <div className="space-y-1.5">
-                            <p className="text-white/50 font-medium text-[10px] uppercase tracking-wider">Net Profit</p>
-                            <h2 className={cn(
-                                "text-3xl font-bold tracking-tight flex items-center gap-1",
-                                stats.todayProfit >= 0 ? "text-emerald-400" : "text-rose-400"
-                            )}>
-                                {stats.todayProfit >= 0 ? <Plus size={22} strokeWidth={2.5} /> : <Minus size={22} strokeWidth={2.5} />}
-                                <span>
-                                    <span className="text-lg align-top opacity-60 font-normal mr-0.5">₹</span>
-                                    {Math.abs(stats.todayProfit).toLocaleString()}
-                                </span>
-                            </h2>
+                    ) : statsError ? (
+                        // Error State
+                        <div className="space-y-4 text-center py-4">
+                            <div className="text-rose-400 text-sm font-medium">{statsError}</div>
+                            <button
+                                onClick={fetchStats}
+                                className="px-4 py-2 bg-white/10 hover:bg-white/15 active:bg-white/20 active:scale-[0.98] text-white text-sm font-semibold rounded-lg transition-all duration-200"
+                            >
+                                Retry
+                            </button>
                         </div>
-                    </div>
+                    ) : (
+                        // Stats Content
+                        <>
+                            <div className="grid grid-cols-2 gap-5 md:gap-6">
+                                <div className="space-y-2">
+                                    <p className="text-white/50 font-medium text-[10px] uppercase tracking-wider">Total Revenue</p>
+                                    <h2 className="text-3xl font-bold text-white tracking-tight">
+                                        <span className="text-lg align-top opacity-50 font-normal mr-0.5">₹</span>
+                                        {stats.todayRevenue.toLocaleString()}
+                                    </h2>
+                                </div>
+                                <div className="space-y-2">
+                                    <p className="text-white/50 font-medium text-[10px] uppercase tracking-wider">Net Profit</p>
+                                    <h2 className={cn(
+                                        "text-3xl font-bold tracking-tight flex items-center gap-1",
+                                        stats.todayProfit >= 0 ? "text-emerald-400" : "text-rose-400"
+                                    )}>
+                                        {stats.todayProfit >= 0 ? <Plus size={22} strokeWidth={2.5} /> : <Minus size={22} strokeWidth={2.5} />}
+                                        <span>
+                                            <span className="text-lg align-top opacity-60 font-normal mr-0.5">₹</span>
+                                            {Math.abs(stats.todayProfit).toLocaleString()}
+                                        </span>
+                                    </h2>
+                                </div>
+                            </div>
 
-                    <Link
-                        to="/reports"
-                        className="group flex items-center justify-center w-full py-3 bg-white/10 hover:bg-white/15 active:bg-white/20 backdrop-blur-sm border border-white/10 hover:border-white/20 text-white rounded-xl text-xs font-semibold tracking-wide transition-all duration-200 active:scale-[0.98]"
-                    >
-                        View Detailed Report
-                        <ChevronRight className="ml-1.5 opacity-60 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all duration-200" size={14} strokeWidth={2.5} />
-                    </Link>
+                            <Link
+                                to="/reports"
+                                className="group flex items-center justify-center w-full py-4 md:py-3.5 bg-white/10 hover:bg-white/15 active:bg-white/20 active:scale-[0.98] backdrop-blur-sm border border-white/10 hover:border-white/20 text-white rounded-xl text-xs font-semibold tracking-wide transition-all duration-200 focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                            >
+                                View Detailed Report
+                                <ChevronRight className="ml-1.5 opacity-60 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all duration-200" size={14} strokeWidth={2.5} />
+                            </Link>
+                        </>
+                    )}
                 </div>
             </div>
 
@@ -198,24 +265,24 @@ export default function Dashboard() {
             <div className="grid grid-cols-2 gap-3">
                 <Link
                     to="/sale/new"
-                    className="group relative overflow-hidden flex flex-col items-center justify-center bg-gradient-to-br from-emerald-900/40 to-emerald-950/60 p-4 md:p-5 rounded-2xl shadow-lg shadow-black/20 active:scale-[0.97] transition-all duration-200 border border-emerald-500/20 hover:border-emerald-500/40 hover:shadow-xl hover:shadow-emerald-900/20"
+                    className="group relative overflow-hidden flex flex-col items-center justify-center bg-gradient-to-br from-emerald-700/60 to-emerald-900/80 p-5 md:p-6 rounded-2xl shadow-lg shadow-black/20 active:scale-[0.97] transition-all duration-200 border border-emerald-500/30 hover:border-emerald-500/50 hover:shadow-xl hover:shadow-emerald-900/30 min-h-[120px]"
                 >
-                    <div className="absolute inset-0 bg-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
-                    <div className="bg-emerald-500/20 p-3 rounded-full mb-3 backdrop-blur-sm group-hover:bg-emerald-500/30 group-hover:scale-105 transition-all duration-200 border border-emerald-500/20">
-                        <Plus className="text-emerald-400" size={24} strokeWidth={2.5} />
+                    <div className="absolute inset-0 bg-emerald-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+                    <div className="bg-emerald-500/30 p-3.5 rounded-full mb-3 backdrop-blur-sm group-hover:bg-emerald-500/40 group-hover:scale-105 transition-all duration-200 border border-emerald-500/30">
+                        <Plus className="text-emerald-300" size={24} strokeWidth={2.5} />
                     </div>
-                    <p className="text-emerald-100 font-semibold text-xs md:text-sm tracking-wide">New Sale</p>
+                    <p className="text-emerald-50 font-semibold text-sm md:text-base tracking-wide">New Sale</p>
                 </Link>
 
                 <Link
                     to="/expense/new"
-                    className="group relative overflow-hidden flex flex-col items-center justify-center bg-gradient-to-br from-rose-900/40 to-rose-950/60 p-4 md:p-5 rounded-2xl shadow-lg shadow-black/20 active:scale-[0.97] transition-all duration-200 border border-rose-500/20 hover:border-rose-500/40 hover:shadow-xl hover:shadow-rose-900/20"
+                    className="group relative overflow-hidden flex flex-col items-center justify-center bg-gradient-to-br from-rose-700/60 to-rose-900/80 p-5 md:p-6 rounded-2xl shadow-lg shadow-black/20 active:scale-[0.97] transition-all duration-200 border border-rose-500/30 hover:border-rose-500/50 hover:shadow-xl hover:shadow-rose-900/30 min-h-[120px]"
                 >
-                    <div className="absolute inset-0 bg-rose-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
-                    <div className="bg-rose-500/20 p-3 rounded-full mb-3 backdrop-blur-sm group-hover:bg-rose-500/30 group-hover:scale-105 transition-all duration-200 border border-rose-500/20">
-                        <Minus className="text-rose-400" size={24} strokeWidth={2.5} />
+                    <div className="absolute inset-0 bg-rose-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+                    <div className="bg-rose-500/30 p-3.5 rounded-full mb-3 backdrop-blur-sm group-hover:bg-rose-500/40 group-hover:scale-105 transition-all duration-200 border border-rose-500/30">
+                        <Minus className="text-rose-300" size={24} strokeWidth={2.5} />
                     </div>
-                    <p className="text-rose-100 font-semibold text-xs md:text-sm tracking-wide">New Expense</p>
+                    <p className="text-rose-50 font-semibold text-sm md:text-base tracking-wide">New Expense</p>
                 </Link>
             </div>
 
@@ -229,20 +296,20 @@ export default function Dashboard() {
                             <Link
                                 key={item.title}
                                 to={item.link}
-                                className="flex items-center p-3 md:p-4 bg-zinc-900/50 dark:bg-zinc-900/40 hover:bg-zinc-800/60 active:bg-zinc-800/70 border border-white/5 hover:border-white/10 rounded-xl group transition-all duration-200 shadow-sm hover:shadow-md"
+                                className="flex items-center p-4 md:p-5 bg-zinc-900/50 dark:bg-zinc-900/40 hover:bg-zinc-800/60 active:bg-zinc-800/70 active:scale-[0.99] border border-white/5 hover:border-white/10 rounded-xl group transition-all duration-200 shadow-sm hover:shadow-md focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background min-h-[72px]"
                             >
                                 <div className={cn(
-                                    "w-10 h-10 md:w-11 md:h-11 rounded-xl flex items-center justify-center mr-4 transition-all duration-200 group-hover:scale-105",
+                                    "w-11 h-11 md:w-12 md:h-12 rounded-xl flex items-center justify-center mr-4 transition-all duration-200 group-hover:scale-105",
                                     item.bg, item.color
                                 )}>
-                                    <Icon size={20} strokeWidth={2} />
+                                    <Icon size={22} strokeWidth={2} />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <p className="font-semibold text-foreground text-[15px] group-hover:text-white transition-colors duration-200">{item.title}</p>
+                                    <p className="font-semibold text-foreground text-[15px] md:text-base group-hover:text-white transition-colors duration-200">{item.title}</p>
                                     <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-[0.1em] opacity-60">Manage {item.title}</p>
                                 </div>
-                                <div className="bg-white/5 group-hover:bg-white/10 p-2 rounded-full opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all duration-200">
-                                    <ChevronRight className="text-white" size={14} strokeWidth={2.5} />
+                                <div className="bg-white/5 group-hover:bg-white/10 p-2.5 rounded-full opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all duration-200">
+                                    <ChevronRight className="text-white" size={16} strokeWidth={2.5} />
                                 </div>
                             </Link>
                         )

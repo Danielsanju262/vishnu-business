@@ -19,7 +19,8 @@ export default function Reports() {
     // Filters
     const [rangeType, setRangeType] = useState<DateRangeType>("today");
     const [showFilters, setShowFilters] = useState(false);
-    useDropdownClose(showFilters, () => setShowFilters(false));
+    const filterButtonRef = useRef<HTMLButtonElement>(null);
+    useDropdownClose(showFilters, () => setShowFilters(false), filterButtonRef);
     const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
     const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
 
@@ -518,7 +519,7 @@ export default function Reports() {
                     <div className="flex flex-col gap-3">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                                <Link to="/" className="p-2.5 -ml-2 rounded-full hover:bg-accent hover:text-foreground text-muted-foreground transition interactive active:scale-95">
+                                <Link to="/" className="p-3 -ml-2 rounded-full hover:bg-accent hover:text-foreground text-muted-foreground transition interactive active:scale-95 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1">
                                     <ArrowLeft size={20} />
                                 </Link>
                                 <div>
@@ -536,7 +537,15 @@ export default function Reports() {
                                 {/* Export Trigger */}
                                 <button
                                     onClick={() => setShowExportModal(true)}
-                                    className="flex items-center gap-2 px-3 py-2 rounded-full text-xs md:text-sm font-bold bg-card text-muted-foreground border border-border hover:bg-accent hover:text-foreground transition-all"
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter" || e.key === " ") {
+                                            e.preventDefault();
+                                            setShowExportModal(true);
+                                        }
+                                    }}
+                                    tabIndex={0}
+                                    className="flex items-center gap-2 px-4 py-3 rounded-full text-xs md:text-sm font-bold bg-card text-muted-foreground border border-border hover:bg-accent hover:text-foreground transition-all focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+                                    aria-label="Export data"
                                 >
                                     <Download size={16} />
                                     <span className="hidden sm:inline">Export</span>
@@ -544,11 +553,20 @@ export default function Reports() {
 
                                 {/* Filter Trigger */}
                                 <button
+                                    ref={filterButtonRef}
                                     onClick={() => setShowFilters(!showFilters)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter" || e.key === " ") {
+                                            e.preventDefault();
+                                            setShowFilters(!showFilters);
+                                        }
+                                    }}
+                                    tabIndex={0}
                                     className={cn(
-                                        "flex items-center gap-2 px-3 py-2 rounded-full text-xs md:text-sm font-bold border interactive transition-all",
+                                        "flex items-center gap-2 px-4 py-3 rounded-full text-xs md:text-sm font-bold border interactive transition-all focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-1",
                                         showFilters ? "bg-primary text-primary-foreground border-primary" : "bg-card text-muted-foreground border-border"
                                     )}
+                                    aria-label="Toggle date filter"
                                 >
                                     <Calendar size={16} />
                                     {ranges.find(r => r.key === rangeType)?.label}
@@ -565,8 +583,16 @@ export default function Reports() {
                                         <button
                                             key={r.key}
                                             onClick={() => { setRangeType(r.key as DateRangeType); if (r.key !== 'custom') setShowFilters(false); }}
+                                            onKeyDown={(e) => {
+                                                if (e.key === "Enter" || e.key === " ") {
+                                                    e.preventDefault();
+                                                    setRangeType(r.key as DateRangeType);
+                                                    if (r.key !== 'custom') setShowFilters(false);
+                                                }
+                                            }}
+                                            tabIndex={0}
                                             className={cn(
-                                                "px-3 py-2 text-xs md:text-sm font-semibold rounded-full border transition-all active:scale-95",
+                                                "px-4 py-3 text-xs md:text-sm font-semibold rounded-full border transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1",
                                                 rangeType === r.key
                                                     ? "bg-primary text-primary-foreground border-primary shadow-md shadow-primary/20"
                                                     : "bg-card text-muted-foreground border-border hover:bg-accent"
@@ -586,7 +612,7 @@ export default function Reports() {
                                                     type="date"
                                                     value={startDate}
                                                     onChange={(e) => { setStartDate(e.target.value); if (endDate < e.target.value) setEndDate(e.target.value); }}
-                                                    className="w-full px-3 py-2 bg-accent rounded-lg border border-border/50 text-xs font-bold text-foreground focus:ring-2 focus:ring-primary outline-none"
+                                                    className="w-full px-3 py-3 md:py-2 bg-accent rounded-lg border border-border/50 text-xs font-bold text-foreground focus:ring-2 focus:ring-primary outline-none h-12 md:h-auto"
                                                 />
                                             </div>
                                             <div className="flex-1">
@@ -595,7 +621,7 @@ export default function Reports() {
                                                     type="date"
                                                     value={endDate}
                                                     onChange={(e) => setEndDate(e.target.value)}
-                                                    className="w-full px-3 py-2 bg-accent rounded-lg border border-border/50 text-xs font-bold text-foreground focus:ring-2 focus:ring-primary outline-none"
+                                                    className="w-full px-3 py-3 md:py-2 bg-accent rounded-lg border border-border/50 text-xs font-bold text-foreground focus:ring-2 focus:ring-primary outline-none h-12 md:h-auto"
                                                 />
                                             </div>
                                         </div>
@@ -611,19 +637,40 @@ export default function Reports() {
                         <div className="flex p-1 bg-muted/50 rounded-xl">
                             <button
                                 onClick={() => setActiveTab('profit')}
-                                className={cn("flex-1 py-2 md:py-2.5 text-xs md:text-sm font-bold rounded-lg transition-all", activeTab === 'profit' ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/20" : "text-muted-foreground hover:text-foreground")}
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter" || e.key === " ") {
+                                        e.preventDefault();
+                                        setActiveTab('profit');
+                                    }
+                                }}
+                                tabIndex={0}
+                                className={cn("flex-1 py-2 md:py-2.5 text-xs md:text-sm font-bold rounded-lg transition-all focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-1", activeTab === 'profit' ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/20" : "text-muted-foreground hover:text-foreground")}
                             >
                                 P&L Statement
                             </button>
                             <button
                                 onClick={() => setActiveTab('customers')}
-                                className={cn("flex-1 py-2 md:py-2.5 text-xs md:text-sm font-bold rounded-lg transition-all", activeTab === 'customers' ? "bg-blue-500 text-white shadow-md shadow-blue-500/20" : "text-muted-foreground hover:text-foreground")}
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter" || e.key === " ") {
+                                        e.preventDefault();
+                                        setActiveTab('customers');
+                                    }
+                                }}
+                                tabIndex={0}
+                                className={cn("flex-1 py-2 md:py-2.5 text-xs md:text-sm font-bold rounded-lg transition-all focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-1", activeTab === 'customers' ? "bg-blue-500 text-white shadow-md shadow-blue-500/20" : "text-muted-foreground hover:text-foreground")}
                             >
                                 Customers
                             </button>
                             <button
                                 onClick={() => setActiveTab('activity')}
-                                className={cn("flex-1 py-2 md:py-2.5 text-xs md:text-sm font-bold rounded-lg transition-all", activeTab === 'activity' ? "bg-rose-500 text-white shadow-md shadow-rose-500/20" : "text-muted-foreground hover:text-foreground")}
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter" || e.key === " ") {
+                                        e.preventDefault();
+                                        setActiveTab('activity');
+                                    }
+                                }}
+                                tabIndex={0}
+                                className={cn("flex-1 py-2 md:py-2.5 text-xs md:text-sm font-bold rounded-lg transition-all focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-1", activeTab === 'activity' ? "bg-rose-500 text-white shadow-md shadow-rose-500/20" : "text-muted-foreground hover:text-foreground")}
                             >
                                 Activity
                             </button>
@@ -666,7 +713,16 @@ export default function Reports() {
                                 {/* Gross Sales Row */}
                                 <div
                                     onClick={() => setSelectedDetail('sales')}
-                                    className="flex justify-between items-center p-2.5 md:p-3 -mx-2 md:-mx-3 rounded-xl hover:bg-accent/50 cursor-pointer transition-colors group"
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter" || e.key === " ") {
+                                            e.preventDefault();
+                                            setSelectedDetail('sales');
+                                        }
+                                    }}
+                                    tabIndex={0}
+                                    role="button"
+                                    className="flex justify-between items-center p-2.5 md:p-3 -mx-2 md:-mx-3 rounded-xl hover:bg-accent/50 cursor-pointer transition-colors group focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+                                    aria-label="View gross sales breakdown"
                                 >
                                     <div className="flex items-center gap-2">
                                         <div className="p-1.5 bg-emerald-500/10 rounded-lg text-emerald-600">
@@ -683,7 +739,16 @@ export default function Reports() {
                                 {/* Goods Sold Row */}
                                 <div
                                     onClick={() => setSelectedDetail('goods')}
-                                    className="flex justify-between items-center p-2.5 md:p-3 -mx-2 md:-mx-3 rounded-xl hover:bg-accent/50 cursor-pointer transition-colors group"
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter" || e.key === " ") {
+                                            e.preventDefault();
+                                            setSelectedDetail('goods');
+                                        }
+                                    }}
+                                    tabIndex={0}
+                                    role="button"
+                                    className="flex justify-between items-center p-2.5 md:p-3 -mx-2 md:-mx-3 rounded-xl hover:bg-accent/50 cursor-pointer transition-colors group focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+                                    aria-label="View goods cost breakdown"
                                 >
                                     <div className="flex items-center gap-2">
                                         <div className="p-1.5 bg-orange-500/10 rounded-lg text-orange-600">
@@ -707,7 +772,16 @@ export default function Reports() {
                                 {/* Other Expenses Row */}
                                 <div
                                     onClick={() => setSelectedDetail('expenses')}
-                                    className="flex justify-between items-center p-2.5 md:p-3 -mx-2 md:-mx-3 rounded-xl hover:bg-accent/50 cursor-pointer transition-colors group"
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter" || e.key === " ") {
+                                            e.preventDefault();
+                                            setSelectedDetail('expenses');
+                                        }
+                                    }}
+                                    tabIndex={0}
+                                    role="button"
+                                    className="flex justify-between items-center p-2.5 md:p-3 -mx-2 md:-mx-3 rounded-xl hover:bg-accent/50 cursor-pointer transition-colors group focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+                                    aria-label="View other expenses breakdown"
                                 >
                                     <div className="flex items-center gap-2">
                                         <div className="p-1.5 bg-rose-500/10 rounded-lg text-rose-600">
@@ -744,15 +818,12 @@ export default function Reports() {
                         >
                             {selectedDetail && (
                                 <>
-                                    <div className="p-5 border-b border-zinc-800 flex justify-between items-center bg-zinc-950 shrink-0">
+                                    <div className="p-5 border-b border-zinc-800 bg-zinc-950 shrink-0">
                                         <h3 className="font-black text-lg flex items-center gap-2 text-white">
                                             {selectedDetail === 'sales' && <><TrendingUp className="text-emerald-500" /> Gross Sales Breakdown</>}
                                             {selectedDetail === 'goods' && <><ShoppingBag className="text-orange-500" /> Goods Cost Breakdown</>}
                                             {selectedDetail === 'expenses' && <><Wallet className="text-rose-500" /> Other Expenses</>}
                                         </h3>
-                                        <Button size="icon" variant="ghost" className="rounded-full h-8 w-8 hover:bg-zinc-800 text-zinc-400" onClick={() => setSelectedDetail(null)}>
-                                            <X size={18} />
-                                        </Button>
                                     </div>
 
                                     <div className="overflow-y-auto p-4 space-y-3 bg-zinc-950">
@@ -849,12 +920,20 @@ export default function Reports() {
                                     placeholder="Search customer..."
                                     value={customerSearch}
                                     onChange={e => setCustomerSearch(e.target.value)}
-                                    className="w-full bg-card pl-9 pr-4 py-2.5 rounded-xl border border-border text-sm font-semibold focus:ring-2 focus:ring-primary outline-none transition-all placeholder:font-medium"
+                                    className="w-full bg-card pl-9 pr-4 py-3 md:py-2.5 rounded-xl border border-border text-sm font-semibold focus:ring-2 focus:ring-primary outline-none transition-all placeholder:font-medium h-12 md:h-auto"
                                 />
                             </div>
                             <button
                                 onClick={() => setCustomerSort(prev => prev === 'high' ? 'low' : 'high')}
-                                className="bg-card px-3 rounded-xl border border-border text-muted-foreground hover:text-foreground hover:border-primary/50 transition-all flex items-center gap-2"
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter" || e.key === " ") {
+                                        e.preventDefault();
+                                        setCustomerSort(prev => prev === 'high' ? 'low' : 'high');
+                                    }
+                                }}
+                                tabIndex={0}
+                                className="bg-card px-4 py-3 rounded-xl border border-border text-muted-foreground hover:text-foreground hover:border-primary/50 transition-all flex items-center gap-2 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+                                aria-label={`Sort ${customerSort === 'high' ? 'low to high' : 'high to low'}`}
                             >
                                 <ArrowUpDown size={16} />
                                 <span className="text-xs font-bold hidden sm:inline">{customerSort === 'high' ? 'High-Low' : 'Low-High'}</span>
@@ -871,7 +950,16 @@ export default function Reports() {
                                     <div
                                         key={c.name}
                                         onClick={() => setSelectedCustomer(c.name)}
-                                        className="bg-card p-3 md:p-4 rounded-xl border border-border/50 shadow-sm flex items-center justify-between cursor-pointer hover:bg-accent/50 transition-all group"
+                                        onKeyDown={(e) => {
+                                            if (e.key === "Enter" || e.key === " ") {
+                                                e.preventDefault();
+                                                setSelectedCustomer(c.name);
+                                            }
+                                        }}
+                                        tabIndex={0}
+                                        role="button"
+                                        className="bg-card p-3 md:p-4 rounded-xl border border-border/50 shadow-sm flex items-center justify-between cursor-pointer hover:bg-accent/50 transition-all group focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+                                        aria-label={`View details for ${c.name}`}
                                     >
                                         <div>
                                             <p className="font-bold text-foreground text-sm md:text-base mb-0.5 group-hover:text-primary transition-colors">{c.name}</p>
