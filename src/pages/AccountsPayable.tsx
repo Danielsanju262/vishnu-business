@@ -66,23 +66,20 @@ export default function AccountsPayable() {
     const [editDateValue, setEditDateValue] = useState("");
 
     // Handle browser back button
+    const isModalOpen = showNewPayable || !!quickActionSupplier || !!editDateSupplier;
+
     useBrowserBackButton(() => {
         if (showNewPayable) {
             setShowNewPayable(false);
-            return true;
         } else if (quickActionSupplier) {
             setQuickActionSupplier(null);
             setActionType(null);
             setAmount("");
             setDueDate("");
-            return true;
         } else if (editDateSupplier) {
             setEditDateSupplier(null);
-            return true;
-        } else {
-            navigate("/");
         }
-    });
+    }, isModalOpen);
 
     // Close dropdowns on ESC or click outside
     const listRef = useRef<HTMLDivElement>(null);

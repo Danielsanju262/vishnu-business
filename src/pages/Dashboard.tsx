@@ -12,20 +12,6 @@ import { useBrowserBackButton } from "../hooks/useBrowserBackButton";
 export default function Dashboard() {
     const { lockApp } = useAuth();
 
-    useBrowserBackButton(() => {
-        if (showCustomDateModal) {
-            setShowCustomDateModal(false);
-            return true;
-        }
-        if (showFilterDropdown) {
-            setShowFilterDropdown(false);
-            return true;
-        }
-        if (isEditingName) {
-            setIsEditingName(false);
-            return true;
-        }
-    });
     const [stats, setStats] = useState({
         revenue: 0,
         profit: 0,
@@ -44,6 +30,23 @@ export default function Dashboard() {
     });
     const [showFilterDropdown, setShowFilterDropdown] = useState(false);
     const [showCustomDateModal, setShowCustomDateModal] = useState(false);
+
+    const isModalOpen = showCustomDateModal || showFilterDropdown || isEditingName;
+    useBrowserBackButton(() => {
+        if (showCustomDateModal) {
+            setShowCustomDateModal(false);
+            return;
+        }
+        if (showFilterDropdown) {
+            setShowFilterDropdown(false);
+            return;
+        }
+        if (isEditingName) {
+            setIsEditingName(false);
+            return;
+        }
+    }, isModalOpen);
+
     const dropdownRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -189,7 +192,7 @@ export default function Dashboard() {
                                             setIsEditingName(false);
                                         }
                                     }}
-                                    className="bg-transparent text-2xl font-bold text-foreground tracking-tight border-b-2 border-white/60 dark:border-white/40 outline-none min-w-[140px] py-1 placeholder:text-muted-foreground/50"
+                                    className="bg-transparent text-3xl md:text-4xl font-bold text-foreground tracking-tight border-b-2 border-white/60 dark:border-white/40 outline-none min-w-[140px] py-1 placeholder:text-muted-foreground/50"
                                     placeholder="Enter name..."
                                 />
                                 <button
@@ -205,7 +208,7 @@ export default function Dashboard() {
                             </div>
                         ) : (
                             <>
-                                <h1 className="text-2xl font-bold text-foreground tracking-tight leading-tight">
+                                <h1 className="text-3xl md:text-4xl font-bold text-foreground tracking-tight leading-tight">
                                     Welcome back, <span className="text-white">{userName}</span>
                                 </h1>
                                 <button
@@ -342,7 +345,7 @@ export default function Dashboard() {
                             <>
                                 <div className="flex justify-center gap-6 md:gap-16 text-center">
                                     <div className="space-y-1 flex flex-col items-start">
-                                        <p className="text-white/50 font-medium text-[10px] uppercase tracking-wider text-center w-full">
+                                        <p className="text-white/50 font-medium text-[10px] uppercase tracking-wider text-center w-full whitespace-nowrap">
                                             {dateFilter === 'today' ? 'Revenue (Today)' :
                                                 dateFilter === 'yesterday' ? 'Revenue (Yesterday)' :
                                                     dateFilter === 'thisWeek' ? 'Revenue (This Week)' :
@@ -355,7 +358,7 @@ export default function Dashboard() {
                                         </h2>
                                     </div>
                                     <div className="space-y-1 flex flex-col items-end">
-                                        <p className="text-white/50 font-medium text-[10px] uppercase tracking-wider text-center w-full">Net Profit</p>
+                                        <p className="text-white/50 font-medium text-[10px] uppercase tracking-wider text-center w-full whitespace-nowrap">Net Profit</p>
                                         <h2 className={cn(
                                             "text-3xl font-bold tracking-tight flex items-center gap-1",
                                             stats.profit >= 0 ? "text-emerald-400" : "text-rose-400"

@@ -1,56 +1,58 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 /**
  * Hook to handle browser back button behavior
- * Prevents default browser navigation and uses custom handler instead
  * 
- * @param onBack - Custom function to call when back button is pressed
- * @param shouldHandle - Whether to handle the back button (default: true)
+ * @param onBack - Function to call when back button is pressed while "active" (trapped)
+ * @param isActive - Whether to trap the back button. If true, a history entry is added. 
+ *                   If false, standard navigation behavior applies.
  */
 export function useBrowserBackButton(
-    onBack: () => boolean | void,
-    shouldHandle: boolean = true
+    onBack: () => void,
+    isActive: boolean = false
 ) {
-    // Keep reference to the callback to avoid re-running effect when callback changes
     const onBackRef = useRef(onBack);
-    // Capture the URL that we want to lock to
-    const checkPointUrl = useRef(window.location.href);
+    // Track if we currently own a history trap
+    const isTrapped = useRef(false);
+    // Trigger to force re-evaluation after popstate
+    const [tick, setTick] = useState(0);
 
-    // Update handler reference whenever it changes
     useEffect(() => {
         onBackRef.current = onBack;
     }, [onBack]);
 
     useEffect(() => {
-        if (!shouldHandle) return;
+        // If becoming active and not trapped, push trap
+        if (isActive && !isTrapped.current) {
+            window.history.pushState({ trap: true, id: Date.now() }, '', window.location.href);
+            isTrapped.current = true;
+        }
+        // If becoming inactive but strictly trapped, remove trap
+        else if (!isActive && isTrapped.current) {
+            // We assume if isTrapped is true, we haven't popped it yet.
+            // This handles the case where the user closes the modal via UI button (not back button)
+            window.history.back();
+            isTrapped.current = false;
+        }
+    }, [isActive, tick]);
 
-        // Arm the trap with current URL - Capture BEFORE the back event happens
-        // We use a unique state object to ensure the browser creates a new history entry
-        // even if the URL is the same.
-        const trapState = { isTrap: true, time: Date.now() };
-        checkPointUrl.current = window.location.href;
-        window.history.pushState(trapState, '', checkPointUrl.current);
-
+    useEffect(() => {
         const handlePopState = () => {
-            // We've already popped here. The URL might have changed to the previous page.
+            // If we were trapped, and a pop happens, it means the trap was consumed.
+            if (isTrapped.current) {
+                isTrapped.current = false;
 
-            // Call the callback to see if we should trap (stay) or let go
-            let shouldStay = false;
-            if (onBackRef.current) {
-                shouldStay = onBackRef.current() === true;
+                // Allow browser to settle the pop event before re-evaluating
+                setTimeout(() => {
+                    // Notify parent to handle the "Back" intent (e.g. close modal)
+                    onBackRef.current();
+                    // Force re-evaluation to potentially restore trap
+                    setTick(t => t + 1);
+                }, 10);
             }
-
-            if (shouldStay) {
-                // Restore the state to our checkpoint
-                window.history.pushState(trapState, '', checkPointUrl.current);
-            }
-            // Else: we let the pop stand. User goes to previous page.
         };
 
         window.addEventListener('popstate', handlePopState);
-
-        return () => {
-            window.removeEventListener('popstate', handlePopState);
-        };
-    }, [shouldHandle]);
+        return () => window.removeEventListener('popstate', handlePopState);
+    }, []);
 }

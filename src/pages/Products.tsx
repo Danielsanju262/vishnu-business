@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { Button } from "../components/ui/Button";
 import { Trash2, Plus, Milk, Package, ArrowLeft, Tag, Box, MoreVertical, CheckCircle2, Circle, X, Edit2 } from "lucide-react";
@@ -19,30 +19,11 @@ type Product = {
 import { ConfirmationModal } from "../components/ui/ConfirmationModal";
 
 export default function Products() {
-    const navigate = useNavigate();
+
     const { toast } = useToast();
 
     // Handle browser back button
-    // Handle browser back button
-    useBrowserBackButton(() => {
-        if (confirmConfig.isOpen) {
-            closeConfirm();
-            return true;
-        }
-        if (activeMenuId) {
-            setActiveMenuId(null);
-            return true;
-        }
-        if (isSelectionMode) {
-            toggleSelectionMode();
-            return true;
-        }
-        if (isAdding) {
-            cleanForm();
-            return true;
-        }
-        navigate('/');
-    });
+
 
     const [products, setProducts] = useState<Product[]>([]);
     const [loading, setLoading] = useState(true);
@@ -68,6 +49,20 @@ export default function Products() {
     });
 
     const closeConfirm = () => setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+
+    const isStateActive = confirmConfig.isOpen || !!activeMenuId || isSelectionMode || isAdding;
+
+    useBrowserBackButton(() => {
+        if (confirmConfig.isOpen) {
+            closeConfirm();
+        } else if (activeMenuId) {
+            setActiveMenuId(null);
+        } else if (isSelectionMode) {
+            toggleSelectionMode();
+        } else if (isAdding) {
+            cleanForm();
+        }
+    }, isStateActive);
 
     // Long Press for Selection
     const timerRef = useRef<any>(null);

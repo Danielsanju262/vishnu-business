@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { Button } from "../components/ui/Button";
 import { ArrowLeft, Trash2, Plus, User, Truck, MoreVertical, CheckCircle2, Circle, X, Edit2, WifiOff } from "lucide-react";
@@ -17,32 +17,11 @@ type Supplier = {
 import { ConfirmationModal } from "../components/ui/ConfirmationModal";
 
 export default function Suppliers() {
-    const navigate = useNavigate();
+
     const { toast } = useToast();
 
     // Handle browser back button
-    // Handle browser back button
-    useBrowserBackButton(() => {
-        if (confirmConfig.isOpen) {
-            closeConfirm();
-            return true;
-        }
-        if (activeMenuId) {
-            setActiveMenuId(null);
-            return true;
-        }
-        if (isSelectionMode) {
-            toggleSelectionMode();
-            return true;
-        }
-        if (isAdding) {
-            setIsAdding(false);
-            setNewName("");
-            setEditingId(null);
-            return true;
-        }
-        navigate('/');
-    });
+
 
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
     const [loading, setLoading] = useState(true);
@@ -71,6 +50,22 @@ export default function Suppliers() {
     });
 
     const closeConfirm = () => setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+
+    const isStateActive = confirmConfig.isOpen || !!activeMenuId || isSelectionMode || isAdding;
+
+    useBrowserBackButton(() => {
+        if (confirmConfig.isOpen) {
+            closeConfirm();
+        } else if (activeMenuId) {
+            setActiveMenuId(null);
+        } else if (isSelectionMode) {
+            toggleSelectionMode();
+        } else if (isAdding) {
+            setIsAdding(false);
+            setNewName("");
+            setEditingId(null);
+        }
+    }, isStateActive);
 
     // Long Press for Selection
     const timerRef = useRef<any>(null);

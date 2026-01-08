@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { Button } from "../components/ui/Button";
 import { ArrowLeft, Trash2, Plus, User, Store, MoreVertical, CheckCircle2, Circle, X, Edit2 } from "lucide-react";
@@ -16,32 +16,11 @@ type Customer = {
 };
 
 export default function Customers() {
-    const navigate = useNavigate();
+
     const { toast } = useToast();
 
     // Handle browser back button
-    // Handle browser back button
-    useBrowserBackButton(() => {
-        if (confirmConfig.isOpen) {
-            closeConfirm();
-            return true;
-        }
-        if (activeMenuId) {
-            setActiveMenuId(null);
-            return true;
-        }
-        if (isSelectionMode) {
-            toggleSelectionMode();
-            return true;
-        }
-        if (isAdding) {
-            setIsAdding(false);
-            setNewName("");
-            setEditingId(null);
-            return true;
-        }
-        navigate('/');
-    });
+
 
     const [customers, setCustomers] = useState<Customer[]>([]);
     const [loading, setLoading] = useState(true);
@@ -70,6 +49,22 @@ export default function Customers() {
     });
 
     const closeConfirm = () => setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+
+    const isStateActive = confirmConfig.isOpen || !!activeMenuId || isSelectionMode || isAdding;
+
+    useBrowserBackButton(() => {
+        if (confirmConfig.isOpen) {
+            closeConfirm();
+        } else if (activeMenuId) {
+            setActiveMenuId(null);
+        } else if (isSelectionMode) {
+            toggleSelectionMode();
+        } else if (isAdding) {
+            setIsAdding(false);
+            setNewName("");
+            setEditingId(null);
+        }
+    }, isStateActive);
 
     // Long Press for Selection
     const timerRef = useRef<any>(null);

@@ -63,21 +63,7 @@ export default function SupplierPaymentDetail() {
     const navigate = useNavigate();
     const { toast } = useToast();
 
-    // Handle browser back button
-    useBrowserBackButton(() => {
-        if (showAddPayable) {
-            setShowAddPayable(false);
-            return true;
-        } else if (showMakePayment) {
-            setShowMakePayment(false);
-            return true;
-        } else if (showEditDate) {
-            setShowEditDate(false);
-            return true;
-        } else {
-            navigate('/accounts-payable');
-        }
-    });
+
 
     const [supplier, setSupplier] = useState<Supplier | null>(null);
     const [payables, setPayables] = useState<Payable[]>([]);
@@ -99,6 +85,19 @@ export default function SupplierPaymentDetail() {
     // Edit Due Date
     const [showEditDate, setShowEditDate] = useState(false);
     const [newDueDate, setNewDueDate] = useState("");
+
+    // Handle browser back button
+    const isModalOpen = showAddPayable || showMakePayment || showEditDate;
+
+    useBrowserBackButton(() => {
+        if (showAddPayable) {
+            setShowAddPayable(false);
+        } else if (showMakePayment) {
+            setShowMakePayment(false);
+        } else if (showEditDate) {
+            setShowEditDate(false);
+        }
+    }, isModalOpen);
 
     const [confirmConfig, setConfirmConfig] = useState<{
         isOpen: boolean;
