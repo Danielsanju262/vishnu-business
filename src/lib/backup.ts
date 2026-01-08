@@ -14,7 +14,8 @@ export const exportData = async () => {
         { data: transactions },
         { data: expenses },
         { data: payment_reminders },
-        { data: accounts_payable }
+        { data: accounts_payable },
+        { data: app_settings }
     ] = await Promise.all([
         supabase.from('customers').select('*').is('deleted_at', null),
         supabase.from('products').select('*').is('deleted_at', null),
@@ -22,24 +23,26 @@ export const exportData = async () => {
         supabase.from('expense_presets').select('*').is('deleted_at', null),
         supabase.from('transactions').select('*').is('deleted_at', null),
         supabase.from('expenses').select('*').is('deleted_at', null),
-        supabase.from('payment_reminders').select('*').is('deleted_at', null), // Assuming logic doesn't soft delete these?
-        supabase.from('accounts_payable').select('*').is('deleted_at', null)      // Or status based. Let's fetch everything to be safe.
+        supabase.from('payment_reminders').select('*').is('deleted_at', null),
+        supabase.from('accounts_payable').select('*').is('deleted_at', null),
+        supabase.from('app_settings').select('*') // No deleted_at for settings usually
     ]);
 
     const backup = {
         meta: {
-            version: "1.0",
+            version: "1.1",
             date: new Date().toISOString(),
             app: "Vishnu Business"
         },
         data: {
+            app_settings: app_settings || [],
             customers: customers || [],
             products: products || [],
             suppliers: suppliers || [],
             expense_presets: expense_presets || [],
             transactions: transactions || [],
             expenses: expenses || [],
-            payment_reminders: payment_reminders || [], // Need to check if pending is better? No, backup everything.
+            payment_reminders: payment_reminders || [],
             accounts_payable: accounts_payable || []
         }
     };
@@ -62,6 +65,7 @@ export const importData = async (jsonString: string) => {
     if (!backup.data) throw new Error("Invalid backup structure");
 
     const {
+        app_settings,
         customers,
         products,
         suppliers,
@@ -98,6 +102,7 @@ export const importData = async (jsonString: string) => {
 
     // PHASE 1: UPSERT (Parents First -> Children)
     // Ensures all referenced constraints exist before children reference them.
+    if (app_settings) await upsertTable('app_settings', app_settings);
     await upsertTable('customers', customers);
     await upsertTable('products', products);
     await upsertTable('suppliers', suppliers);

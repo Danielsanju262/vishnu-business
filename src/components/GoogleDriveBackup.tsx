@@ -14,6 +14,27 @@ export function GoogleDriveBackup() {
     const [isLoading, setIsLoading] = useState(false);
     const [backups, setBackups] = useState<any[]>([]);
     const [showBackups, setShowBackups] = useState(false);
+    const [isAutoBackupEnabled, setIsAutoBackupEnabled] = useState(false);
+
+    // Load Auto Backup Config
+    useEffect(() => {
+        const configStr = localStorage.getItem('vishnu_backup_config');
+        if (configStr) {
+            try {
+                const config = JSON.parse(configStr);
+                setIsAutoBackupEnabled(config.enabled || false);
+            } catch (e) {
+                console.error("Failed to parse backup config", e);
+            }
+        }
+    }, []);
+
+    const toggleAutoBackup = () => {
+        const newState = !isAutoBackupEnabled;
+        setIsAutoBackupEnabled(newState);
+        localStorage.setItem('vishnu_backup_config', JSON.stringify({ enabled: newState }));
+        toast(newState ? "Daily auto-backup enabled" : "Auto-backup disabled", "success");
+    };
 
     // Confirmation State
     const [confirmConfig, setConfirmConfig] = useState<{
@@ -158,6 +179,35 @@ export function GoogleDriveBackup() {
                     <Button variant="ghost" size="sm" onClick={() => { setToken(null); localStorage.removeItem('vishnu_gdrive_token'); }}>
                         Disconnect
                     </Button>
+                </div>
+
+                {/* Regular Backup Toggle */}
+                <div className="flex items-center justify-between p-3 bg-neutral-50 dark:bg-neutral-800/50 rounded-xl mb-4 border border-neutral-100 dark:border-neutral-800">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-blue-100 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 rounded-lg">
+                            <RefreshCw size={18} />
+                        </div>
+                        <div>
+                            <p className="text-sm font-semibold text-neutral-900 dark:text-white">Regular Daily Backup</p>
+                            <p className="text-[10px] text-neutral-500 dark:text-neutral-400">
+                                Automatically back up when you open the app
+                            </p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={toggleAutoBackup}
+                        className={cn(
+                            "relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
+                            isAutoBackupEnabled ? "bg-primary" : "bg-neutral-200 dark:bg-neutral-700"
+                        )}
+                    >
+                        <span
+                            className={cn(
+                                "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
+                                isAutoBackupEnabled ? "translate-x-6" : "translate-x-1"
+                            )}
+                        />
+                    </button>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">

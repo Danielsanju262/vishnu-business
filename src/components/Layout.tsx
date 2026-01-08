@@ -2,10 +2,12 @@ import { Outlet, useLocation, Link } from "react-router-dom";
 import { LayoutDashboard, Settings, Wallet } from "lucide-react";
 import { cn } from "../lib/utils";
 import { usePaymentNotifications } from "../hooks/usePaymentNotifications";
+import { useAutoBackup } from "../hooks/useAutoBackup";
 
 export default function Layout() {
     const location = useLocation();
     usePaymentNotifications();
+    useAutoBackup();
 
     const RupeeTextIcon = ({ size = 24, className, strokeWidth }: any) => {
         return (
