@@ -25,8 +25,11 @@ export function useBrowserBackButton(
         if (!shouldHandle) return;
 
         // Arm the trap with current URL - Capture BEFORE the back event happens
+        // We use a unique state object to ensure the browser creates a new history entry
+        // even if the URL is the same.
+        const trapState = { isTrap: true, time: Date.now() };
         checkPointUrl.current = window.location.href;
-        window.history.pushState(null, '', checkPointUrl.current);
+        window.history.pushState(trapState, '', checkPointUrl.current);
 
         const handlePopState = () => {
             // We've already popped here. The URL might have changed to the previous page.
@@ -38,8 +41,8 @@ export function useBrowserBackButton(
             }
 
             if (shouldStay) {
-                // Restore the state to our checkpoint (the correct page URL)
-                window.history.pushState(null, '', checkPointUrl.current);
+                // Restore the state to our checkpoint
+                window.history.pushState(trapState, '', checkPointUrl.current);
             }
             // Else: we let the pop stand. User goes to previous page.
         };
