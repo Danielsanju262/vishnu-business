@@ -8,8 +8,7 @@ import { cn } from "../lib/utils";
 import { Modal } from "../components/ui/Modal";
 import { useDropdownClose } from "../hooks/useDropdownClose";
 import { ConfirmationModal } from "../components/ui/ConfirmationModal";
-
-// ... (imports)
+import { useBrowserBackButton } from "../hooks/useBrowserBackButton";
 
 type Customer = {
     id: string;
@@ -35,33 +34,41 @@ type TransactionLog = {
 };
 
 // Helper function to format date with ordinal suffix
-const formatDateWithOrdinal = (dateStr: string): string => {
-    try {
-        // Parse the date string (format: "8 Jan" or similar)
-        const parts = dateStr.trim().split(' ');
-        if (parts.length < 2) return dateStr;
+function formatDateWithOrdinal(dateStr: string): string {
+    const date = new Date(dateStr);
+    const day = date.getDate();
+    const month = date.toLocaleDateString('en-US', { month: 'short' });
+    const year = date.getFullYear();
 
-        const day = parseInt(parts[0]);
-        const month = parts[1];
-        const currentYear = new Date().getFullYear();
+    const getOrdinal = (n: number) => {
+        const s = ["th", "st", "nd", "rd"];
+        const v = n % 100;
+        return n + (s[(v - 20) % 10] || s[v] || s[0]);
+    };
 
-        // Get ordinal suffix
-        const getOrdinal = (n: number): string => {
-            const s = ["th", "st", "nd", "rd"];
-            const v = n % 100;
-            return n + (s[(v - 20) % 10] || s[v] || s[0]);
-        };
-
-        return `${getOrdinal(day)} ${month} ${currentYear}`;
-    } catch (e) {
-        return dateStr;
-    }
-};
+    return `${getOrdinal(day)} ${month} ${year}`;
+}
 
 export default function CustomerPaymentDetail() {
     const { customerId } = useParams<{ customerId: string }>();
     const navigate = useNavigate();
     const { toast } = useToast();
+
+    // Handle browser back button
+    useBrowserBackButton(() => {
+        if (showAddDue) {
+            setShowAddDue(false);
+            return true;
+        } else if (showReceivePayment) {
+            setShowReceivePayment(false);
+            return true;
+        } else if (showEditDate) {
+            setShowEditDate(false);
+            return true;
+        } else {
+            navigate('/payment-reminders');
+        }
+    });
 
     // ... (state vars)
     const [customer, setCustomer] = useState<Customer | null>(null);

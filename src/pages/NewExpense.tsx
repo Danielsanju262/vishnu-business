@@ -16,6 +16,7 @@ type Preset = {
 };
 
 import { ConfirmationModal } from "../components/ui/ConfirmationModal";
+import { useBrowserBackButton } from "../hooks/useBrowserBackButton";
 
 export default function NewExpense() {
     const navigate = useNavigate();
@@ -36,6 +37,16 @@ export default function NewExpense() {
     const [presets, setPresets] = useState<Preset[]>([]);
     const [isManageMode, setIsManageMode] = useState(false);
     const [isAddingPreset, setIsAddingPreset] = useState(false);
+
+    // Handle browser back button
+    useBrowserBackButton(() => {
+        if (isManageMode) {
+            setIsManageMode(false);
+            return true;
+        } else {
+            navigate("/");
+        }
+    });
 
     // Preset Form
     const [presetName, setPresetName] = useState("");

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import Papa from "papaparse";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, Database, Shield, Lock, Check, Fingerprint, LogOut, KeyRound, Loader2, Smartphone, Trash2, AlertTriangle, ShieldCheck, Clock, Mail, Download, Upload, ChevronDown, Cloud } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { cn } from "../lib/utils";
@@ -10,6 +10,7 @@ import { supabase } from "../lib/supabase";
 import { useToast } from "../components/toast-provider";
 import { Modal } from "../components/ui/Modal";
 import { GoogleDriveBackup } from "../components/GoogleDriveBackup";
+import { useBrowserBackButton } from "../hooks/useBrowserBackButton";
 
 // Collapsible Section Component
 const CollapsibleSection = ({
@@ -87,7 +88,7 @@ const formatRelativeTime = (dateString?: string) => {
 };
 
 export default function Settings() {
-
+    const navigate = useNavigate();
     const {
         hasBiometrics,
         registerBiometrics,
@@ -169,6 +170,31 @@ export default function Settings() {
     const [isExporting, setIsExporting] = useState(false);
     const [isImporting, setIsImporting] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Handle browser back button
+    useBrowserBackButton(() => {
+        if (isSetupSuperAdminOpen) {
+            resetSuperAdminSetup();
+            return true;
+        } else if (isChangePinOpen) {
+            resetPinState();
+            return true;
+        } else if (isRevokeModalOpen) {
+            resetRevokeState();
+            return true;
+        } else if (showDeauthConfirm) {
+            setShowDeauthConfirm(false);
+            return true;
+        } else if (isExportModalOpen) {
+            setIsExportModalOpen(false);
+            return true;
+        } else if (showMigrationHelp) {
+            setShowMigrationHelp(false);
+            return true;
+        } else {
+            navigate("/");
+        }
+    });
 
     const REQUIRED_CSV_HEADERS = [
         "Date", "Customer Name", "Product Name", "Quantity", "Unit", "Sell Price", "Buy Price", "Is Deleted"
@@ -538,7 +564,6 @@ export default function Settings() {
                             <span className="text-sm text-neutral-500 dark:text-neutral-400 font-medium">Version</span>
                             <span className="text-sm font-semibold text-neutral-900 dark:text-white bg-neutral-100 dark:bg-neutral-800 px-2.5 py-1 rounded-md">v3.5.0</span>
                         </div>
-
 
 
                         <div className="flex justify-between items-center py-3">

@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { Button } from "../components/ui/Button";
 import { ArrowLeft, Trash2, Plus, User, Truck, MoreVertical, CheckCircle2, Circle, X, Edit2, WifiOff } from "lucide-react";
@@ -7,6 +7,7 @@ import { useToast } from "../components/toast-provider";
 import { cn } from "../lib/utils";
 import { useRealtimeTable } from "../hooks/useRealtimeSync";
 import { useDropdownClose } from "../hooks/useDropdownClose";
+import { useBrowserBackButton } from "../hooks/useBrowserBackButton";
 
 type Supplier = {
     id: string;
@@ -16,7 +17,13 @@ type Supplier = {
 import { ConfirmationModal } from "../components/ui/ConfirmationModal";
 
 export default function Suppliers() {
+    const navigate = useNavigate();
     const { toast } = useToast();
+
+    // Handle browser back button
+    useBrowserBackButton(() => {
+        navigate('/');
+    });
 
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
     const [loading, setLoading] = useState(true);

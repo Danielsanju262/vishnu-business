@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useCallback } from "react";
 import { supabase } from "../lib/supabase";
 import { ArrowLeft, Trash2, Calendar, ShoppingBag, Wallet, Edit2, ChevronDown, TrendingUp, TrendingDown, ArrowUpDown, X, ChevronRight, User, CheckCircle2, Circle, MoreVertical, Download } from "lucide-react";
 import Papa from "papaparse";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { subDays, startOfMonth, startOfWeek } from "date-fns";
 import { Button } from "../components/ui/Button";
 import { cn } from "../lib/utils";
@@ -10,10 +10,12 @@ import { useToast } from "../components/toast-provider";
 import { Modal } from "../components/ui/Modal";
 import { useRealtimeTables } from "../hooks/useRealtimeSync";
 import { useDropdownClose } from "../hooks/useDropdownClose";
+import { useBrowserBackButton } from "../hooks/useBrowserBackButton";
 
 type DateRangeType = "today" | "yesterday" | "week" | "month" | "custom";
 
 export default function Reports() {
+    const navigate = useNavigate();
     const { toast, confirm } = useToast();
 
     // Filters
@@ -62,6 +64,21 @@ export default function Reports() {
     const [showExportModal, setShowExportModal] = useState(false);
     const [isExporting, setIsExporting] = useState(false);
 
+    // Handle browser back button
+    useBrowserBackButton(() => {
+        if (selectedDetail) {
+            setSelectedDetail(null);
+            return true;
+        } else if (showExportModal) {
+            setShowExportModal(false);
+            return true;
+        } else if (showFilters) {
+            setShowFilters(false);
+            return true;
+        } else {
+            navigate("/");
+        }
+    });
 
     // Long Press Refs
     const timerRef = useRef<any>(null);

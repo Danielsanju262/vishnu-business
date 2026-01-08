@@ -8,6 +8,7 @@ import { cn } from "../lib/utils";
 import { Modal } from "../components/ui/Modal";
 import { useDropdownClose } from "../hooks/useDropdownClose";
 import { ConfirmationModal } from "../components/ui/ConfirmationModal";
+import { useBrowserBackButton } from "../hooks/useBrowserBackButton";
 
 type Supplier = {
     id: string;
@@ -61,6 +62,22 @@ export default function SupplierPaymentDetail() {
     const { supplierId } = useParams<{ supplierId: string }>();
     const navigate = useNavigate();
     const { toast } = useToast();
+
+    // Handle browser back button
+    useBrowserBackButton(() => {
+        if (showAddPayable) {
+            setShowAddPayable(false);
+            return true;
+        } else if (showMakePayment) {
+            setShowMakePayment(false);
+            return true;
+        } else if (showEditDate) {
+            setShowEditDate(false);
+            return true;
+        } else {
+            navigate('/accounts-payable');
+        }
+    });
 
     const [supplier, setSupplier] = useState<Supplier | null>(null);
     const [payables, setPayables] = useState<Payable[]>([]);

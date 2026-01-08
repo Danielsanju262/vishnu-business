@@ -7,6 +7,7 @@ import { cn } from "../lib/utils";
 import { useToast } from "../components/toast-provider";
 import { useRealtimeTables } from "../hooks/useRealtimeSync";
 import { Modal } from "../components/ui/Modal";
+import { useBrowserBackButton } from "../hooks/useBrowserBackButton";
 
 type Customer = { id: string; name: string };
 type Product = { id: string; name: string; unit: string; category: string };
@@ -287,6 +288,29 @@ export default function NewSale() {
             document.removeEventListener('touchstart', handleClickOutside);
         };
     }, [showPayableSupplierList]);
+
+    // Handle browser back button to mimic on-screen back button
+    useBrowserBackButton(() => {
+        // Mimic the on-screen back button logic
+        if (step === "details") {
+            if (editingIndex !== null) {
+                setEditingIndex(null);
+                setTempProd(null);
+                setStep("cart");
+            } else {
+                setStep("product");
+            }
+            return true;
+        } else if (step === "product") {
+            setStep("cart");
+            return true;
+        } else if (step === "cart") {
+            setStep("customer");
+            return true;
+        } else if (step === "customer") {
+            navigate("/");
+        }
+    });
 
     // --- Actions ---
 
@@ -1318,7 +1342,7 @@ export default function NewSale() {
                                             setTempProd(null);
                                             setStep("cart");
                                         }}
-                                        className="absolute right-0 top-0 p-3 -mr-3 -mt-3 text-muted-foreground hover:text-destructive transition-colors bg-accent/50 rounded-full"
+                                        className="absolute right-4 top-0 p-3 -mt-3 text-muted-foreground hover:text-destructive transition-colors bg-accent/50 rounded-full"
                                     >
                                         <X size={30} strokeWidth={2.5} />
                                     </button>

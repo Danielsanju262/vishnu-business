@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { Button } from "../components/ui/Button";
 import { ArrowLeft, Trash2, Plus, User, Store, MoreVertical, CheckCircle2, Circle, X, Edit2 } from "lucide-react";
@@ -8,6 +8,7 @@ import { cn } from "../lib/utils";
 import { useRealtimeTable } from "../hooks/useRealtimeSync";
 import { useDropdownClose } from "../hooks/useDropdownClose";
 import { ConfirmationModal } from "../components/ui/ConfirmationModal";
+import { useBrowserBackButton } from "../hooks/useBrowserBackButton";
 
 type Customer = {
     id: string;
@@ -15,7 +16,13 @@ type Customer = {
 };
 
 export default function Customers() {
+    const navigate = useNavigate();
     const { toast } = useToast();
+
+    // Handle browser back button
+    useBrowserBackButton(() => {
+        navigate('/');
+    });
 
     const [customers, setCustomers] = useState<Customer[]>([]);
     const [loading, setLoading] = useState(true);

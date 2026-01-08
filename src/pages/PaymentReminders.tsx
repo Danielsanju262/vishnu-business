@@ -9,6 +9,7 @@ import { Link } from "react-router-dom";
 import { useRealtimeTable } from "../hooks/useRealtimeSync";
 import { Modal } from "../components/ui/Modal";
 import { useDropdownClose } from "../hooks/useDropdownClose";
+import { useBrowserBackButton } from "../hooks/useBrowserBackButton";
 
 type Customer = {
     id: string;
@@ -63,6 +64,25 @@ export default function PaymentReminders() {
     // Edit Due Date Modal
     const [editDateCustomer, setEditDateCustomer] = useState<{ id: string; name: string } | null>(null);
     const [editDateValue, setEditDateValue] = useState("");
+
+    // Handle browser back button
+    useBrowserBackButton(() => {
+        if (showNewReminder) {
+            setShowNewReminder(false);
+            return true;
+        } else if (quickActionCustomer) {
+            setQuickActionCustomer(null);
+            setActionType(null);
+            setAmount("");
+            setDueDate("");
+            return true;
+        } else if (editDateCustomer) {
+            setEditDateCustomer(null);
+            return true;
+        } else {
+            navigate("/");
+        }
+    });
 
     // Close dropdowns on ESC or click outside
     const listRef = useRef<HTMLDivElement>(null);
