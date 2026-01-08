@@ -54,21 +54,7 @@ export default function CustomerPaymentDetail() {
     const navigate = useNavigate();
     const { toast } = useToast();
 
-    // Handle browser back button
-    useBrowserBackButton(() => {
-        if (showAddDue) {
-            setShowAddDue(false);
-            return true;
-        } else if (showReceivePayment) {
-            setShowReceivePayment(false);
-            return true;
-        } else if (showEditDate) {
-            setShowEditDate(false);
-            return true;
-        } else {
-            navigate('/payment-reminders');
-        }
-    });
+
 
     // ... (state vars)
     const [customer, setCustomer] = useState<Customer | null>(null);
@@ -92,6 +78,19 @@ export default function CustomerPaymentDetail() {
     const [receiveAmount, setReceiveAmount] = useState("");
     const [showEditDate, setShowEditDate] = useState(false);
     const [newDueDate, setNewDueDate] = useState("");
+
+    // Handle browser back button
+    const isModalOpen = showAddDue || showReceivePayment || showEditDate;
+
+    useBrowserBackButton(() => {
+        if (showAddDue) {
+            setShowAddDue(false);
+        } else if (showReceivePayment) {
+            setShowReceivePayment(false);
+        } else if (showEditDate) {
+            setShowEditDate(false);
+        }
+    }, isModalOpen);
 
     const [confirmConfig, setConfirmConfig] = useState<{
         isOpen: boolean;

@@ -42,11 +42,8 @@ export default function NewExpense() {
     useBrowserBackButton(() => {
         if (isManageMode) {
             setIsManageMode(false);
-            return true;
-        } else {
-            navigate("/");
         }
-    });
+    }, isManageMode);
 
     // Preset Form
     const [presetName, setPresetName] = useState("");

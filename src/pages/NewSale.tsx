@@ -290,6 +290,7 @@ export default function NewSale() {
     }, [showPayableSupplierList]);
 
     // Handle browser back button to mimic on-screen back button
+    // Handle browser back button to mimic on-screen back button
     useBrowserBackButton(() => {
         // Mimic the on-screen back button logic
         if (step === "details") {
@@ -300,17 +301,12 @@ export default function NewSale() {
             } else {
                 setStep("product");
             }
-            return true;
         } else if (step === "product") {
             setStep("cart");
-            return true;
         } else if (step === "cart") {
             setStep("customer");
-            return true;
-        } else if (step === "customer") {
-            navigate("/");
         }
-    });
+    }, step !== "customer");
 
     // --- Actions ---
 

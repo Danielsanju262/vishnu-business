@@ -66,23 +66,20 @@ export default function PaymentReminders() {
     const [editDateValue, setEditDateValue] = useState("");
 
     // Handle browser back button
+    const isModalOpen = showNewReminder || !!quickActionCustomer || !!editDateCustomer;
+
     useBrowserBackButton(() => {
         if (showNewReminder) {
             setShowNewReminder(false);
-            return true;
         } else if (quickActionCustomer) {
             setQuickActionCustomer(null);
             setActionType(null);
             setAmount("");
             setDueDate("");
-            return true;
         } else if (editDateCustomer) {
             setEditDateCustomer(null);
-            return true;
-        } else {
-            navigate("/");
         }
-    });
+    }, isModalOpen);
 
     // Close dropdowns on ESC or click outside
     const listRef = useRef<HTMLDivElement>(null);
