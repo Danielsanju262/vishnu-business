@@ -7,9 +7,25 @@ import { Link } from "react-router-dom";
 import { cn } from "../lib/utils";
 import { useRealtimeTables } from "../hooks/useRealtimeSync";
 import { Modal } from "../components/ui/Modal";
+import { useBrowserBackButton } from "../hooks/useBrowserBackButton";
 
 export default function Dashboard() {
     const { lockApp } = useAuth();
+
+    useBrowserBackButton(() => {
+        if (showCustomDateModal) {
+            setShowCustomDateModal(false);
+            return true;
+        }
+        if (showFilterDropdown) {
+            setShowFilterDropdown(false);
+            return true;
+        }
+        if (isEditingName) {
+            setIsEditingName(false);
+            return true;
+        }
+    });
     const [stats, setStats] = useState({
         revenue: 0,
         profit: 0,

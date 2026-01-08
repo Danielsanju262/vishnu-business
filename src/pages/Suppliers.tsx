@@ -21,7 +21,26 @@ export default function Suppliers() {
     const { toast } = useToast();
 
     // Handle browser back button
+    // Handle browser back button
     useBrowserBackButton(() => {
+        if (confirmConfig.isOpen) {
+            closeConfirm();
+            return true;
+        }
+        if (activeMenuId) {
+            setActiveMenuId(null);
+            return true;
+        }
+        if (isSelectionMode) {
+            toggleSelectionMode();
+            return true;
+        }
+        if (isAdding) {
+            setIsAdding(false);
+            setNewName("");
+            setEditingId(null);
+            return true;
+        }
         navigate('/');
     });
 

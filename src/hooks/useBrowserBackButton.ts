@@ -28,7 +28,7 @@ export function useBrowserBackButton(
         checkPointUrl.current = window.location.href;
         window.history.pushState(null, '', checkPointUrl.current);
 
-        const handlePopState = (e: PopStateEvent) => {
+        const handlePopState = () => {
             // We've already popped here. The URL might have changed to the previous page.
 
             // Call the callback to see if we should trap (stay) or let go

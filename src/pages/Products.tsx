@@ -23,7 +23,24 @@ export default function Products() {
     const { toast } = useToast();
 
     // Handle browser back button
+    // Handle browser back button
     useBrowserBackButton(() => {
+        if (confirmConfig.isOpen) {
+            closeConfirm();
+            return true;
+        }
+        if (activeMenuId) {
+            setActiveMenuId(null);
+            return true;
+        }
+        if (isSelectionMode) {
+            toggleSelectionMode();
+            return true;
+        }
+        if (isAdding) {
+            cleanForm();
+            return true;
+        }
         navigate('/');
     });
 
