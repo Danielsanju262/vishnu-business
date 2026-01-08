@@ -304,29 +304,30 @@ export default function NewSale() {
             } else {
                 setStep("product");
             }
-            return true;
         } else if (step === "product") {
             // If product search input is focused, blur it first (close keyboard)
             if (productSearchInputRef.current && document.activeElement === productSearchInputRef.current) {
                 productSearchInputRef.current.blur();
-                return true; // Stay on page, keyboard will close
+                // We don't return here, just fall through (though in this case preventing default isn't controlled by return)
+                // Actually with the new hook, we just perform side effects.
+                // But wait, if we just blur, we probably WANT to stay on the page.
+                // The hook already consumed the back event. So effectively we ARE staying on the page unless we navigate elsewhere.
+                return;
             }
             // Otherwise, go back to cart
             setStep("cart");
-            return true;
         } else if (step === "cart") {
             setStep("customer");
-            return true;
         } else if (step === "customer") {
             // If customer search input is focused, blur it first (close keyboard)
             if (customerSearchInputRef.current && document.activeElement === customerSearchInputRef.current) {
                 customerSearchInputRef.current.blur();
-                return true; // Stay on page, keyboard will close
+                return;
             }
             // Otherwise, navigate to home
             navigate("/");
         }
-    });
+    }, step !== "customer" || !!search);
 
     // --- Actions ---
 
