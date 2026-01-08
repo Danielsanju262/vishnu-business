@@ -133,6 +133,10 @@ export default function NewSale() {
     const [newItemName, setNewItemName] = useState("");
     const [newItemUnit, setNewItemUnit] = useState("kg");
 
+    // Refs to track input focus for keyboard handling
+    const customerSearchInputRef = useRef<HTMLInputElement>(null);
+    const productSearchInputRef = useRef<HTMLInputElement>(null);
+
     const fetchData = useCallback(async () => {
         const [custRes, prodRes, supRes] = await Promise.all([
             supabase.from("customers").select("*").eq('is_active', true).order("name"),
@@ -302,12 +306,24 @@ export default function NewSale() {
             }
             return true;
         } else if (step === "product") {
+            // If product search input is focused, blur it first (close keyboard)
+            if (productSearchInputRef.current && document.activeElement === productSearchInputRef.current) {
+                productSearchInputRef.current.blur();
+                return true; // Stay on page, keyboard will close
+            }
+            // Otherwise, go back to cart
             setStep("cart");
             return true;
         } else if (step === "cart") {
             setStep("customer");
             return true;
         } else if (step === "customer") {
+            // If customer search input is focused, blur it first (close keyboard)
+            if (customerSearchInputRef.current && document.activeElement === customerSearchInputRef.current) {
+                customerSearchInputRef.current.blur();
+                return true; // Stay on page, keyboard will close
+            }
+            // Otherwise, navigate to home
             navigate("/");
         }
     });
@@ -674,8 +690,25 @@ export default function NewSale() {
                             setStep("product");
                             return;
                         }
-                        if (step === "product") { setStep("cart"); return; }
+                        if (step === "product") {
+                            // If product search input is focused, blur it first (close keyboard)
+                            if (productSearchInputRef.current && document.activeElement === productSearchInputRef.current) {
+                                productSearchInputRef.current.blur();
+                                return;
+                            }
+                            setStep("cart");
+                            return;
+                        }
                         if (step === "cart") { setStep("customer"); return; }
+                        if (step === "customer") {
+                            // If customer search input is focused, blur it first (close keyboard)
+                            if (customerSearchInputRef.current && document.activeElement === customerSearchInputRef.current) {
+                                customerSearchInputRef.current.blur();
+                                return;
+                            }
+                            navigate("/");
+                            return;
+                        }
                         navigate("/");
                     }}
                     onKeyDown={(e) => {
@@ -708,6 +741,7 @@ export default function NewSale() {
                     <div className="flex-1 flex flex-col animate-in slide-in-from-right-4 duration-300">
                         <div className="relative mb-6">
                             <input
+                                ref={customerSearchInputRef}
                                 className="w-full bg-accent/30 border border-border/30 px-4 py-3 md:py-2.5 rounded-xl focus:ring-2 focus:ring-primary focus:bg-background outline-none text-base text-foreground transition-all h-12 md:h-auto"
                                 placeholder="Search customer..."
                                 value={search}
@@ -1253,6 +1287,7 @@ export default function NewSale() {
                         <div className="flex-1 flex flex-col animate-in slide-in-from-right-4 duration-300">
                             <div className="relative mb-6">
                                 <input
+                                    ref={productSearchInputRef}
                                     className="w-full bg-accent/50 border border-border/50 px-4 py-3.5 rounded-2xl focus:ring-2 focus:ring-primary focus:bg-background outline-none text-lg text-foreground transition-all shadow-sm"
                                     placeholder="Search product..."
                                     value={search}
