@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+
+import { useEffect, useRef } from 'react';
 
 /**
  * Hook to handle browser back button behavior
@@ -14,8 +15,6 @@ export function useBrowserBackButton(
     const onBackRef = useRef(onBack);
     // Track if we currently own a history trap
     const isTrapped = useRef(false);
-    // Trigger to force re-evaluation after popstate
-    const [tick, setTick] = useState(0);
 
     useEffect(() => {
         onBackRef.current = onBack;
@@ -29,26 +28,26 @@ export function useBrowserBackButton(
         }
         // If becoming inactive but strictly trapped, remove trap
         else if (!isActive && isTrapped.current) {
-            // We assume if isTrapped is true, we haven't popped it yet.
-            // This handles the case where the user closes the modal via UI button (not back button)
-            window.history.back();
+            // Important: Mark as not trapped BEFORE calling back() to prevent
+            // the popstate handler from re-trapping
             isTrapped.current = false;
+            window.history.back();
         }
-    }, [isActive, tick]);
+    }, [isActive]);
 
     useEffect(() => {
         const handlePopState = () => {
-            // If we were trapped, and a pop happens, it means the trap was consumed.
+            // If we were trapped, and a pop happens, it means the user tried to go back.
             if (isTrapped.current) {
-                isTrapped.current = false;
+                // IMMEDIATE TRAP RESTORATION
+                // We push state immediately to effectively "cancel" the back navigation from the user's perspective
+                // and keep the history stack size constant.
+                window.history.pushState({ trap: true, id: Date.now() }, '', window.location.href);
 
-                // Allow browser to settle the pop event before re-evaluating
-                setTimeout(() => {
-                    // Notify parent to handle the "Back" intent (e.g. close modal)
+                // Now we handle the logical "back" action (e.g., change modal state)
+                if (onBackRef.current) {
                     onBackRef.current();
-                    // Force re-evaluation to potentially restore trap
-                    setTick(t => t + 1);
-                }, 10);
+                }
             }
         };
 
