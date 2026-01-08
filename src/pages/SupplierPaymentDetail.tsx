@@ -428,7 +428,7 @@ export default function SupplierPaymentDetail() {
         const newAmount = primaryPayable.amount + parseFloat(payableAmount);
         const today = new Date();
         const dateStr = today.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-        const timeStr = today.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+        const timeStr = today.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
 
         let newNote = primaryPayable.note || "";
         if (newNote) newNote += "\n";
@@ -471,7 +471,7 @@ export default function SupplierPaymentDetail() {
         const newBalance = primaryPayable.amount - paid;
         const today = new Date();
         const dateStr = today.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-        const timeStr = today.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+        const timeStr = today.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
 
         let newNote = primaryPayable.note || "";
         if (newNote) newNote += "\n";
@@ -939,21 +939,25 @@ export default function SupplierPaymentDetail() {
                 <div className="h-24 md:h-28" />
 
                 {/* Balance Card */}
-                <div className="bg-gradient-to-br from-rose-500 to-rose-600 dark:from-rose-600 dark:to-rose-700 rounded-2xl p-6 mb-6 text-white shadow-xl">
-                    <p className="text-sm opacity-90 mb-1">Current Balance Due</p>
-                    <p className="text-4xl font-black mb-6">₹{totalBalance.toLocaleString()}</p>
-                    <div className="flex items-center gap-3">
+                <div className="bg-gradient-to-br from-rose-500 to-rose-600 dark:from-rose-600 dark:to-rose-700 rounded-2xl p-4 md:p-5 mb-6 text-white shadow-xl">
+                    <div className="flex items-center justify-between gap-4">
                         <div className="flex-1">
-                            <p className="text-xs opacity-75 mb-1">Due Date</p>
-                            <p className="text-base font-bold">{earliestDueDate ? new Date(earliestDueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A'}</p>
+                            <p className="text-xs opacity-75 mb-1">Current Balance Due</p>
+                            <p className="text-3xl md:text-4xl font-black">₹{totalBalance.toLocaleString()}</p>
                         </div>
-                        <button
-                            onClick={() => { setNewDueDate(earliestDueDate || ''); setShowEditDate(true); }}
-                            className="p-2 rounded-lg hover:bg-white/20 transition-colors"
-                            aria-label="Edit due date"
-                        >
-                            <Edit2 size={16} />
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <div className="text-right">
+                                <p className="text-xs opacity-75 mb-1">Due Date</p>
+                                <p className="text-sm md:text-base font-bold">{earliestDueDate ? new Date(earliestDueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A'}</p>
+                            </div>
+                            <button
+                                onClick={() => { setNewDueDate(earliestDueDate || ''); setShowEditDate(true); }}
+                                className="p-2 rounded-lg hover:bg-white/20 transition-colors"
+                                aria-label="Edit due date"
+                            >
+                                <Edit2 size={16} />
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -1045,49 +1049,53 @@ export default function SupplierPaymentDetail() {
                                                 </div>
                                             )}
                                             <div className="flex-1">
-                                                <div className="flex items-center gap-2 mb-0">
-                                                    <span className={cn(
-                                                        "text-base font-bold",
-                                                        txn.type === 'payment_made' ? "text-emerald-600 dark:text-emerald-400" :
-                                                            txn.type === 'credit_purchase' ? "text-blue-600 dark:text-blue-400" :
-                                                                "text-orange-600 dark:text-orange-400"
-                                                    )}>
-                                                        {txn.type === 'payment_made' ? 'Payment Made' :
-                                                            txn.type === 'credit_purchase' ? 'Credit Purchase' :
-                                                                'Payable Added'}
-                                                    </span>
-                                                    {!isSelectionMode && isEditable && (
-                                                        <button
-                                                            onClick={(e) => { e.stopPropagation(); setEditingIndex(actualIndex); }}
-                                                            className="p-2 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-1"
-                                                            aria-label="Edit transaction"
-                                                        >
-                                                            <Edit2 size={14} className="text-zinc-400" strokeWidth={2.5} />
-                                                        </button>
-                                                    )}
-                                                    {!isSelectionMode && (
-                                                        <button
-                                                            onClick={(e) => { e.stopPropagation(); handleDeleteTransaction(actualIndex); }}
-                                                            className="p-2 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-1"
-                                                            aria-label="Delete transaction"
-                                                        >
-                                                            <Trash2 size={14} className="text-zinc-400 hover:text-red-500" strokeWidth={2.5} />
-                                                        </button>
-                                                    )}
+                                                <div className="flex items-center justify-between mb-0">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={cn(
+                                                            "text-base md:text-lg font-bold",
+                                                            txn.type === 'payment_made' ? "text-emerald-600 dark:text-emerald-400" :
+                                                                txn.type === 'credit_purchase' ? "text-blue-600 dark:text-blue-400" :
+                                                                    "text-orange-600 dark:text-orange-400"
+                                                        )}>
+                                                            {txn.type === 'payment_made' ? 'Payment Made' :
+                                                                txn.type === 'credit_purchase' ? 'Credit Purchase' :
+                                                                    'Payable Added'}
+                                                        </span>
+                                                        {!isSelectionMode && (
+                                                            <div className="flex items-center gap-0">
+                                                                {isEditable && (
+                                                                    <button
+                                                                        onClick={(e) => { e.stopPropagation(); setEditingIndex(actualIndex); }}
+                                                                        className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-1"
+                                                                        aria-label="Edit transaction"
+                                                                    >
+                                                                        <Edit2 size={14} className="text-zinc-400" strokeWidth={2.5} />
+                                                                    </button>
+                                                                )}
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); handleDeleteTransaction(actualIndex); }}
+                                                                    className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-1"
+                                                                    aria-label="Delete transaction"
+                                                                >
+                                                                    <Trash2 size={14} className="text-zinc-400 hover:text-red-500" strokeWidth={2.5} />
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className={cn(
+                                                            "text-base md:text-lg font-bold",
+                                                            txn.type === 'payment_made' ? "text-emerald-600 dark:text-emerald-400" :
+                                                                txn.type === 'credit_purchase' ? "text-blue-600 dark:text-blue-400" :
+                                                                    "text-orange-600 dark:text-orange-400"
+                                                        )}>
+                                                            {txn.type === 'payment_made' ? '-' : '+'}₹{txn.amount.toLocaleString()}
+                                                        </p>
+                                                        <p className="text-xs text-zinc-500">Balance: ₹{txn.balance.toLocaleString()}</p>
+                                                    </div>
                                                 </div>
                                                 <p className="text-xs text-zinc-500 font-medium">{formatDateWithOrdinal(txn.date)}{txn.time ? ` • ${txn.time}` : ''}</p>
                                                 {txn.note && <p className="text-xs text-blue-500 mt-1">{txn.note}</p>}
-                                            </div>
-                                            <div className="text-right">
-                                                <p className={cn(
-                                                    "text-lg font-bold",
-                                                    txn.type === 'payment_made' ? "text-emerald-600 dark:text-emerald-400" :
-                                                        txn.type === 'credit_purchase' ? "text-blue-600 dark:text-blue-400" :
-                                                            "text-orange-600 dark:text-orange-400"
-                                                )}>
-                                                    {txn.type === 'payment_made' ? '-' : '+'}₹{txn.amount.toLocaleString()}
-                                                </p>
-                                                <p className="text-xs text-zinc-500">Balance: ₹{txn.balance.toLocaleString()}</p>
                                             </div>
                                         </div>
                                     </div>
@@ -1104,11 +1112,10 @@ export default function SupplierPaymentDetail() {
                     <div>
                         <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Amount</label>
                         <div className="relative mt-1">
-                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 font-bold">₹</span>
                             <input
                                 type="number"
                                 autoFocus
-                                className="w-full bg-zinc-50 dark:bg-zinc-800 border-2 border-zinc-200 dark:border-zinc-700 focus:border-orange-500 rounded-xl pl-9 pr-4 h-12 text-lg font-bold outline-none transition-all"
+                                className="w-full bg-zinc-50 dark:bg-zinc-800 border-2 border-zinc-200 dark:border-zinc-700 focus:border-orange-500 rounded-xl px-4 h-12 text-lg font-bold outline-none transition-all"
                                 placeholder="0"
                                 value={payableAmount}
                                 onChange={e => setPayableAmount(e.target.value)}
@@ -1149,11 +1156,10 @@ export default function SupplierPaymentDetail() {
                     <div>
                         <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Amount Paid</label>
                         <div className="relative mt-1">
-                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 font-bold">₹</span>
                             <input
                                 type="number"
                                 autoFocus
-                                className="w-full bg-zinc-50 dark:bg-zinc-800 border-2 border-zinc-200 dark:border-zinc-700 focus:border-emerald-500 rounded-xl pl-9 pr-20 h-14 text-xl font-bold outline-none transition-all"
+                                className="w-full bg-zinc-50 dark:bg-zinc-800 border-2 border-zinc-200 dark:border-zinc-700 focus:border-emerald-500 rounded-xl px-4 pr-20 h-14 text-xl font-bold outline-none transition-all"
                                 placeholder="0"
                                 value={paymentAmount}
                                 onChange={e => setPaymentAmount(e.target.value)}
@@ -1188,12 +1194,11 @@ export default function SupplierPaymentDetail() {
                         <div>
                             <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Correct Amount</label>
                             <div className="relative mt-1">
-                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 font-bold text-lg">₹</span>
                                 <input
                                     type="number"
                                     autoFocus
                                     key={editingIndex}
-                                    className="w-full bg-zinc-50 dark:bg-zinc-800 border-2 border-zinc-200 dark:border-zinc-700 focus:border-violet-500 rounded-xl pl-9 pr-4 h-14 text-xl font-bold outline-none transition-all"
+                                    className="w-full bg-zinc-50 dark:bg-zinc-800 border-2 border-zinc-200 dark:border-zinc-700 focus:border-violet-500 rounded-xl px-4 h-14 text-xl font-bold outline-none transition-all"
                                     defaultValue={transactions[editingIndex >= transactions.length ? transactions.length - 1 : editingIndex].amount}
                                     id="edit-amount"
                                 />

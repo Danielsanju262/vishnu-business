@@ -7,7 +7,6 @@ import { cn } from "../lib/utils";
 import { useToast } from "../components/toast-provider";
 import { useRealtimeTables } from "../hooks/useRealtimeSync";
 import { Modal } from "../components/ui/Modal";
-import { useDropdownClose } from "../hooks/useDropdownClose";
 
 type Customer = { id: string; name: string };
 type Product = { id: string; name: string; unit: string; category: string };
@@ -226,8 +225,46 @@ export default function NewSale() {
         }
     };
 
+    const handleTouchMove = () => {
+        if (timerRef.current) {
+            clearTimeout(timerRef.current);
+            timerRef.current = null;
+        }
+    };
+
     // Close menu when clicking outside or pressing ESC
-    useDropdownClose(activeMenuIndex !== null, () => setActiveMenuIndex(null));
+    useEffect(() => {
+        if (activeMenuIndex === null) return;
+
+        const handleClickOutside = (event: MouseEvent | TouchEvent) => {
+            const target = event.target as HTMLElement;
+            // Don't close if clicking on the menu trigger button or menu content
+            if (target.closest('.menu-trigger') || target.closest('.menu-content')) {
+                return;
+            }
+            setActiveMenuIndex(null);
+        };
+
+        const handleEscape = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                setActiveMenuIndex(null);
+            }
+        };
+
+        // Small delay to avoid closing on the same click that opened it
+        const timeoutId = setTimeout(() => {
+            document.addEventListener('mousedown', handleClickOutside);
+            document.addEventListener('touchstart', handleClickOutside);
+            window.addEventListener('keydown', handleEscape);
+        }, 10);
+
+        return () => {
+            clearTimeout(timeoutId);
+            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('touchstart', handleClickOutside);
+            window.removeEventListener('keydown', handleEscape);
+        };
+    }, [activeMenuIndex]);
 
     // Close supplier list when clicking outside (separate handling)
     useEffect(() => {
@@ -448,7 +485,7 @@ export default function NewSale() {
             const pAmount = parseFloat(payableAmount);
             const today = new Date();
             const dateStr = today.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-            const timeStr = today.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+            const timeStr = today.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
 
             if (existingPayable) {
                 // Update existing
@@ -512,7 +549,7 @@ export default function NewSale() {
             if (remaining > 0) {
                 const today = new Date();
                 const dateStr = today.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-                const timeStr = today.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+                const timeStr = today.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
 
                 // Check if a pending reminder already exists for this customer
                 const { data: existingReminder } = await supabase
@@ -751,7 +788,7 @@ export default function NewSale() {
                                     }
                                 }}
                                 tabIndex={0}
-                                className="relative z-10 px-4 py-2.5 bg-white/10 hover:bg-white/20 rounded-full text-[10px] md:text-xs font-bold backdrop-blur-md transition border border-white/10 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-1"
+                                className="relative z-10 px-5 py-3 bg-white/10 hover:bg-white/20 rounded-full text-xs md:text-sm font-bold backdrop-blur-md transition border border-white/10 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-1"
                                 aria-label="Change customer"
                             >
                                 Change
@@ -802,7 +839,7 @@ export default function NewSale() {
                                     <p className="text-sm opacity-70">Tap anywhere to add products</p>
                                 </button>
                             ) : (
-                                <div className="space-y-3 relative z-0">
+                                <div className="space-y-3 relative">
                                     {cart.map((item, idx) => (
                                         <div
                                             key={idx}
@@ -819,6 +856,7 @@ export default function NewSale() {
                                                     onContextMenu={(e) => e.preventDefault()}
                                                     onTouchStart={() => handleTouchStart(idx)}
                                                     onTouchEnd={handleTouchEnd}
+                                                    onTouchMove={handleTouchMove}
                                                     onMouseDown={() => handleTouchStart(idx)}
                                                     onMouseUp={handleTouchEnd}
                                                     onMouseLeave={handleTouchEnd}
@@ -945,7 +983,7 @@ export default function NewSale() {
                                     }
                                 }}
                                 tabIndex={0}
-                                className="flex justify-between items-center mb-2 cursor-pointer w-full text-left focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 rounded-lg p-1 -m-1"
+                                className="flex justify-between items-center mb-2 cursor-pointer w-full text-left focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 rounded-lg p-1 -m-1 relative z-0"
                                 aria-label={`${isLinkedPayable ? 'Disable' : 'Enable'} linked supplier payment`}
                             >
                                 <div>
@@ -1108,14 +1146,14 @@ export default function NewSale() {
                                     }}
                                     tabIndex={0}
                                     className={cn(
-                                        "flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1",
+                                        "w-full flex items-center justify-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1",
                                         addToOutstanding
                                             ? "border-amber-500 bg-amber-50 dark:bg-amber-900/10"
                                             : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
                                     )}
                                     aria-label={`${addToOutstanding ? 'Disable' : 'Enable'} credit sale`}
                                 >
-                                    <div className="flex flex-col">
+                                    <div className="flex flex-col items-center text-center">
                                         <span className="font-bold text-sm">Add to Outstanding?</span>
                                         <span className="text-xs text-muted-foreground">Is this a credit/partial payment?</span>
                                     </div>
@@ -1136,13 +1174,12 @@ export default function NewSale() {
                                         <div>
                                             <label className="text-xs font-bold text-muted-foreground ml-1 uppercase tracking-wider">Paid Now</label>
                                             <div className="relative mt-1">
-                                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold text-lg">₹</span>
                                                 <input
                                                     type="number"
                                                     min="0"
                                                     step="0.01"
                                                     autoFocus
-                                                    className="w-full bg-background border-2 border-zinc-200 dark:border-zinc-700 focus:border-amber-500 dark:focus:border-amber-500 rounded-xl pl-9 pr-4 h-14 text-xl font-bold outline-none transition-all placeholder:text-muted-foreground/30"
+                                                    className="w-full bg-background border-2 border-zinc-200 dark:border-zinc-700 focus:border-amber-500 dark:focus:border-amber-500 rounded-xl px-4 h-14 text-xl font-bold outline-none transition-all placeholder:text-muted-foreground/30"
                                                     placeholder="0"
                                                     value={paidNowAmount}
                                                     onChange={e => setPaidNowAmount(e.target.value)}
@@ -1311,10 +1348,9 @@ export default function NewSale() {
                                         <div>
                                             <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2 block ml-1">Selling Rate</label>
                                             <div className="relative">
-                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-bold text-lg">₹</span>
                                                 <input
                                                     type="number"
-                                                    className="w-full bg-accent/50 border border-border/50 rounded-2xl py-3.5 pl-10 pr-3 text-xl font-bold text-center text-foreground outline-none focus:ring-2 focus:ring-primary focus:bg-background transition-all"
+                                                    className="w-full bg-accent/50 border border-border/50 rounded-2xl py-3.5 px-3 text-xl font-bold text-center text-foreground outline-none focus:ring-2 focus:ring-primary focus:bg-background transition-all"
                                                     placeholder="0"
                                                     value={sellPrice}
                                                     onChange={e => setSellPrice(e.target.value)}
@@ -1324,10 +1360,9 @@ export default function NewSale() {
                                         <div className={tempProd.category === 'ghee' ? "opacity-50 pointer-events-none" : ""}>
                                             <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2 block ml-1">{tempProd.category === 'ghee' ? "Auto Calc" : "Buying Rate"}</label>
                                             <div className="relative">
-                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-bold text-lg">₹</span>
                                                 <input
                                                     type="number"
-                                                    className="w-full bg-accent/50 border border-border/50 rounded-2xl py-3.5 pl-10 pr-3 text-xl font-bold text-center text-foreground outline-none focus:ring-2 focus:ring-primary focus:bg-background transition-all"
+                                                    className="w-full bg-accent/50 border border-border/50 rounded-2xl py-3.5 px-3 text-xl font-bold text-center text-foreground outline-none focus:ring-2 focus:ring-primary focus:bg-background transition-all"
                                                     placeholder="0"
                                                     value={buyPrice}
                                                     onChange={e => setBuyPrice(e.target.value)}

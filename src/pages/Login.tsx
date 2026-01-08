@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useToast } from '../components/toast-provider';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Lock, Mail, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
 
 export default function Login() {
     const { toast } = useToast();
@@ -59,13 +59,12 @@ export default function Login() {
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-foreground">Email</label>
                         <div className="relative">
-                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
                             <Input
                                 type="email"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 placeholder="you@example.com"
-                                className="pl-10 h-12"
+                                className="px-4 h-12"
                                 required
                             />
                         </div>
@@ -74,13 +73,12 @@ export default function Login() {
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-foreground">Password</label>
                         <div className="relative">
-                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
                             <Input
                                 type={showPassword ? "text" : "password"}
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 placeholder="••••••••"
-                                className="pl-10 pr-10 h-12"
+                                className="px-4 pr-10 h-12"
                                 required
                                 minLength={6}
                             />

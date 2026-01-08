@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useToast } from '../components/toast-provider';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Lock, Shield, Loader2, KeyRound, Fingerprint } from 'lucide-react';
+import { Shield, Loader2, KeyRound, Fingerprint } from 'lucide-react';
 
 export default function MasterPinSetup({ onSuccess }: { onSuccess: () => void }) {
     const { toast } = useToast();
@@ -157,14 +157,13 @@ export default function MasterPinSetup({ onSuccess }: { onSuccess: () => void })
                             {hasExistingPin ? "Master PIN" : "Create PIN (4-6 digits)"}
                         </label>
                         <div className="relative">
-                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
                             <Input
                                 type="password"
                                 inputMode="numeric"
                                 value={pin}
                                 onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
                                 placeholder="••••••"
-                                className="pl-10 h-14 text-center text-2xl font-black tracking-[0.5em]"
+                                className="px-4 h-14 text-center text-2xl font-black tracking-[0.5em]"
                                 required
                                 autoFocus
                             />

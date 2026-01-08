@@ -324,9 +324,9 @@ export default function Dashboard() {
                         ) : (
                             // Stats Content
                             <>
-                                <div className="flex justify-center gap-5 md:gap-12 text-center text-left md:text-left">
-                                    <div className="space-y-2">
-                                        <p className="text-white/50 font-medium text-[10px] uppercase tracking-wider">
+                                <div className="flex justify-center gap-6 md:gap-16 text-center">
+                                    <div className="space-y-1 flex flex-col items-start">
+                                        <p className="text-white/50 font-medium text-[10px] uppercase tracking-wider text-center w-full">
                                             {dateFilter === 'today' ? 'Revenue (Today)' :
                                                 dateFilter === 'yesterday' ? 'Revenue (Yesterday)' :
                                                     dateFilter === 'thisWeek' ? 'Revenue (This Week)' :
@@ -334,12 +334,12 @@ export default function Dashboard() {
                                                             'Revenue (Custom)'}
                                         </p>
                                         <h2 className="text-3xl font-bold text-white tracking-tight">
-                                            <span className="text-lg align-top opacity-50 font-normal mr-0.5">₹</span>
+                                            <span className="text-lg align-top opacity-50 font-normal ml-1">₹</span>
                                             {stats.revenue.toLocaleString()}
                                         </h2>
                                     </div>
-                                    <div className="space-y-2">
-                                        <p className="text-white/50 font-medium text-[10px] uppercase tracking-wider">Net Profit</p>
+                                    <div className="space-y-1 flex flex-col items-end">
+                                        <p className="text-white/50 font-medium text-[10px] uppercase tracking-wider text-center w-full">Net Profit</p>
                                         <h2 className={cn(
                                             "text-3xl font-bold tracking-tight flex items-center gap-1",
                                             stats.profit >= 0 ? "text-emerald-400" : "text-rose-400"

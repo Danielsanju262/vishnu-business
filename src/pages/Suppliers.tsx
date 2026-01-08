@@ -50,14 +50,19 @@ export default function Suppliers() {
     const timerRef = useRef<any>(null);
 
     const handleTouchStart = (id: string, currentSelected: boolean) => {
+        const touchStartId = id;
         timerRef.current = setTimeout(() => {
             if (navigator.vibrate) navigator.vibrate(50);
             if (!isSelectionMode) setIsSelectionMode(true);
-            if (!currentSelected) toggleSelection(id);
+            if (!currentSelected) toggleSelection(touchStartId);
         }, 500);
     };
 
     const handleTouchEnd = () => {
+        if (timerRef.current) clearTimeout(timerRef.current);
+    };
+
+    const handleTouchMove = () => {
         if (timerRef.current) clearTimeout(timerRef.current);
     };
 
@@ -216,7 +221,7 @@ export default function Suppliers() {
         <div className="min-h-screen bg-background pb-28 md:pb-32 w-full md:max-w-2xl md:mx-auto px-3 md:px-4">
             {/* Header / Bulk Header */}
             {isSelectionMode ? (
-                <div className="fixed top-0 left-0 right-0 z-40 bg-card px-4 py-3 border-b border-border shadow-sm flex items-center justify-between">
+                <div className="fixed top-0 left-0 right-0 z-40 bg-white dark:bg-gray-900 px-4 py-3 border-b border-border shadow-sm flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <Button size="icon" variant="ghost" onClick={toggleSelectionMode}>
                             <X size={20} />
@@ -278,7 +283,7 @@ export default function Suppliers() {
                         <input
                             type="text"
                             placeholder="Search suppliers..."
-                            className="w-full px-4 h-12 rounded-xl bg-accent/50 border-transparent focus:bg-background focus:border-ring transition-all"
+                            className="w-full px-4 h-12 rounded-xl bg-background border-2 border-border focus:border-ring transition-all"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                         />
@@ -353,6 +358,7 @@ export default function Suppliers() {
                                         className="flex justify-between items-center"
                                         onTouchStart={() => handleTouchStart(s.id, selectedIds.has(s.id))}
                                         onTouchEnd={handleTouchEnd}
+                                        onTouchMove={handleTouchMove}
                                         onMouseDown={() => handleTouchStart(s.id, selectedIds.has(s.id))}
                                         onMouseUp={handleTouchEnd}
                                         onMouseLeave={handleTouchEnd}

@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useCallback } from "react";
 import { supabase } from "../lib/supabase";
-import { ArrowLeft, Trash2, Calendar, ShoppingBag, Wallet, Edit2, ChevronDown, TrendingUp, TrendingDown, Search, ArrowUpDown, X, ChevronRight, User, CheckCircle2, Circle, MoreVertical, Download } from "lucide-react";
+import { ArrowLeft, Trash2, Calendar, ShoppingBag, Wallet, Edit2, ChevronDown, TrendingUp, TrendingDown, ArrowUpDown, X, ChevronRight, User, CheckCircle2, Circle, MoreVertical, Download } from "lucide-react";
 import Papa from "papaparse";
 import { Link } from "react-router-dom";
 import { subDays, startOfMonth, startOfWeek } from "date-fns";
@@ -860,12 +860,11 @@ export default function Reports() {
                         {/* Search & Sort */}
                         <div className="flex gap-2">
                             <div className="flex-1 relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={14} />
                                 <input
                                     placeholder="Search customer..."
                                     value={customerSearch}
                                     onChange={e => setCustomerSearch(e.target.value)}
-                                    className="w-full bg-card pl-9 pr-4 py-3 md:py-2.5 rounded-xl border border-border text-sm font-semibold focus:ring-2 focus:ring-primary outline-none transition-all placeholder:font-medium h-12 md:h-auto"
+                                    className="w-full bg-card px-4 py-3 md:py-2.5 rounded-xl border border-border text-sm font-semibold focus:ring-2 focus:ring-primary outline-none transition-all placeholder:font-medium h-12 md:h-auto"
                                 />
                             </div>
                             <button

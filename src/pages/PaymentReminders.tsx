@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { Button } from "../components/ui/Button";
-import { ArrowLeft, Plus, Receipt, IndianRupee, Calendar, WifiOff, Search, Edit2 } from "lucide-react";
+import { ArrowLeft, Plus, Receipt, IndianRupee, Calendar, WifiOff, Edit2 } from "lucide-react";
 import { useToast } from "../components/toast-provider";
 import { cn } from "../lib/utils";
 import { Link } from "react-router-dom";
@@ -193,7 +193,7 @@ export default function PaymentReminders() {
         const reminder = quickActionCustomer.reminder;
         const today = new Date();
         const dateStr = today.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-        const timeStr = today.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+        const timeStr = today.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
 
         if (actionType === 'add') {
             // Add new due
@@ -293,7 +293,7 @@ export default function PaymentReminders() {
 
         const today = new Date();
         const dateStr = today.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-        const timeStr = today.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+        const timeStr = today.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
         const noteStr = `[${dateStr} ${timeStr}] New Due Added: \u20b9${reminderAmount.toLocaleString()}. Balance: \u20b9${reminderAmount.toLocaleString()}`;
 
         const { error } = await supabase.from('payment_reminders').insert({
@@ -568,11 +568,10 @@ export default function PaymentReminders() {
                     <div>
                         <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Amount</label>
                         <div className="relative mt-1">
-                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 font-bold text-lg">₹</span>
                             <input
                                 type="number"
                                 autoFocus
-                                className="w-full bg-zinc-50 dark:bg-zinc-800 border-2 border-zinc-200 dark:border-zinc-700 focus:border-emerald-500 rounded-xl pl-9 pr-4 h-14 text-xl font-bold outline-none transition-all"
+                                className="w-full bg-zinc-50 dark:bg-zinc-800 border-2 border-zinc-200 dark:border-zinc-700 focus:border-emerald-500 rounded-xl px-4 h-14 text-xl font-bold outline-none transition-all"
                                 placeholder="0"
                                 value={amount}
                                 onChange={e => setAmount(e.target.value)}
@@ -625,10 +624,9 @@ export default function PaymentReminders() {
                     <div className="relative">
                         <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Customer *</label>
                         <div className="relative mt-1">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={16} />
                             <input
                                 type="text"
-                                className="w-full bg-zinc-50 dark:bg-zinc-800 border-2 border-zinc-200 dark:border-zinc-700 focus:border-emerald-500 rounded-xl pl-10 pr-4 h-12 text-sm font-bold outline-none transition-all"
+                                className="w-full bg-zinc-50 dark:bg-zinc-800 border-2 border-zinc-200 dark:border-zinc-700 focus:border-emerald-500 rounded-xl px-4 h-12 text-sm font-bold outline-none transition-all"
                                 placeholder="Search customer..."
                                 value={newReminderCustomerSearch}
                                 onChange={e => {
@@ -669,10 +667,9 @@ export default function PaymentReminders() {
                     <div>
                         <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Amount *</label>
                         <div className="relative mt-1">
-                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 font-bold text-lg">₹</span>
                             <input
                                 type="number"
-                                className="w-full bg-zinc-50 dark:bg-zinc-800 border-2 border-zinc-200 dark:border-zinc-700 focus:border-emerald-500 rounded-xl pl-9 pr-4 h-14 text-xl font-bold outline-none transition-all"
+                                className="w-full bg-zinc-50 dark:bg-zinc-800 border-2 border-zinc-200 dark:border-zinc-700 focus:border-emerald-500 rounded-xl px-4 h-14 text-xl font-bold outline-none transition-all"
                                 placeholder="0"
                                 value={newReminderAmount}
                                 onChange={e => setNewReminderAmount(e.target.value)}

@@ -85,6 +85,10 @@ export default function NewExpense() {
         if (timerRef.current) clearTimeout(timerRef.current);
     };
 
+    const handleTouchMove = () => {
+        if (timerRef.current) clearTimeout(timerRef.current);
+    };
+
     const fetchPresets = useCallback(async () => {
         const { data } = await supabase.from('expense_presets').select('*').is('deleted_at', null).order('label');
         if (data && data.length > 0) {
@@ -391,6 +395,7 @@ export default function NewExpense() {
                                                         )}
                                                         onTouchStart={() => handleTouchStart(item.id, selectedIds.has(item.id))}
                                                         onTouchEnd={handleTouchEnd}
+                                                        onTouchMove={handleTouchMove}
                                                         onMouseDown={() => handleTouchStart(item.id, selectedIds.has(item.id))}
                                                         onMouseUp={handleTouchEnd}
                                                         onMouseLeave={handleTouchEnd}
@@ -453,6 +458,7 @@ export default function NewExpense() {
                                                 role="button"
                                                 onTouchStart={() => handleTouchStart(item.id)}
                                                 onTouchEnd={handleTouchEnd}
+                                                onTouchMove={handleTouchMove}
                                                 onMouseDown={() => handleTouchStart(item.id)}
                                                 onMouseUp={handleTouchEnd}
                                                 onMouseLeave={handleTouchEnd}
@@ -529,12 +535,11 @@ export default function NewExpense() {
                                 <div>
                                     <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5 block ml-1">Amount</label>
                                     <div className="relative">
-                                        <span className="absolute left-3.5 top-2.5 md:top-3.5 text-muted-foreground font-bold">₹</span>
                                         <input
                                             type="number"
                                             min="0"
                                             step="0.01"
-                                            className="w-full bg-accent/50 border border-border/50 rounded-xl py-3 md:py-3 pl-8 pr-4 text-base md:text-lg font-bold text-foreground outline-none focus:ring-2 focus:ring-primary focus:bg-background transition-all h-14 md:h-12"
+                                            className="w-full bg-accent/50 border border-border/50 rounded-xl py-3 md:py-3 px-4 text-base md:text-lg font-bold text-foreground outline-none focus:ring-2 focus:ring-primary focus:bg-background transition-all h-14 md:h-12"
                                             placeholder="0"
                                             value={amount}
                                             onChange={e => setAmount(e.target.value)}

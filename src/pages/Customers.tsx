@@ -49,14 +49,22 @@ export default function Customers() {
     const timerRef = useRef<any>(null);
 
     const handleTouchStart = (id: string, currentSelected: boolean) => {
+        // Store which element the touch started on
+        const touchStartId = id;
         timerRef.current = setTimeout(() => {
+            // Only trigger if we're still on the same element
             if (navigator.vibrate) navigator.vibrate(50);
             if (!isSelectionMode) setIsSelectionMode(true);
-            if (!currentSelected) toggleSelection(id);
+            if (!currentSelected) toggleSelection(touchStartId);
         }, 500);
     };
 
     const handleTouchEnd = () => {
+        if (timerRef.current) clearTimeout(timerRef.current);
+    };
+
+    const handleTouchMove = () => {
+        // Cancel the long-press if user moves their finger (scrolling)
         if (timerRef.current) clearTimeout(timerRef.current);
     };
 
@@ -170,7 +178,7 @@ export default function Customers() {
         <div className="min-h-screen bg-background pb-28 md:pb-32 w-full md:max-w-2xl md:mx-auto px-3 md:px-4">
             {/* Header */}
             {isSelectionMode ? (
-                <div className="fixed top-0 left-0 right-0 z-40 bg-card border-b border-border shadow-sm px-4 py-3 flex items-center justify-between">
+                <div className="fixed top-0 left-0 right-0 z-40 bg-white dark:bg-gray-900 border-b border-border shadow-sm px-4 py-3 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <Button size="icon" variant="ghost" onClick={toggleSelectionMode}>
                             <X size={20} />
@@ -233,7 +241,7 @@ export default function Customers() {
                             <input
                                 type="text"
                                 placeholder="Search customers..."
-                                className="w-full px-4 h-12 rounded-xl bg-accent/50 border-transparent focus:bg-background focus:border-ring transition-all"
+                                className="w-full px-4 h-12 rounded-xl bg-background border-2 border-border focus:border-ring transition-all"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                             />
@@ -288,7 +296,7 @@ export default function Customers() {
                             {filteredCustomers.map((c) => (
                                 <div key={c.id} className={cn(
                                     "group bg-card p-3 md:p-4 rounded-2xl shadow-sm border border-border/60 transition-all duration-300 relative",
-                                    isSelectionMode && selectedIds.has(c.id) && "ring-2 ring-primary bg-primary/5",
+                                    isSelectionMode && selectedIds.has(c.id) && "ring-2 ring-primary bg-primary",
                                     activeMenuId === c.id ? "z-50" : "z-0"
                                 )}>
                                     {isSelectionMode ? (
@@ -304,7 +312,7 @@ export default function Customers() {
                                                 <span className="text-sm font-black">{c.name.charAt(0).toUpperCase()}</span>
                                             </div>
                                             <div className="flex-1">
-                                                <h3 className="font-bold text-lg text-foreground leading-tight">{c.name}</h3>
+                                                <h3 className="font-bold text-base md:text-lg text-foreground leading-tight">{c.name}</h3>
                                             </div>
                                         </div>
                                     ) : (
@@ -312,6 +320,7 @@ export default function Customers() {
                                             className="flex justify-between items-center"
                                             onTouchStart={() => handleTouchStart(c.id, selectedIds.has(c.id))}
                                             onTouchEnd={handleTouchEnd}
+                                            onTouchMove={handleTouchMove}
                                             onMouseDown={() => handleTouchStart(c.id, selectedIds.has(c.id))}
                                             onMouseUp={handleTouchEnd}
                                             onMouseLeave={handleTouchEnd}
