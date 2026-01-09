@@ -7,6 +7,7 @@ import basicSsl from '@vitejs/plugin-basic-ssl'
 export default defineConfig({
   plugins: [
     react(),
+    // react(), duplicate removed
     basicSsl(),
     VitePWA({
       registerType: 'autoUpdate',

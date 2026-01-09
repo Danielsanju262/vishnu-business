@@ -294,6 +294,7 @@ export default function NewSale() {
     }, [showPayableSupplierList]);
 
     // Handle browser back button to mimic on-screen back button
+    // The hook now handles keyboard visibility and blur automatically
     useBrowserBackButton(() => {
         // Mimic the on-screen back button logic
         if (step === "details") {
@@ -305,29 +306,13 @@ export default function NewSale() {
                 setStep("product");
             }
         } else if (step === "product") {
-            // If product search input is focused, blur it first (close keyboard)
-            if (productSearchInputRef.current && document.activeElement === productSearchInputRef.current) {
-                productSearchInputRef.current.blur();
-                // We don't return here, just fall through (though in this case preventing default isn't controlled by return)
-                // Actually with the new hook, we just perform side effects.
-                // But wait, if we just blur, we probably WANT to stay on the page.
-                // The hook already consumed the back event. So effectively we ARE staying on the page unless we navigate elsewhere.
-                return;
-            }
-            // Otherwise, go back to cart
             setStep("cart");
         } else if (step === "cart") {
             setStep("customer");
         } else if (step === "customer") {
-            // If customer search input is focused, blur it first (close keyboard)
-            if (customerSearchInputRef.current && document.activeElement === customerSearchInputRef.current) {
-                customerSearchInputRef.current.blur();
-                return;
-            }
-            // Otherwise, navigate to home
             navigate("/");
         }
-    }, step !== "customer" || !!search);
+    }, true); // Always handle back navigation
 
     // --- Actions ---
 

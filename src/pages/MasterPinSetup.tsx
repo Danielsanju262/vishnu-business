@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../components/toast-provider';
 import { Button } from '../components/ui/Button';
@@ -13,9 +13,18 @@ export default function MasterPinSetup({ onSuccess }: { onSuccess: () => void })
     const [hasExistingPin, setHasExistingPin] = useState(false);
     const [isCreating, setIsCreating] = useState(false);
 
+    const inputRef = useRef<HTMLInputElement>(null);
+
     useEffect(() => {
         checkExistingPin();
     }, []);
+
+    useEffect(() => {
+        // Try to focus immediately when component becomes visible
+        if (!isLoading) {
+            inputRef.current?.focus();
+        }
+    }, [isLoading, hasExistingPin]);
 
     const checkExistingPin = async () => {
         try {
@@ -153,20 +162,54 @@ export default function MasterPinSetup({ onSuccess }: { onSuccess: () => void })
                 {/* Form */}
                 <form onSubmit={hasExistingPin ? handleVerifyPin : handleCreatePin} className="space-y-4">
                     <div className="space-y-2">
-                        <label className="text-sm font-medium text-foreground">
-                            {hasExistingPin ? "Master PIN" : "Create PIN (4-6 digits)"}
-                        </label>
-                        <div className="relative">
-                            <Input
-                                type="password"
-                                inputMode="numeric"
-                                value={pin}
-                                onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                                placeholder="••••••"
-                                className="px-4 h-14 text-center text-2xl font-black tracking-[0.5em]"
-                                required
-                                autoFocus
-                            />
+                        <div
+                            onClick={() => inputRef.current?.focus()}
+                            onTouchEnd={() => inputRef.current?.focus()}
+                            className="cursor-pointer"
+                        >
+                            <label
+                                htmlFor="master-pin-input"
+                                className="text-sm font-medium text-foreground block mb-2"
+                            >
+                                {hasExistingPin ? "Master PIN" : "Create PIN (4-6 digits)"}
+                            </label>
+                            <div
+                                className="relative z-[9999]"
+                                style={{ pointerEvents: 'auto' }}
+                            >
+                                <input
+                                    id="master-pin-input"
+                                    ref={inputRef}
+                                    type="tel"
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
+                                    value={pin}
+                                    onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                    onTouchStart={(e) => {
+                                        e.stopPropagation();
+                                        e.currentTarget.focus();
+                                    }}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        e.currentTarget.focus();
+                                    }}
+                                    onFocus={(e) => {
+                                        e.currentTarget.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                    }}
+                                    placeholder="••••••"
+                                    className="w-full px-4 h-16 text-center text-2xl font-black tracking-[0.5em] bg-secondary/50 border-2 border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all"
+                                    style={{
+                                        pointerEvents: 'auto',
+                                        touchAction: 'manipulation',
+                                        WebkitUserSelect: 'text',
+                                        userSelect: 'text'
+                                    }}
+                                    required
+                                    autoFocus
+                                    autoComplete="off"
+                                    readOnly={false}
+                                />
+                            </div>
                         </div>
                     </div>
 

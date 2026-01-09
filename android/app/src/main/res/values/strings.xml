@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Vishnu Business</string>
+    <string name="title_activity_main">Vishnu Business</string>
+    <string name="package_name">com.vishnu.business</string>
+    <string name="custom_url_scheme">com.vishnu.business</string>
+</resources>

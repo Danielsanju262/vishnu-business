@@ -32,6 +32,10 @@ export default function Dashboard() {
     const [showCustomDateModal, setShowCustomDateModal] = useState(false);
 
     const isModalOpen = showCustomDateModal || showFilterDropdown || isEditingName;
+
+    // Dashboard is the root screen
+    // When modals are open, pressing back should close them
+    // When no modals are open and on native, allow app to minimize
     useBrowserBackButton(() => {
         if (showCustomDateModal) {
             setShowCustomDateModal(false);
@@ -45,7 +49,8 @@ export default function Dashboard() {
             setIsEditingName(false);
             return;
         }
-    }, isModalOpen);
+        // At Dashboard root with no modals open - on native this will minimize app
+    }, isModalOpen, !isModalOpen); // isRootScreen = true when no modals are open
 
     const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -343,9 +348,9 @@ export default function Dashboard() {
                         ) : (
                             // Stats Content
                             <>
-                                <div className="flex justify-center gap-6 md:gap-16 text-center">
+                                <div className="flex justify-start items-center gap-7">
                                     <div className="space-y-1 flex flex-col items-start">
-                                        <p className="text-white/50 font-medium text-[10px] uppercase tracking-wider text-center w-full whitespace-nowrap">
+                                        <p className="text-white/50 font-medium text-[10px] uppercase tracking-wider text-left w-full whitespace-nowrap">
                                             {dateFilter === 'today' ? 'Revenue (Today)' :
                                                 dateFilter === 'yesterday' ? 'Revenue (Yesterday)' :
                                                     dateFilter === 'thisWeek' ? 'Revenue (This Week)' :
@@ -353,17 +358,17 @@ export default function Dashboard() {
                                                             'Revenue (Custom)'}
                                         </p>
                                         <h2 className="text-3xl font-bold text-white tracking-tight">
-                                            <span className="text-lg align-top opacity-50 font-normal ml-1">₹</span>
+                                            <span className="text-lg align-top opacity-50 font-normal">₹</span>
                                             {stats.revenue.toLocaleString()}
                                         </h2>
                                     </div>
-                                    <div className="space-y-1 flex flex-col items-end">
-                                        <p className="text-white/50 font-medium text-[10px] uppercase tracking-wider text-center w-full whitespace-nowrap">Net Profit</p>
+                                    <div className="space-y-1 flex flex-col items-start">
+                                        <p className="text-white/50 font-medium text-[10px] uppercase tracking-wider text-left w-full whitespace-nowrap">Net Profit</p>
                                         <h2 className={cn(
                                             "text-3xl font-bold tracking-tight flex items-center gap-1",
                                             stats.profit >= 0 ? "text-emerald-400" : "text-rose-400"
                                         )}>
-                                            {stats.profit >= 0 ? <Plus size={22} strokeWidth={2.5} /> : <Minus size={22} strokeWidth={2.5} />}
+                                            {stats.profit >= 0 ? <Plus size={16} strokeWidth={2.5} /> : <Minus size={15} strokeWidth={2.5} />}
                                             <span>
                                                 <span className="text-lg align-top opacity-60 font-normal mr-0.5">₹</span>
                                                 {Math.abs(stats.profit).toLocaleString()}

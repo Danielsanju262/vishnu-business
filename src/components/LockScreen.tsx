@@ -1,8 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Fingerprint, Lock, KeyRound, Loader2, ShieldAlert } from 'lucide-react';
 import { Button } from './ui/Button';
-import { Input } from './ui/Input';
 
 export default function LockScreen() {
     const {
@@ -17,6 +16,7 @@ export default function LockScreen() {
     const [pin, setPin] = useState("");
     const [error, setError] = useState(false);
     const [loading, setLoading] = useState(false);
+    const inputRef = useRef<HTMLInputElement>(null);
 
     // Check if PIN was updated and biometrics are temporarily disabled
     const pinWasUpdated = devicePinVersion > 0 && devicePinVersion < currentPinVersion;
@@ -43,6 +43,16 @@ export default function LockScreen() {
             setShowPin(true);
         }
     }, [canUseBiometrics, pinWasUpdated]);
+
+    useEffect(() => {
+        if (showPin) {
+            // Force focus when PIN screen is proven to be visible
+            const t = setTimeout(() => {
+                inputRef.current?.focus();
+            }, 100);
+            return () => clearTimeout(t);
+        }
+    }, [showPin]);
 
     const handleUnlock = async () => {
         setIsAnimating(true);
@@ -109,15 +119,39 @@ export default function LockScreen() {
                             <span className="text-sm font-semibold text-foreground">Enter Master PIN</span>
                         </div>
 
-                        <div className="relative">
-                            <Input
-                                type="password"
+                        <div
+                            className="relative z-[9999]"
+                            style={{ pointerEvents: 'auto' }}
+                        >
+                            <input
+                                ref={inputRef}
+                                type="tel"
                                 inputMode="numeric"
+                                pattern="[0-9]*"
                                 autoFocus
                                 value={pin}
                                 onChange={e => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                onTouchStart={(e) => {
+                                    e.stopPropagation();
+                                    e.currentTarget.focus();
+                                }}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    e.currentTarget.focus();
+                                }}
+                                onFocus={(e) => {
+                                    e.currentTarget.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                }}
                                 placeholder="••••••"
-                                className={`h-14 text-center text-2xl font-black tracking-[0.5em] rounded-2xl ${error ? 'border-rose-500 animate-shake' : ''}`}
+                                className={`w-full h-16 text-center text-2xl font-black tracking-[0.5em] rounded-2xl bg-secondary/50 border-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all ${error ? 'border-rose-500 animate-shake' : 'border-border'}`}
+                                style={{
+                                    pointerEvents: 'auto',
+                                    touchAction: 'manipulation',
+                                    WebkitUserSelect: 'text',
+                                    userSelect: 'text'
+                                }}
+                                autoComplete="off"
+                                readOnly={false}
                             />
                         </div>
                         <Button
