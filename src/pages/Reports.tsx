@@ -410,7 +410,7 @@ export default function Reports() {
                     toast("Export successful", "success");
                 }
             } else {
-                toast("No data to export", "error");
+                toast("No data found for the selected period. Try adjusting your date range.", "warning");
             }
 
         } catch (error) {

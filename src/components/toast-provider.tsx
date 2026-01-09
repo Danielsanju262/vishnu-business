@@ -86,14 +86,14 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             {children}
 
             {/* Toast Container */}
-            <div className="fixed top-4 left-0 right-0 z-[110] px-4 pointer-events-none">
+            <div className="fixed top-4 left-0 right-0 z-[200] px-4 pointer-events-none">
                 <div className="max-w-sm ml-auto space-y-2 pointer-events-auto">
                     {toasts.map((t) => (
                         <div
                             key={t.id}
                             className={cn(
                                 "flex items-center gap-3 p-4 rounded-xl shadow-2xl border-2 animate-in slide-in-from-right relative overflow-hidden",
-                                "bg-surface-elevation-3 dark:bg-zinc-900 border-border z-[120]"
+                                "bg-surface-elevation-3 dark:bg-zinc-900 border-border z-[210]"
                             )}
                         >
                             {getIcon(t.type)}

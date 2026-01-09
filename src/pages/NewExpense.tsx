@@ -106,8 +106,16 @@ export default function NewExpense() {
 
 
     const handleSave = async () => {
-        if (!title || !amount || !date) {
-            toast("Please fill all fields", "warning");
+        if (!title.trim()) {
+            toast("Please enter an expense title", "warning");
+            return;
+        }
+        if (!amount || parseFloat(amount) <= 0) {
+            toast("Please enter a valid amount", "warning");
+            return;
+        }
+        if (!date) {
+            toast("Please select a date", "warning");
             return;
         }
 

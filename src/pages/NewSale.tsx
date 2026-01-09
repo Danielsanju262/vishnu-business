@@ -76,16 +76,32 @@ export default function NewSale() {
 
     // Workflow State -- Synced with browser history for proper back navigation
     // Determine initial step based on stored data
-    const getInitialStep = (): "customer" | "cart" | "product" | "details" => {
-        const storedCart = localStorage.getItem('vishnu_new_sale_cart');
-        const hasCartItems = storedCart && JSON.parse(storedCart).length > 0;
-        return hasCartItems ? "cart" : "customer";
-    };
-
+    // Workflow State -- Synced with browser history for proper back navigation
+    // Always start at 'customer' to ensure it exists in history stack.
+    // We will auto-navigate to 'cart' if needed, creating a history entry.
     const [step, setStep] = useHistorySyncedStep<"customer" | "cart" | "product" | "details">(
-        getInitialStep(),
+        "customer",
         'newSaleStep'
     );
+
+    // Auto-navigate to cart if data exists (only once on mount/initial check)
+    // This allows the history stack to encompass 'Customer' -> 'Cart'
+    const [hasCheckedInitial, setHasCheckedInitial] = useState(false);
+
+    useEffect(() => {
+        if (hasCheckedInitial) return;
+
+        const storedCart = localStorage.getItem('vishnu_new_sale_cart');
+        const hasCartItems = storedCart && JSON.parse(storedCart).length > 0;
+
+        // Only auto-navigate if appropriate and we haven't already
+        // And ensure we are currently at 'customer' so we don't mess up if history restored to 'details' etc
+        if (hasCartItems && step === 'customer') {
+            setStep('cart');
+        }
+
+        setHasCheckedInitial(true);
+    }, [step, setStep, hasCheckedInitial]);
 
     // Auto-redirect if cart is empty for 30s
     useEffect(() => {
@@ -102,7 +118,7 @@ export default function NewSale() {
         }
 
         return () => clearTimeout(timeout);
-    }, [step, cart, toast]);
+    }, [step, cart, toast, setStep]);
 
     // Persistence Effects
     useEffect(() => {
@@ -311,13 +327,13 @@ export default function NewSale() {
     // --- Actions ---
 
 
-    const handleAddCustomer = async () => {
-        if (!newItemName) return;
-        const { data, error } = await supabase.from("customers").insert([{ name: newItemName, is_active: true }]).select().single();
+    const handleCreateCustomer = async (name: string) => {
+        const { data, error } = await supabase.from("customers").insert([{ name: name, is_active: true }]).select().single();
         if (data && !error) {
-            setCustomers(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
+            setCustomers(prev => [...prev, data]);
             setSelectedCust(data);
-            setStep("cart"); // Allow immediate proceed
+            setStep("cart");
+            setSearch("");
             setNewItemName("");
             setIsAddingNew(false);
             toast("Customer added", "success");
@@ -326,8 +342,63 @@ export default function NewSale() {
         }
     };
 
+    const confirmAddCustomer = (name: string) => {
+        // If no name is typed in search, fallback to the manual inline form
+        if (!name || !name.trim()) {
+            setNewItemName("");
+            setIsAddingNew(true);
+            return;
+        }
+
+        setConfirmConfig({
+            isOpen: true,
+            title: "Add New Customer?",
+            description: `Create new customer "${name}"?`,
+            onConfirm: () => handleCreateCustomer(name),
+            variant: "default",
+            confirmText: "Create"
+        });
+    };
+
+    const handleCreateSupplier = async (name: string) => {
+        const { data, error } = await supabase.from("suppliers").insert([{ name: name, is_active: true }]).select().single();
+        if (data && !error) {
+            setSuppliers(prev => [...prev, data]);
+            setPayableSelectedSupplierId(data.id);
+            setPayableSupplierSearch(data.name);
+            setShowPayableSupplierList(false);
+            toast("Supplier added", "success");
+        } else {
+            toast("Failed to add supplier", "error");
+        }
+    };
+
+    const confirmAddSupplier = (name: string) => {
+        if (!name.trim()) return;
+        setConfirmConfig({
+            isOpen: true,
+            title: "Add New Supplier?",
+            description: `Create new supplier "${name}"?`,
+            onConfirm: () => handleCreateSupplier(name),
+            variant: "default",
+            confirmText: "Create"
+        });
+    };
+
+    // Kept for backward compatibility if logic uses it, but effectively replaced by confirmation
+    const handleAddCustomer = async () => {
+        if (!newItemName) {
+            toast("Please enter a name", "warning");
+            return;
+        }
+        await handleCreateCustomer(newItemName);
+    };
+
     const handleAddProduct = async () => {
-        if (!newItemName) return;
+        if (!newItemName) {
+            toast("Please enter a name", "warning");
+            return;
+        }
         const { data, error } = await supabase.from("products").insert([{ name: newItemName, unit: newItemUnit, category: 'general', is_active: true }]).select().single();
         if (data && !error) {
             setProducts(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
@@ -342,8 +413,15 @@ export default function NewSale() {
     };
 
     const addToCart = () => {
-        if (!tempProd || !qty || !sellPrice) {
-            toast("Please enter quantity and price", "warning");
+        if (!tempProd) return;
+
+        if (!qty || parseFloat(qty) <= 0) {
+            toast("Please enter a valid quantity", "warning");
+            return;
+        }
+
+        if (!sellPrice || parseFloat(sellPrice) < 0) {
+            toast("Please enter a valid selling price", "warning");
             return;
         }
 
@@ -396,8 +474,18 @@ export default function NewSale() {
         setQty("");
         setSellPrice("");
         setBuyPrice("");
-        setStep("cart");
-        setEditingIndex(null);
+
+        if (editingIndex !== null) {
+            setEditingIndex(null);
+            // If editing, we came from Cart -> Details. Back returns to Cart.
+            // Using history.back() correctly pops 'Details' from stack.
+            window.history.back();
+        } else {
+            // If new item, we came from Product -> Details.
+            // We want to go to Cart, but REPLACE Details so back goes to Product.
+            // Stack: ... -> Product -> Cart (instead of ... -> Product -> Details -> Cart)
+            setStep("cart", { replace: true });
+        }
     };
 
     const removeFromCart = (index: number) => {
@@ -456,7 +544,14 @@ export default function NewSale() {
     };
 
     const finalizeSale = async () => {
-        if (!selectedCust || cart.length === 0) return;
+        if (!selectedCust) {
+            toast("Please select a customer", "warning");
+            return;
+        }
+        if (cart.length === 0) {
+            toast("Cart is empty", "warning");
+            return;
+        }
 
         // 0. Validate Payable Amount if Linked
         if (isLinkedPayable) {
@@ -715,12 +810,11 @@ export default function NewSale() {
                             </div>
                         ) : (
                             <button
-                                onClick={() => { setIsAddingNew(true); setNewItemName(search); }}
+                                onClick={() => confirmAddCustomer(search)}
                                 onKeyDown={(e) => {
                                     if (e.key === "Enter" || e.key === " ") {
                                         e.preventDefault();
-                                        setIsAddingNew(true);
-                                        setNewItemName(search);
+                                        confirmAddCustomer(search);
                                     }
                                 }}
                                 tabIndex={0}
@@ -1044,9 +1138,12 @@ export default function NewSale() {
                                                         </button>
                                                     ))
                                                 ) : (
-                                                    <div className="p-3 text-center">
-                                                        <p className="text-[10px] text-muted-foreground mb-1">No supplier found</p>
-                                                    </div>
+                                                    <button
+                                                        onClick={(e) => { e.preventDefault(); confirmAddSupplier(payableSupplierSearch); }}
+                                                        className="w-full text-left px-4 py-3 text-xs font-bold transition-colors hover:bg-accent flex items-center gap-2 text-indigo-600 dark:text-indigo-400"
+                                                    >
+                                                        <Plus size={14} /> Add new supplier "{payableSupplierSearch}"
+                                                    </button>
                                                 )}
                                             </div>
                                         )}
@@ -1347,18 +1444,6 @@ export default function NewSale() {
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2 block ml-1">Selling Rate</label>
-                                            <div className="relative">
-                                                <input
-                                                    type="number"
-                                                    className="w-full bg-accent/50 border border-border/50 rounded-2xl py-3.5 px-3 text-xl font-bold text-center text-foreground outline-none focus:ring-2 focus:ring-primary focus:bg-background transition-all"
-                                                    placeholder="0"
-                                                    value={sellPrice}
-                                                    onChange={e => setSellPrice(e.target.value)}
-                                                />
-                                            </div>
-                                        </div>
                                         <div className={tempProd.category === 'ghee' ? "opacity-50 pointer-events-none" : ""}>
                                             <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2 block ml-1">{tempProd.category === 'ghee' ? "Auto Calc" : "Buying Rate"}</label>
                                             <div className="relative">
@@ -1368,6 +1453,18 @@ export default function NewSale() {
                                                     placeholder="0"
                                                     value={buyPrice}
                                                     onChange={e => setBuyPrice(e.target.value)}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2 block ml-1">Selling Rate</label>
+                                            <div className="relative">
+                                                <input
+                                                    type="number"
+                                                    className="w-full bg-accent/50 border border-border/50 rounded-2xl py-3.5 px-3 text-xl font-bold text-center text-foreground outline-none focus:ring-2 focus:ring-primary focus:bg-background transition-all"
+                                                    placeholder="0"
+                                                    value={sellPrice}
+                                                    onChange={e => setSellPrice(e.target.value)}
                                                 />
                                             </div>
                                         </div>

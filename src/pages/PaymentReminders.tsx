@@ -279,7 +279,10 @@ export default function PaymentReminders() {
     };
 
     const handleUpdateDueDate = async () => {
-        if (!editDateCustomer || !editDateValue) return;
+        if (!editDateCustomer || !editDateValue) {
+            toast("Please select a date", "warning");
+            return;
+        }
 
         const { error } = await supabase
             .from('payment_reminders')
@@ -344,14 +347,19 @@ export default function PaymentReminders() {
     };
 
     const handleNewReminder = async () => {
-        if (!newReminderAmount || !newReminderDueDate) {
-            toast("Please fill all fields", "warning");
+        if (!newReminderAmount) {
+            toast("Please enter an amount", "warning");
+            return;
+        }
+
+        if (!newReminderDueDate) {
+            toast("Please select a due date", "warning");
             return;
         }
 
         const reminderAmount = parseFloat(newReminderAmount);
         if (isNaN(reminderAmount) || reminderAmount <= 0) {
-            toast("Please enter a valid amount", "warning");
+            toast("Please enter a valid amount greater than 0", "warning");
             return;
         }
 

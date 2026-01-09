@@ -279,7 +279,10 @@ export default function AccountsPayable() {
     };
 
     const handleUpdateDueDate = async () => {
-        if (!editDateSupplier || !editDateValue) return;
+        if (!editDateSupplier || !editDateValue) {
+            toast("Please select a date", "warning");
+            return;
+        }
 
         const { error } = await supabase
             .from('accounts_payable')
@@ -344,14 +347,19 @@ export default function AccountsPayable() {
     };
 
     const handleNewPayable = async () => {
-        if (!newPayableAmount || !newPayableDueDate) {
-            toast("Please fill all fields", "warning");
+        if (!newPayableAmount) {
+            toast("Please enter an amount", "warning");
+            return;
+        }
+
+        if (!newPayableDueDate) {
+            toast("Please select a due date", "warning");
             return;
         }
 
         const payableAmount = parseFloat(newPayableAmount);
         if (isNaN(payableAmount) || payableAmount <= 0) {
-            toast("Please enter a valid amount", "warning");
+            toast("Please enter a valid amount greater than 0", "warning");
             return;
         }
 

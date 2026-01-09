@@ -12,7 +12,7 @@ import { useState, useEffect, useCallback } from 'react';
 export function useHistorySyncedStep<T extends string>(
     initialStep: T,
     stepKey: string = 'step'
-): [T, (newStep: T) => void, () => void] {
+): [T, (newStep: T, options?: { replace?: boolean }) => void, () => void] {
     const [step, setStepState] = useState<T>(() => {
         // Check if there's a step in the current history state
         const historyStep = window.history.state?.[stepKey];
@@ -44,13 +44,21 @@ export function useHistorySyncedStep<T extends string>(
     }, []);
 
     // Set step and push to history
-    const setStep = useCallback((newStep: T) => {
+    const setStep = useCallback((newStep: T, options?: { replace?: boolean }) => {
         if (newStep !== step) {
-            window.history.pushState(
-                { ...window.history.state, [stepKey]: newStep },
-                '',
-                window.location.href
-            );
+            if (options?.replace) {
+                window.history.replaceState(
+                    { ...window.history.state, [stepKey]: newStep },
+                    '',
+                    window.location.href
+                );
+            } else {
+                window.history.pushState(
+                    { ...window.history.state, [stepKey]: newStep },
+                    '',
+                    window.location.href
+                );
+            }
             setStepState(newStep);
         }
     }, [step, stepKey]);

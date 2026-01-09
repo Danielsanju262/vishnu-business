@@ -92,7 +92,10 @@ export default function Customers() {
     useRealtimeTable('customers', fetchCustomers, []);
 
     const handleSave = async () => {
-        if (!newName) return;
+        if (!newName) {
+            toast("Please enter a name", "warning");
+            return;
+        }
 
         let error;
         if (editingId) {

@@ -102,7 +102,10 @@ export default function Suppliers() {
     useRealtimeTable('suppliers', fetchSuppliers, []);
 
     const handleSave = async () => {
-        if (!newName) return;
+        if (!newName) {
+            toast("Please enter a name", "warning");
+            return;
+        }
 
         let error;
         if (editingId) {
