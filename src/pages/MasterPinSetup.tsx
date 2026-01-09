@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useToast } from '../components/toast-provider';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Shield, Loader2, KeyRound, Fingerprint } from 'lucide-react';
+import { Shield, Loader2, KeyRound, Fingerprint, Eye, EyeOff } from 'lucide-react';
 
 export default function MasterPinSetup({ onSuccess }: { onSuccess: () => void }) {
     const { toast } = useToast();
@@ -12,6 +12,7 @@ export default function MasterPinSetup({ onSuccess }: { onSuccess: () => void })
     const [isLoading, setIsLoading] = useState(true);
     const [hasExistingPin, setHasExistingPin] = useState(false);
     const [isCreating, setIsCreating] = useState(false);
+    const [showPin, setShowPin] = useState(false);
 
     const inputRef = useRef<HTMLInputElement>(null);
 
@@ -191,7 +192,7 @@ export default function MasterPinSetup({ onSuccess }: { onSuccess: () => void })
                                 <input
                                     id="master-pin-input"
                                     ref={inputRef}
-                                    type="tel"
+                                    type={showPin ? "tel" : "password"}
                                     inputMode="numeric"
                                     pattern="[0-9]*"
                                     value={pin}
@@ -208,7 +209,7 @@ export default function MasterPinSetup({ onSuccess }: { onSuccess: () => void })
                                         e.currentTarget.scrollIntoView({ behavior: 'smooth', block: 'center' });
                                     }}
                                     placeholder="••••••"
-                                    className="w-full px-4 h-16 text-center text-2xl font-black tracking-[0.5em] bg-secondary/50 border-2 border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all"
+                                    className="w-full px-4 h-16 text-center text-2xl font-black tracking-[0.5em] bg-secondary/50 border-2 border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all pr-12"
                                     style={{
                                         pointerEvents: 'auto',
                                         touchAction: 'manipulation',
@@ -220,6 +221,22 @@ export default function MasterPinSetup({ onSuccess }: { onSuccess: () => void })
                                     autoComplete="off"
                                     readOnly={false}
                                 />
+                                <button
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setShowPin(!showPin);
+                                    }}
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 p-2 text-muted-foreground hover:text-foreground hover:bg-background/80 rounded-full transition-colors"
+                                    tabIndex={-1}
+                                >
+                                    {showPin ? (
+                                        <EyeOff size={24} />
+                                    ) : (
+                                        <Eye size={24} />
+                                    )}
+                                </button>
                             </div>
                         </div>
                     </div>

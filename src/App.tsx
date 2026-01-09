@@ -91,7 +91,8 @@ function AppContent() {
       {isLocked && <LockScreen />}
       <Routes>
         <Route path="/" element={<Layout />}>
-          <Route index element={
+          <Route index element={<Dashboard />} />
+          <Route path="insights" element={
             <Suspense fallback={<div className="p-10 text-center">Loading Insights...</div>}>
               <Insights />
             </Suspense>
@@ -106,6 +107,7 @@ function AppContent() {
               <BusinessInsights />
             </Suspense>
           } />
+          {/* Dashboard is now home, but keep this route for legacy links if any */}
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="customers" element={<Customers />} />
           <Route path="products" element={<Products />} />

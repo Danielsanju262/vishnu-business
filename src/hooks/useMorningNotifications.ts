@@ -45,7 +45,7 @@ export function useMorningNotifications() {
                                     body: `You have ${taskCount} tasks to complete today. Ask AI for business insights!`,
                                     icon: '/vite.svg', // Fallback icon
                                     tag: 'morning-insight',
-                                    data: { url: '/insights' }
+                                    data: { url: '/?action=view_tasks' }
                                 });
                             });
                         } else {
@@ -57,8 +57,7 @@ export function useMorningNotifications() {
 
                             notification.onclick = () => {
                                 window.focus();
-                                // Navigation handling depends on router, but clicking usually opens the app
-                                // If inside PWA, it naturally opens.
+                                window.location.href = '/?action=view_tasks';
                             };
                         }
 

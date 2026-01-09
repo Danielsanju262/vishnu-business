@@ -870,12 +870,10 @@ export default function BusinessInsights() {
                     {selectedProduct && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in"
                             onClick={() => setSelectedProduct(null)}
-                            onTouchStart={() => setSelectedProduct(null)}
                         >
                             <div
-                                className="bg-zinc-950 w-full max-w-lg rounded-3xl border border-zinc-800 overflow-hidden shadow-2xl flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200"
+                                className="bg-zinc-950 w-full max-w-lg rounded-3xl border border-zinc-800 overflow-hidden shadow-2xl flex flex-col max-h-[80vh] animate-in zoom-in-95 duration-200"
                                 onClick={(e) => e.stopPropagation()}
-                                onTouchStart={(e) => e.stopPropagation()}
                             >
                                 <div className="p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-900/50">
                                     <div>
@@ -886,7 +884,7 @@ export default function BusinessInsights() {
                                         <X size={16} />
                                     </button>
                                 </div>
-                                <div className="p-4 overflow-y-auto space-y-2">
+                                <div className="p-4 overflow-y-auto space-y-2 flex-1">
                                     {data.transactions
                                         .filter(t => (t.products?.name === selectedProduct.name))
                                         .sort((a, b) => b.quantity - a.quantity)

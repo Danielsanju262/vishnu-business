@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Fingerprint, Lock, KeyRound, Loader2, ShieldAlert } from 'lucide-react';
+import { Fingerprint, Lock, KeyRound, Loader2, ShieldAlert, Eye, EyeOff } from 'lucide-react';
 import { Button } from './ui/Button';
 
 export default function LockScreen() {
@@ -13,6 +13,7 @@ export default function LockScreen() {
     } = useAuth();
     const [isAnimating, setIsAnimating] = useState(false);
     const [showPin, setShowPin] = useState(false);
+    const [revealPin, setRevealPin] = useState(false);
     const [pin, setPin] = useState("");
     const [error, setError] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -125,7 +126,7 @@ export default function LockScreen() {
                         >
                             <input
                                 ref={inputRef}
-                                type="tel"
+                                type={revealPin ? "tel" : "password"}
                                 inputMode="numeric"
                                 pattern="[0-9]*"
                                 autoFocus
@@ -143,7 +144,7 @@ export default function LockScreen() {
                                     e.currentTarget.scrollIntoView({ behavior: 'smooth', block: 'center' });
                                 }}
                                 placeholder="••••••"
-                                className={`w-full h-16 text-center text-2xl font-black tracking-[0.5em] rounded-2xl bg-secondary/50 border-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all ${error ? 'border-rose-500 animate-shake' : 'border-border'}`}
+                                className={`w-full h-16 text-center text-2xl font-black tracking-[0.5em] rounded-2xl bg-secondary/50 border-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all pr-12 ${error ? 'border-rose-500 animate-shake' : 'border-border'}`}
                                 style={{
                                     pointerEvents: 'auto',
                                     touchAction: 'manipulation',
@@ -153,6 +154,22 @@ export default function LockScreen() {
                                 autoComplete="off"
                                 readOnly={false}
                             />
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setRevealPin(!revealPin);
+                                }}
+                                className="absolute right-4 top-1/2 -translate-y-1/2 p-2 text-muted-foreground hover:text-foreground hover:bg-background/80 rounded-full transition-colors"
+                                tabIndex={-1}
+                            >
+                                {revealPin ? (
+                                    <EyeOff size={24} />
+                                ) : (
+                                    <Eye size={24} />
+                                )}
+                            </button>
                         </div>
                         <Button
                             className="w-full h-12 font-bold rounded-xl"
