@@ -86,7 +86,7 @@ export default function Layout() {
                     <div className="bg-zinc-900/95 dark:bg-zinc-950/95 backdrop-blur-2xl border border-white/10 shadow-2xl shadow-black/40 rounded-full py-3 px-6 flex justify-around items-center ring-1 ring-white/5">
                         {navItems.filter(item => {
                             // Check if we are on a "Core" page where we want full navigation
-                            const isCorePage = ["/", "/dashboard", "/payment-reminders", "/accounts-payable", "/settings"].includes(location.pathname);
+                            const isCorePage = ["/", "/dashboard", "/payment-reminders", "/accounts-payable", "/settings", "/insights"].includes(location.pathname);
                             if (isCorePage) return true;
 
                             // Otherwise, ONLY show the button for the active section
