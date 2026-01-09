@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { Button } from "../components/ui/Button";
@@ -120,7 +120,7 @@ export default function SupplierPaymentDetail() {
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
     const [showMenu, setShowMenu] = useState(false);
-    const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
+    const timerRef = useRef<NodeJS.Timeout | null>(null);
 
     // Close menu on ESC or click outside
     useDropdownClose(showMenu, () => setShowMenu(false));
@@ -155,20 +155,26 @@ export default function SupplierPaymentDetail() {
     };
 
     const handleTouchStart = (index: number) => {
-        const timer = setTimeout(() => {
+        timerRef.current = setTimeout(() => {
             setIsSelectionMode(true);
             const newSet = new Set<number>();
             newSet.add(index);
             setSelectedIndices(newSet);
             if (navigator.vibrate) navigator.vibrate(50);
         }, 500);
-        setLongPressTimer(timer);
     };
 
     const handleTouchEnd = () => {
-        if (longPressTimer) {
-            clearTimeout(longPressTimer);
-            setLongPressTimer(null);
+        if (timerRef.current) {
+            clearTimeout(timerRef.current);
+            timerRef.current = null;
+        }
+    };
+
+    const handleTouchMove = () => {
+        if (timerRef.current) {
+            clearTimeout(timerRef.current);
+            timerRef.current = null;
         }
     };
 
@@ -963,8 +969,8 @@ export default function SupplierPaymentDetail() {
                         </div>
                         <div className="flex items-center gap-2">
                             <div className="text-right">
-                                <p className="text-xs opacity-75 mb-1">Due Date</p>
-                                <p className="text-sm md:text-base font-bold">{earliestDueDate ? new Date(earliestDueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A'}</p>
+                                <p className="text-sm opacity-75 mb-1">Due Date</p>
+                                <p className="text-lg md:text-xl font-bold">{earliestDueDate ? new Date(earliestDueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A'}</p>
                             </div>
                             <button
                                 onClick={() => { setNewDueDate(earliestDueDate || ''); setShowEditDate(true); }}
@@ -1050,6 +1056,7 @@ export default function SupplierPaymentDetail() {
                                         }}
                                         onTouchStart={() => handleTouchStart(actualIndex)}
                                         onTouchEnd={handleTouchEnd}
+                                        onTouchMove={handleTouchMove}
                                         onContextMenu={() => {
                                             // Prevent default context menu on long press
                                         }}

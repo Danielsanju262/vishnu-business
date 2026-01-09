@@ -4,29 +4,44 @@ import { supabase } from "./supabase";
  * Backup Logic
  * Fetches all critical data from Supabase and packages it into a JSON object.
  */
-export const exportData = async () => {
+export const exportData = async (onProgress?: (progress: number) => void) => {
+    onProgress?.(10);
     // 1. Fetch tables in parallel
+    // We'll fetch them individually to track progress if needed, or just map the promise completion
+    // Actually parallel is faster. Let's stick to parallel but maybe weigh the progress?
+    // For simplicity with Promise.all, we can't easily track individual progress without a wrapper.
+    // Let's wrap promises.
+
+    const tables = [
+        'customers', 'products', 'suppliers', 'expense_presets',
+        'transactions', 'expenses', 'payment_reminders', 'accounts_payable', 'app_settings'
+    ];
+
+    let completed = 0;
+    const updateProgress = () => {
+        completed++;
+        // 0-80% for fetching
+        onProgress?.(10 + Math.round((completed / tables.length) * 70));
+    };
+
+    const fetchTable = async (table: string) => {
+        const query = supabase.from(table).select('*');
+        if (table !== 'app_settings') {
+            query.is('deleted_at', null);
+        }
+        const { data } = await query;
+        updateProgress();
+        return data || [];
+    };
+
+    const results = await Promise.all(tables.map(fetchTable));
+
+    onProgress?.(85);
+
     const [
-        { data: customers },
-        { data: products },
-        { data: suppliers },
-        { data: expense_presets },
-        { data: transactions },
-        { data: expenses },
-        { data: payment_reminders },
-        { data: accounts_payable },
-        { data: app_settings }
-    ] = await Promise.all([
-        supabase.from('customers').select('*').is('deleted_at', null),
-        supabase.from('products').select('*').is('deleted_at', null),
-        supabase.from('suppliers').select('*').is('deleted_at', null),
-        supabase.from('expense_presets').select('*').is('deleted_at', null),
-        supabase.from('transactions').select('*').is('deleted_at', null),
-        supabase.from('expenses').select('*').is('deleted_at', null),
-        supabase.from('payment_reminders').select('*').is('deleted_at', null),
-        supabase.from('accounts_payable').select('*').is('deleted_at', null),
-        supabase.from('app_settings').select('*') // No deleted_at for settings usually
-    ]);
+        customers, products, suppliers, expense_presets,
+        transactions, expenses, payment_reminders, accounts_payable, app_settings
+    ] = results;
 
     const backup = {
         meta: {
@@ -35,26 +50,73 @@ export const exportData = async () => {
             app: "Vishnu Business"
         },
         data: {
-            app_settings: app_settings || [],
-            customers: customers || [],
-            products: products || [],
-            suppliers: suppliers || [],
-            expense_presets: expense_presets || [],
-            transactions: transactions || [],
-            expenses: expenses || [],
-            payment_reminders: payment_reminders || [],
-            accounts_payable: accounts_payable || []
+            app_settings,
+            customers,
+            products,
+            suppliers,
+            expense_presets,
+            transactions,
+            expenses,
+            payment_reminders,
+            accounts_payable
         }
     };
 
+    onProgress?.(90);
     return JSON.stringify(backup, null, 2);
+};
+
+export const getBackupStats = (jsonString: string) => {
+    try {
+        const backup = JSON.parse(jsonString);
+        if (!backup.data) return null;
+        return {
+            customers: backup.data.customers?.length || 0,
+            products: backup.data.products?.length || 0,
+            suppliers: backup.data.suppliers?.length || 0,
+            transactions: backup.data.transactions?.length || 0,
+            expenses: backup.data.expenses?.length || 0,
+            payment_reminders: backup.data.payment_reminders?.length || 0,
+            accounts_payable: backup.data.accounts_payable?.length || 0,
+            created_at: backup.meta?.date
+        };
+    } catch (e) {
+        return null;
+    }
+};
+
+export const getCurrentStats = async () => {
+    const fetchCount = async (table: string) => {
+        const { count } = await supabase.from(table).select('*', { count: 'exact', head: true }).is('deleted_at', null);
+        return count || 0;
+    };
+
+    const [
+        customers, products, suppliers,
+        transactions, expenses, payment_reminders, accounts_payable
+    ] = await Promise.all([
+        fetchCount('customers'),
+        fetchCount('products'),
+        fetchCount('suppliers'),
+        fetchCount('transactions'),
+        fetchCount('expenses'),
+        fetchCount('payment_reminders'),
+        fetchCount('accounts_payable')
+    ]);
+
+    return {
+        customers, products, suppliers,
+        transactions, expenses, payment_reminders, accounts_payable
+    };
 };
 
 /**
  * Restore Logic
  * Resets the database state to match the backup exactly.
  */
-export const importData = async (jsonString: string) => {
+
+export const importData = async (jsonString: string, onProgress?: (progress: number) => void, excludedTables: string[] = []) => {
+    onProgress?.(0);
     let backup;
     try {
         backup = JSON.parse(jsonString);
@@ -100,30 +162,42 @@ export const importData = async (jsonString: string) => {
         }
     };
 
-    // PHASE 1: UPSERT (Parents First -> Children)
-    // Ensures all referenced constraints exist before children reference them.
-    if (app_settings) await upsertTable('app_settings', app_settings);
-    await upsertTable('customers', customers);
-    await upsertTable('products', products);
-    await upsertTable('suppliers', suppliers);
-    await upsertTable('expense_presets', expense_presets);
+    const steps = [
+        { name: 'app_settings', data: app_settings, op: 'upsert' },
+        { name: 'customers', data: customers, op: 'upsert' },
+        { name: 'products', data: products, op: 'upsert' },
+        { name: 'suppliers', data: suppliers, op: 'upsert' },
+        { name: 'expense_presets', data: expense_presets, op: 'upsert' },
+        { name: 'transactions', data: transactions, op: 'upsert' },
+        { name: 'expenses', data: expenses, op: 'upsert' },
+        { name: 'payment_reminders', data: payment_reminders, op: 'upsert' },
+        { name: 'accounts_payable', data: accounts_payable, op: 'upsert' },
+        // Prune phases
+        { name: 'transactions', data: transactions, op: 'prune' },
+        { name: 'expenses', data: expenses, op: 'prune' },
+        { name: 'payment_reminders', data: payment_reminders, op: 'prune' },
+        { name: 'accounts_payable', data: accounts_payable, op: 'prune' },
+        { name: 'customers', data: customers, op: 'prune' },
+        { name: 'products', data: products, op: 'prune' },
+        { name: 'suppliers', data: suppliers, op: 'prune' },
+        { name: 'expense_presets', data: expense_presets, op: 'prune' },
+    ];
 
-    await upsertTable('transactions', transactions);
-    await upsertTable('expenses', expenses);
-    await upsertTable('payment_reminders', payment_reminders);
-    await upsertTable('accounts_payable', accounts_payable);
+    // Filter out steps for excluded tables
+    const activeSteps = steps.filter(step => !excludedTables.includes(step.name));
 
-    // PHASE 2: PRUNE (Children First -> Parents)
-    // Ensures children are deleted before parents to avoid FK violations.
-    await pruneTable('transactions', transactions);
-    await pruneTable('expenses', expenses);
-    await pruneTable('payment_reminders', payment_reminders);
-    await pruneTable('accounts_payable', accounts_payable);
-
-    await pruneTable('customers', customers);
-    await pruneTable('products', products);
-    await pruneTable('suppliers', suppliers);
-    await pruneTable('expense_presets', expense_presets);
+    const totalSteps = activeSteps.length;
+    for (let i = 0; i < totalSteps; i++) {
+        const step = activeSteps[i];
+        if (step.op === 'upsert') {
+            await upsertTable(step.name, step.data);
+        } else {
+            await pruneTable(step.name, step.data);
+        }
+        // Map 0-100%
+        onProgress?.(Math.round(((i + 1) / totalSteps) * 100));
+    }
 
     return true;
 };
+

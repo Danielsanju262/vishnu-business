@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { Button } from "../components/ui/Button";
@@ -142,23 +142,29 @@ export default function CustomerPaymentDetail() {
 
     // Long Press Logic
     // Using a simple ref-based approach for long press detection
-    const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
+    const timerRef = useRef<NodeJS.Timeout | null>(null);
 
     const handleTouchStart = (index: number) => {
-        const timer = setTimeout(() => {
+        timerRef.current = setTimeout(() => {
             setIsSelectionMode(true);
             const newSet = new Set<number>();
             newSet.add(index);
             setSelectedIndices(newSet);
             if (navigator.vibrate) navigator.vibrate(50);
         }, 500); // 500ms long press
-        setLongPressTimer(timer);
     };
 
     const handleTouchEnd = () => {
-        if (longPressTimer) {
-            clearTimeout(longPressTimer);
-            setLongPressTimer(null);
+        if (timerRef.current) {
+            clearTimeout(timerRef.current);
+            timerRef.current = null;
+        }
+    };
+
+    const handleTouchMove = () => {
+        if (timerRef.current) {
+            clearTimeout(timerRef.current);
+            timerRef.current = null;
         }
     };
 
@@ -183,23 +189,43 @@ export default function CustomerPaymentDetail() {
 
         // 1. Parse all transactions from ALL reminders (Global List)
         const allParsed: { reminderId: string; lineIndex: number; data: TransactionLog }[] = [];
+        const currentYear = new Date().getFullYear();
+        const now = new Date();
 
         for (const reminder of reminders) {
             const noteLines = (reminder.note || "").split('\n');
             noteLines.forEach((line: string, idx: number) => {
                 if (!line.trim()) return;
                 try {
-                    // ... reuse parsing logic block ...
-                    // To avoid code duplication, we really should refactor the parser or copy carefully.
-                    // For brevity in this tool call, I will include abbreviated logic or rely on copy-paste of strict parser from handleDeleteTransaction
-                    // Re-implementing simplified parser matching handleDeleteTransaction:
-
                     if (line.startsWith('[')) {
                         const dateMatch = line.match(/\[(.*?)\]/);
                         if (!dateMatch) return;
-                        const dateParts = dateMatch[1].split(' ');
-                        const datePart = dateParts.length >= 2 ? `${dateParts[0]} ${dateParts[1]}` : dateParts[0] || '';
-                        const timePart = dateParts[2] || '';
+
+                        const dateParts = dateMatch[1].split(' ').filter(Boolean);
+                        let datePart = "";
+                        let timePart = "";
+
+                        if (dateParts.length === 2) {
+                            const tempDate = new Date(`${dateParts[0]} ${dateParts[1]} ${currentYear}`);
+                            const yearToUse = tempDate > now ? currentYear - 1 : currentYear;
+                            datePart = `${dateParts[0]} ${dateParts[1]} ${yearToUse}`;
+                            timePart = "";
+                        } else if (dateParts.length >= 3) {
+                            const isYearAtIndex2 = /^\d{4}$/.test(dateParts[2]);
+                            if (isYearAtIndex2) {
+                                datePart = `${dateParts[0]} ${dateParts[1]} ${dateParts[2]}`;
+                                timePart = dateParts.slice(3).join(' ');
+                            } else {
+                                const tempDate = new Date(`${dateParts[0]} ${dateParts[1]} ${currentYear}`);
+                                const yearToUse = tempDate > now ? currentYear - 1 : currentYear;
+                                datePart = `${dateParts[0]} ${dateParts[1]} ${yearToUse}`;
+                                timePart = dateParts.slice(2).join(' ');
+                            }
+                        } else {
+                            datePart = dateParts[0] || '';
+                        }
+
+                        if (timePart) timePart = timePart.replace(/am|pm/gi, '').trim();
 
                         const isCreditSale = line.includes('Credit Sale:');
                         const isDueAdded = line.includes('New Due Added:');
@@ -499,6 +525,8 @@ export default function CustomerPaymentDetail() {
     const parseTransactions = (note: string) => {
         const lines = note.split('\n').filter(l => l.trim().length > 0);
         const parsed: TransactionLog[] = [];
+        const currentYear = new Date().getFullYear();
+        const now = new Date();
 
         for (const line of lines) {
             try {
@@ -507,10 +535,47 @@ export default function CustomerPaymentDetail() {
                     const dateMatch = line.match(/\[(.*?)\]/);
                     if (!dateMatch) continue;
 
-                    const dateParts = dateMatch[1].split(' ');
-                    // Format is "8 Jan 10:30" - first two parts are date, third is time
-                    const datePart = dateParts.length >= 2 ? `${dateParts[0]} ${dateParts[1]}` : dateParts[0] || '';
-                    const timePart = dateParts[2] || '';
+                    const dateParts = dateMatch[1].split(' ').filter(Boolean);
+                    // Examples: 
+                    // [8 Jan 10:30] -> length 3, p[2] has colon -> Old format
+                    // [8 Jan 2025 10:30] -> length 4, p[2] is year -> New format
+                    // [8 Jan 10:30 AM] -> length 4, p[2] has colon -> Old format
+
+                    let datePart = "";
+                    let timePart = "";
+
+                    if (dateParts.length === 2) {
+                        // "8 Jan" - Missing time + year
+                        const tempDate = new Date(`${dateParts[0]} ${dateParts[1]} ${currentYear}`);
+                        const yearToUse = tempDate > now ? currentYear - 1 : currentYear;
+                        datePart = `${dateParts[0]} ${dateParts[1]} ${yearToUse}`;
+                        timePart = "";
+                    } else if (dateParts.length >= 3) {
+                        // Check if 3rd part (index 2) is a Year (4 digits)
+                        // It must be a number and 4 digits long.
+                        const isYearAtIndex2 = /^\d{4}$/.test(dateParts[2]);
+
+                        if (isYearAtIndex2) {
+                            // NEW FORMAT: Day Month Year Time...
+                            datePart = `${dateParts[0]} ${dateParts[1]} ${dateParts[2]}`;
+                            timePart = dateParts.slice(3).join(' ');
+                        } else {
+                            // OLD FORMAT: Day Month Time... (Year missing)
+                            const tempDate = new Date(`${dateParts[0]} ${dateParts[1]} ${currentYear}`);
+                            const yearToUse = tempDate > now ? currentYear - 1 : currentYear;
+                            datePart = `${dateParts[0]} ${dateParts[1]} ${yearToUse}`;
+                            timePart = dateParts.slice(2).join(' ');
+                        }
+                    } else {
+                        // Fallback
+                        datePart = dateParts[0] || '';
+                    }
+
+                    // Strict 24h format enforcement: Remove AM/PM if present using regex
+                    if (timePart) {
+                        timePart = timePart.replace(/am|pm/gi, '').trim();
+                    }
+
 
                     const isCreditSale = line.includes('Credit Sale:');
                     const isDueAdded = line.includes('New Due Added:');
@@ -582,7 +647,7 @@ export default function CustomerPaymentDetail() {
         const primaryReminder = reminders[0];
         const newAmount = primaryReminder.amount + parseFloat(dueAmount);
         const today = new Date();
-        const dateStr = today.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+        const dateStr = today.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
         const timeStr = today.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
 
         let newNote = primaryReminder.note || "";
@@ -625,12 +690,13 @@ export default function CustomerPaymentDetail() {
         const received = parseFloat(receiveAmount);
         const newBalance = primaryReminder.amount - received;
         const today = new Date();
-        const dateStr = today.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+        const dateStr = today.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
         const timeStr = today.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
 
         let newNote = primaryReminder.note || "";
         if (newNote) newNote += "\n";
         newNote += `[${dateStr} ${timeStr}] Received: ₹${received.toLocaleString()}. Balance: ₹${Math.max(0, newBalance).toLocaleString()}`;
+
 
         const updates: any = {
             note: newNote,
@@ -661,6 +727,8 @@ export default function CustomerPaymentDetail() {
 
         // 1. Parse all transactions from ALL reminders
         const allParsed: { reminderId: string; lineIndex: number; data: TransactionLog }[] = [];
+        const currentYear = new Date().getFullYear();
+        const now = new Date();
 
         for (const reminder of reminders) {
             const noteLines = (reminder.note || "").split('\n');
@@ -670,9 +738,32 @@ export default function CustomerPaymentDetail() {
                     if (line.startsWith('[')) {
                         const dateMatch = line.match(/\[(.*?)\]/);
                         if (!dateMatch) return;
-                        const dateParts = dateMatch[1].split(' ');
-                        const datePart = dateParts.length >= 2 ? `${dateParts[0]} ${dateParts[1]}` : dateParts[0] || '';
-                        const timePart = dateParts[2] || '';
+
+                        const dateParts = dateMatch[1].split(' ').filter(Boolean);
+                        let datePart = "";
+                        let timePart = "";
+
+                        if (dateParts.length === 2) {
+                            const tempDate = new Date(`${dateParts[0]} ${dateParts[1]} ${currentYear}`);
+                            const yearToUse = tempDate > now ? currentYear - 1 : currentYear;
+                            datePart = `${dateParts[0]} ${dateParts[1]} ${yearToUse}`;
+                            timePart = "";
+                        } else if (dateParts.length >= 3) {
+                            const isYearAtIndex2 = /^\d{4}$/.test(dateParts[2]);
+                            if (isYearAtIndex2) {
+                                datePart = `${dateParts[0]} ${dateParts[1]} ${dateParts[2]}`;
+                                timePart = dateParts.slice(3).join(' ');
+                            } else {
+                                const tempDate = new Date(`${dateParts[0]} ${dateParts[1]} ${currentYear}`);
+                                const yearToUse = tempDate > now ? currentYear - 1 : currentYear;
+                                datePart = `${dateParts[0]} ${dateParts[1]} ${yearToUse}`;
+                                timePart = dateParts.slice(2).join(' ');
+                            }
+                        } else {
+                            datePart = dateParts[0] || '';
+                        }
+
+                        if (timePart) timePart = timePart.replace(/am|pm/gi, '').trim();
 
                         const isCreditSale = line.includes('Credit Sale:');
                         const isDueAdded = line.includes('New Due Added:');
@@ -791,6 +882,8 @@ export default function CustomerPaymentDetail() {
 
         // 1. Parse all transactions from ALL reminders (matching how UI displays)
         const allParsed: { reminderId: string; lineIndex: number; data: TransactionLog }[] = [];
+        const currentYear = new Date().getFullYear();
+        const now = new Date();
 
         for (const reminder of reminders) {
             const noteLines = (reminder.note || "").split('\n');
@@ -802,9 +895,32 @@ export default function CustomerPaymentDetail() {
                     if (line.startsWith('[')) {
                         const dateMatch = line.match(/\[(.*?)\]/);
                         if (!dateMatch) return;
-                        const dateParts = dateMatch[1].split(' ');
-                        const datePart = dateParts.length >= 2 ? `${dateParts[0]} ${dateParts[1]}` : dateParts[0] || '';
-                        const timePart = dateParts[2] || '';
+
+                        const dateParts = dateMatch[1].split(' ').filter(Boolean);
+                        let datePart = "";
+                        let timePart = "";
+
+                        if (dateParts.length === 2) {
+                            const tempDate = new Date(`${dateParts[0]} ${dateParts[1]} ${currentYear}`);
+                            const yearToUse = tempDate > now ? currentYear - 1 : currentYear;
+                            datePart = `${dateParts[0]} ${dateParts[1]} ${yearToUse}`;
+                            timePart = "";
+                        } else if (dateParts.length >= 3) {
+                            const isYearAtIndex2 = /^\d{4}$/.test(dateParts[2]);
+                            if (isYearAtIndex2) {
+                                datePart = `${dateParts[0]} ${dateParts[1]} ${dateParts[2]}`;
+                                timePart = dateParts.slice(3).join(' ');
+                            } else {
+                                const tempDate = new Date(`${dateParts[0]} ${dateParts[1]} ${currentYear}`);
+                                const yearToUse = tempDate > now ? currentYear - 1 : currentYear;
+                                datePart = `${dateParts[0]} ${dateParts[1]} ${yearToUse}`;
+                                timePart = dateParts.slice(2).join(' ');
+                            }
+                        } else {
+                            datePart = dateParts[0] || '';
+                        }
+
+                        if (timePart) timePart = timePart.replace(/am|pm/gi, '').trim();
 
                         const isCreditSale = line.includes('Credit Sale:');
                         const isDueAdded = line.includes('New Due Added:');
@@ -815,6 +931,8 @@ export default function CustomerPaymentDetail() {
                         if (isCreditSale) amountMatch = line.match(/Credit Sale: ₹([\d,]+)/);
                         else if (isDueAdded) amountMatch = line.match(/New Due Added: ₹([\d,]+)/);
                         else amountMatch = line.match(/Received: ₹([\d,]+)/);
+
+                        // Remaining logic...
 
                         if (amountMatch) {
                             let txnType: 'due_added' | 'payment_received' | 'credit_sale';
@@ -1102,8 +1220,8 @@ export default function CustomerPaymentDetail() {
                         </div>
                         <div className="flex items-center gap-2">
                             <div className="text-right">
-                                <p className="text-xs opacity-75 mb-1">Due Date</p>
-                                <p className="text-sm md:text-base font-bold">{earliestDueDate ? new Date(earliestDueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A'}</p>
+                                <p className="text-sm opacity-75 mb-1">Due Date</p>
+                                <p className="text-lg md:text-xl font-bold">{earliestDueDate ? new Date(earliestDueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A'}</p>
                             </div>
                             <button
                                 onClick={() => { setNewDueDate(earliestDueDate || ''); setShowEditDate(true); }}
@@ -1192,6 +1310,7 @@ export default function CustomerPaymentDetail() {
                                         }}
                                         onTouchStart={() => handleTouchStart(actualIndex)}
                                         onTouchEnd={handleTouchEnd}
+                                        onTouchMove={handleTouchMove}
                                         onContextMenu={() => {
                                             // Optional: prevent default menu on long press contexts if needed
                                         }}

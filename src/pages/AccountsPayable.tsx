@@ -8,6 +8,7 @@ import { cn } from "../lib/utils";
 import { Link } from "react-router-dom";
 import { useRealtimeTable } from "../hooks/useRealtimeSync";
 import { Modal } from "../components/ui/Modal";
+import { ConfirmationModal } from "../components/ui/ConfirmationModal";
 import { useDropdownClose } from "../hooks/useDropdownClose";
 import { useHistorySyncedState } from "../hooks/useHistorySyncedState";
 
@@ -64,6 +65,7 @@ export default function AccountsPayable() {
     // Edit Due Date Modal
     const [editDateSupplier, setEditDateSupplier] = useState<{ id: string; name: string } | null>(null);
     const [editDateValue, setEditDateValue] = useState("");
+    const [pendingNewSupplierName, setPendingNewSupplierName] = useState<string | null>(null);
 
     // Handle back navigation for modals
     useEffect(() => {
@@ -295,26 +297,15 @@ export default function AccountsPayable() {
         }
     };
 
-    const handleNewPayable = async () => {
-        if (!newPayableSupplier || !newPayableAmount || !newPayableDueDate) {
-            toast("Please fill all fields", "warning");
-            return;
-        }
-
-        const payableAmount = parseFloat(newPayableAmount);
-        if (isNaN(payableAmount) || payableAmount <= 0) {
-            toast("Please enter a valid amount", "warning");
-            return;
-        }
-
+    const createPayableInternal = async (supplierId: string, amountVal: number) => {
         const today = new Date();
         const dateStr = today.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
         const timeStr = today.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
-        const noteStr = `[${dateStr} ${timeStr}] New Payable Added: \u20b9${payableAmount.toLocaleString()}. Balance: \u20b9${payableAmount.toLocaleString()}`;
+        const noteStr = `[${dateStr} ${timeStr}] New Payable Added: \u20b9${amountVal.toLocaleString()}. Balance: \u20b9${amountVal.toLocaleString()}`;
 
         const { error } = await supabase.from('accounts_payable').insert({
-            supplier_id: newPayableSupplier,
-            amount: payableAmount,
+            supplier_id: supplierId,
+            amount: amountVal,
             due_date: newPayableDueDate,
             status: 'pending',
             note: noteStr
@@ -329,8 +320,57 @@ export default function AccountsPayable() {
             setNewPayableSupplierSearch("");
             setNewPayableAmount("");
             setNewPayableDueDate("");
+            setShowSupplierList(false);
+            setPendingNewSupplierName(null);
             loadData();
         }
+    };
+
+    const handleConfirmAddSupplier = async () => {
+        if (!pendingNewSupplierName) return;
+
+        const { data, error } = await supabase.from('suppliers').insert({
+            name: pendingNewSupplierName,
+            is_active: true
+        }).select().single();
+
+        if (error || !data) {
+            toast("Failed to create new supplier", "error");
+            return;
+        }
+
+        const payableAmount = parseFloat(newPayableAmount);
+        await createPayableInternal(data.id, payableAmount);
+    };
+
+    const handleNewPayable = async () => {
+        if (!newPayableAmount || !newPayableDueDate) {
+            toast("Please fill all fields", "warning");
+            return;
+        }
+
+        const payableAmount = parseFloat(newPayableAmount);
+        if (isNaN(payableAmount) || payableAmount <= 0) {
+            toast("Please enter a valid amount", "warning");
+            return;
+        }
+
+        if (!newPayableSupplier) {
+            if (newPayableSupplierSearch.trim()) {
+                const searchLower = newPayableSupplierSearch.trim().toLowerCase();
+                const existing = suppliers.find(s => s.name.toLowerCase() === searchLower);
+                if (existing) {
+                    await createPayableInternal(existing.id, payableAmount);
+                } else {
+                    setPendingNewSupplierName(newPayableSupplierSearch.trim());
+                }
+            } else {
+                toast("Please select a supplier", "warning");
+            }
+            return;
+        }
+
+        await createPayableInternal(newPayableSupplier, payableAmount);
     };
 
     const filteredSuppliersForNewPayable = suppliers.filter(c =>
@@ -759,6 +799,16 @@ export default function AccountsPayable() {
                     </div>
                 </div>
             </Modal>
+
+            <ConfirmationModal
+                isOpen={!!pendingNewSupplierName}
+                onClose={() => setPendingNewSupplierName(null)}
+                onConfirm={handleConfirmAddSupplier}
+                title="Add New Supplier?"
+                description={`"${pendingNewSupplierName}" is not in your list. Do you want to add them now?`}
+                confirmText="Add & Create"
+                variant="default"
+            />
         </>
     );
 }

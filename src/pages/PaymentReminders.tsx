@@ -8,6 +8,7 @@ import { cn } from "../lib/utils";
 import { Link } from "react-router-dom";
 import { useRealtimeTable } from "../hooks/useRealtimeSync";
 import { Modal } from "../components/ui/Modal";
+import { ConfirmationModal } from "../components/ui/ConfirmationModal";
 import { useDropdownClose } from "../hooks/useDropdownClose";
 import { useHistorySyncedState } from "../hooks/useHistorySyncedState";
 
@@ -64,6 +65,7 @@ export default function PaymentReminders() {
     // Edit Due Date Modal
     const [editDateCustomer, setEditDateCustomer] = useState<{ id: string; name: string } | null>(null);
     const [editDateValue, setEditDateValue] = useState("");
+    const [pendingNewCustomerName, setPendingNewCustomerName] = useState<string | null>(null);
 
     // Handle back navigation for modals
     useEffect(() => {
@@ -295,26 +297,15 @@ export default function PaymentReminders() {
         }
     };
 
-    const handleNewReminder = async () => {
-        if (!newReminderCustomer || !newReminderAmount || !newReminderDueDate) {
-            toast("Please fill all fields", "warning");
-            return;
-        }
-
-        const reminderAmount = parseFloat(newReminderAmount);
-        if (isNaN(reminderAmount) || reminderAmount <= 0) {
-            toast("Please enter a valid amount", "warning");
-            return;
-        }
-
+    const createReminderInternal = async (customerId: string, amountVal: number) => {
         const today = new Date();
         const dateStr = today.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
         const timeStr = today.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
-        const noteStr = `[${dateStr} ${timeStr}] New Due Added: \u20b9${reminderAmount.toLocaleString()}. Balance: \u20b9${reminderAmount.toLocaleString()}`;
+        const noteStr = `[${dateStr} ${timeStr}] New Due Added: \u20b9${amountVal.toLocaleString()}. Balance: \u20b9${amountVal.toLocaleString()}`;
 
         const { error } = await supabase.from('payment_reminders').insert({
-            customer_id: newReminderCustomer,
-            amount: reminderAmount,
+            customer_id: customerId,
+            amount: amountVal,
             due_date: newReminderDueDate,
             status: 'pending',
             note: noteStr
@@ -329,8 +320,57 @@ export default function PaymentReminders() {
             setNewReminderCustomerSearch("");
             setNewReminderAmount("");
             setNewReminderDueDate("");
+            setShowCustomerList(false);
+            setPendingNewCustomerName(null);
             loadData();
         }
+    };
+
+    const handleConfirmAddCustomer = async () => {
+        if (!pendingNewCustomerName) return;
+
+        const { data, error } = await supabase.from('customers').insert({
+            name: pendingNewCustomerName,
+            is_active: true
+        }).select().single();
+
+        if (error || !data) {
+            toast("Failed to create new customer", "error");
+            return;
+        }
+
+        const reminderAmount = parseFloat(newReminderAmount);
+        await createReminderInternal(data.id, reminderAmount);
+    };
+
+    const handleNewReminder = async () => {
+        if (!newReminderAmount || !newReminderDueDate) {
+            toast("Please fill all fields", "warning");
+            return;
+        }
+
+        const reminderAmount = parseFloat(newReminderAmount);
+        if (isNaN(reminderAmount) || reminderAmount <= 0) {
+            toast("Please enter a valid amount", "warning");
+            return;
+        }
+
+        if (!newReminderCustomer) {
+            if (newReminderCustomerSearch.trim()) {
+                const searchLower = newReminderCustomerSearch.trim().toLowerCase();
+                const existing = customers.find(c => c.name.toLowerCase() === searchLower);
+                if (existing) {
+                    await createReminderInternal(existing.id, reminderAmount);
+                } else {
+                    setPendingNewCustomerName(newReminderCustomerSearch.trim());
+                }
+            } else {
+                toast("Please select a customer", "warning");
+            }
+            return;
+        }
+
+        await createReminderInternal(newReminderCustomer, reminderAmount);
     };
 
     const filteredCustomersForNewReminder = customers.filter(c =>
@@ -759,6 +799,16 @@ export default function PaymentReminders() {
                     </div>
                 </div>
             </Modal>
+
+            <ConfirmationModal
+                isOpen={!!pendingNewCustomerName}
+                onClose={() => setPendingNewCustomerName(null)}
+                onConfirm={handleConfirmAddCustomer}
+                title="Add New Customer?"
+                description={`"${pendingNewCustomerName}" is not in your list. Do you want to add them now?`}
+                confirmText="Add & Create"
+                variant="default"
+            />
         </>
     );
 }

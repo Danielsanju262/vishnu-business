@@ -46,7 +46,7 @@ export const listBackups = async (accessToken: string) => {
     // List files created by this app or matching our pattern
     // q: "name contains 'vishnu_backup_' and trash = false"
     const q = encodeURIComponent("name contains 'vishnu_backup_' and trashed = false");
-    const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&orderBy=createdTime desc&fields=files(id, name, createdTime, size)`, {
+    const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&orderBy=createdTime desc&pageSize=6&fields=files(id, name, createdTime, size)`, {
         headers: {
             'Authorization': `Bearer ${accessToken}`
         }

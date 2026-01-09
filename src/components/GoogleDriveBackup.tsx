@@ -1,12 +1,176 @@
 import { useState, useEffect } from "react";
 import { useGoogleLogin } from "@react-oauth/google";
-import { Cloud, Upload, Download, Loader2, FileJson, CheckCircle2, RefreshCw } from "lucide-react";
+import { Cloud, Upload, Download, Loader2, FileJson, CheckCircle2, RefreshCw, AlertTriangle, ArrowRight, Database } from "lucide-react";
 import { Button } from "./ui/Button";
 import { useToast } from "./toast-provider";
 import { uploadToDrive, listBackups, downloadFile } from "../lib/drive";
-import { exportData, importData } from "../lib/backup";
-import { ConfirmationModal } from "./ui/ConfirmationModal";
+import { exportData, importData, getBackupStats, getCurrentStats } from "../lib/backup";
+import { Modal } from "./ui/Modal";
 import { cn } from "../lib/utils";
+
+// Progress Modal Component
+const ProgressModal = ({ isOpen, title, progress, status }: { isOpen: boolean; title: string; progress: number; status: string }) => {
+    return (
+        <Modal isOpen={isOpen} onClose={() => { }}>
+            <div className="text-center space-y-6 py-4">
+                <div className="w-16 h-16 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center mx-auto relative">
+                    <Cloud className="w-8 h-8 text-blue-600 dark:text-blue-400 z-10" />
+                    <svg className="absolute w-full h-full -rotate-90" viewBox="0 0 36 36">
+                        <path
+                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                            fill="none"
+                            stroke="#E2E8F0"
+                            strokeWidth="3"
+                            className="dark:stroke-neutral-800"
+                        />
+                        <path
+                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                            fill="none"
+                            stroke="#3B82F6"
+                            strokeWidth="3"
+                            strokeDasharray={`${progress}, 100`}
+                            className="transition-all duration-300 ease-out"
+                        />
+                    </svg>
+                </div>
+                <div>
+                    <h3 className="text-xl font-bold mb-2">{title}</h3>
+                    <p className="text-sm text-muted-foreground animate-pulse">{status}</p>
+                </div>
+                <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
+                    <div
+                        className="bg-blue-600 h-full transition-all duration-300 ease-out"
+                        style={{ width: `${progress}%` }}
+                    />
+                </div>
+                <p className="text-xs font-mono text-muted-foreground">{progress}% Complete</p>
+            </div>
+        </Modal>
+    );
+};
+
+// Restore Preview Modal
+const RestorePreviewModal = ({ isOpen, onClose, onConfirm, currentStats, backupStats, backupName }: any) => {
+    const [selected, setSelected] = useState<Record<string, boolean>>({
+        transactions: true,
+        customers: true,
+        products: true,
+        expenses: true,
+        suppliers: true,
+        accounts_payable: true
+    });
+
+    useEffect(() => {
+        if (isOpen) {
+            setSelected({
+                transactions: true,
+                customers: true,
+                products: true,
+                expenses: true,
+                suppliers: true,
+                accounts_payable: true
+            });
+        }
+    }, [isOpen]);
+
+    if (!currentStats || !backupStats) return null;
+
+    const toggleAll = () => {
+        const allSelected = Object.values(selected).every(Boolean);
+        const newState = !allSelected;
+        setSelected({
+            transactions: newState,
+            customers: newState,
+            products: newState,
+            expenses: newState,
+            suppliers: newState,
+            accounts_payable: newState
+        });
+    };
+
+    const handleConfirm = () => {
+        // Create excluded list from unchecked items
+        const excluded = Object.entries(selected)
+            .filter(([_, isSelected]) => !isSelected)
+            .map(([key]) => key);
+        onConfirm(excluded);
+    };
+
+    const StatRow = ({ id, label, current, backup }: any) => {
+        const diff = backup - current;
+        return (
+            <div className="flex items-center justify-between py-2 border-b border-border/50 last:border-0 text-sm">
+                <div className="flex items-center gap-3">
+                    <input
+                        type="checkbox"
+                        checked={selected[id]}
+                        onChange={() => setSelected(prev => ({ ...prev, [id]: !prev[id] }))}
+                        className="w-4 h-4 rounded border-neutral-300 text-amber-500 focus:ring-amber-500"
+                    />
+                    <span className="font-medium text-foreground">{label}</span>
+                </div>
+                <div className="flex items-center gap-3">
+                    <span className="text-neutral-500 line-through decoration-rose-500/50">{current}</span>
+                    <ArrowRight size={14} className="text-muted-foreground" />
+                    <span className={cn(
+                        "font-bold",
+                        diff < 0 ? "text-rose-500" : diff > 0 ? "text-emerald-500" : "text-foreground"
+                    )}>
+                        {backup}
+                    </span>
+                </div>
+            </div>
+        );
+    };
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose}>
+            <div className="space-y-4">
+                <div className="text-center">
+                    <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center mx-auto text-amber-500 mb-3">
+                        <Database size={24} />
+                    </div>
+                    <h2 className="text-lg font-bold">Confirm Restore</h2>
+                    <p className="text-xs text-muted-foreground">
+                        Restoring <span className="font-semibold text-foreground">"{backupName}"</span>
+                    </p>
+                </div>
+
+                <div className="bg-rose-50 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900/30 rounded-xl p-3 flex gap-3">
+                    <AlertTriangle className="text-rose-600 dark:text-rose-400 shrink-0" size={18} />
+                    <div className="text-xs text-rose-700 dark:text-rose-300 leading-relaxed">
+                        <span className="font-bold">Warning:</span> Overwrites current data.
+                        <br />Uncheck items you want to keep as-is (SKIP restore).
+                    </div>
+                </div>
+
+                <div className="bg-card border border-border rounded-xl p-4 space-y-1">
+                    <div className="flex justify-between items-center text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2 pb-2 border-b border-border">
+                        <div className="flex items-center gap-3">
+                            <button onClick={toggleAll} className="hover:text-primary underline">
+                                {Object.values(selected).every(Boolean) ? "Deselect All" : "Select All"}
+                            </button>
+                        </div>
+                        <span>Change</span>
+                    </div>
+                    <StatRow id="transactions" label="Sales" current={currentStats.transactions} backup={backupStats.transactions} />
+                    <StatRow id="customers" label="Customers" current={currentStats.customers} backup={backupStats.customers} />
+                    <StatRow id="products" label="Products" current={currentStats.products} backup={backupStats.products} />
+                    <StatRow id="expenses" label="Expenses" current={currentStats.expenses} backup={backupStats.expenses} />
+                    <StatRow id="suppliers" label="Suppliers" current={currentStats.suppliers} backup={backupStats.suppliers} />
+                    <StatRow id="accounts_payable" label="Payables" current={currentStats.accounts_payable} backup={backupStats.accounts_payable} />
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                    <Button variant="outline" className="flex-1 h-12" onClick={onClose}>Cancel</Button>
+                    <Button className="flex-1 h-12 bg-amber-500 hover:bg-amber-600 text-white font-bold" onClick={handleConfirm}>
+                        Restore Selected
+                    </Button>
+                </div>
+            </div>
+        </Modal>
+    );
+};
 
 export function GoogleDriveBackup() {
     const { toast } = useToast();
@@ -15,6 +179,26 @@ export function GoogleDriveBackup() {
     const [backups, setBackups] = useState<any[]>([]);
     const [showBackups, setShowBackups] = useState(false);
     const [isAutoBackupEnabled, setIsAutoBackupEnabled] = useState(false);
+
+    // Progress State
+    const [progress, setProgress] = useState(0);
+    const [progressStatus, setProgressStatus] = useState("");
+    const [showProgress, setShowProgress] = useState(false);
+
+    // Restore Preview State
+    const [restorePreview, setRestorePreview] = useState<{
+        isOpen: boolean;
+        backupName: string;
+        currentStats: any;
+        backupStats: any;
+        fileData: any; // We store the downloaded file here to pass it to confirm
+    }>({
+        isOpen: false,
+        backupName: "",
+        currentStats: null,
+        backupStats: null,
+        fileData: null
+    });
 
     // Load Auto Backup Config
     useEffect(() => {
@@ -35,24 +219,6 @@ export function GoogleDriveBackup() {
         localStorage.setItem('vishnu_backup_config', JSON.stringify({ enabled: newState }));
         toast(newState ? "Daily auto-backup enabled" : "Auto-backup disabled", "success");
     };
-
-    // Confirmation State
-    const [confirmConfig, setConfirmConfig] = useState<{
-        isOpen: boolean;
-        title: string;
-        description: string;
-        onConfirm: () => void;
-        variant?: "default" | "destructive";
-        confirmText?: string;
-    }>({
-        isOpen: false,
-        title: "",
-        description: "",
-        onConfirm: () => { },
-        variant: "destructive",
-    });
-
-    const closeConfirm = () => setConfirmConfig(prev => ({ ...prev, isOpen: false }));
 
     const login = useGoogleLogin({
         onSuccess: (codeResponse) => {
@@ -94,54 +260,110 @@ export function GoogleDriveBackup() {
 
     const handleBackup = async () => {
         if (!token) return;
-        setIsLoading(true);
+        setShowProgress(true);
+        setProgress(0);
+        setProgressStatus("Preparing data...");
+
         try {
-            const data = await exportData();
+            // 1. Export Data (0-90%)
+            const data = await exportData((p) => {
+                setProgress(Math.round(p * 0.9)); // Scale to 90%
+                setProgressStatus(`Backing up data... ${Math.round(p)}%`);
+            });
+
+            // 2. Upload (90-100%)
+            setProgress(90);
+            setProgressStatus("Uploading to Drive...");
             const fileName = `vishnu_backup_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
             await uploadToDrive(token, fileName, data);
+
+            setProgress(100);
+            setProgressStatus("Complete!");
             toast("Backup successful!", "success");
-            fetchBackups(token);
+
+            setTimeout(() => {
+                setShowProgress(false);
+                fetchBackups(token);
+            }, 1000);
+
         } catch (e) {
             console.error(e);
             toast("Backup failed", "error");
-        } finally {
-            setIsLoading(false);
+            setShowProgress(false);
         }
     };
 
-    const handleRestore = (fileId: string, fileName: string) => {
-        setConfirmConfig({
-            isOpen: true,
-            title: "Restore from Backup?",
-            description: `This will WIPE current data and restore state from "${fileName}". This cannot be undone.`,
-            variant: "destructive",
-            confirmText: "Yes, Restore",
-            onConfirm: async () => {
-                if (!token) return;
-                setIsLoading(true);
-                try {
-                    const file = await downloadFile(token, fileId);
-                    // drive api returns json object directly if alt=media not handled perfectly by browser fetch for json? 
-                    // actually `downloadFile` calls .json(), so we get the object.
-                    // `importData` expects string (if parsing) or object?
-                    // Let's check `importData` signature. It parses string.
-                    // But `res.json()` returns object.
-                    // So we should stringify it again or adjust importData.
-                    // Adjusting importData is cleaner, but let's just stringify here for safety matching signature.
+    const handleRestoreClick = async (fileId: string, fileName: string) => {
+        if (!token) return;
+        setShowProgress(true);
+        setProgress(0);
+        setProgressStatus("Downloading backup...");
 
-                    await importData(JSON.stringify(file));
+        try {
+            // 1. Download
+            // We fake progress for download since it's one fetch
+            const interval = setInterval(() => {
+                setProgress(p => p < 90 ? p + 5 : p);
+            }, 150);
 
-                    toast("Restore complete! Reloading...", "success");
-                    setTimeout(() => window.location.reload(), 1500);
-                } catch (e) {
-                    console.error(e);
-                    toast("Restore failed: " + String(e), "error");
-                } finally {
-                    setIsLoading(false);
-                }
+            const file = await downloadFile(token, fileId);
+            clearInterval(interval);
+            setProgress(100);
+
+            // 2. Prepare Preview
+            setProgressStatus("Analyzing backup...");
+            const jsonString = JSON.stringify(file);
+            const backupStats = getBackupStats(jsonString);
+            const currentStats = await getCurrentStats();
+
+            // Close progress to show preview
+            setShowProgress(false);
+
+            if (backupStats) {
+                setRestorePreview({
+                    isOpen: true,
+                    backupName: fileName,
+                    currentStats,
+                    backupStats,
+                    fileData: jsonString
+                });
+            } else {
+                toast("Invalid backup file", "error");
             }
-        });
+
+        } catch (e) {
+            console.error(e);
+            toast("Failed to download backup", "error");
+            setShowProgress(false);
+        }
     };
+
+    const confirmRestore = async (excludedTables: string[]) => {
+        if (!restorePreview.fileData) return;
+        setRestorePreview(prev => ({ ...prev, isOpen: false }));
+
+        setShowProgress(true);
+        setProgress(0);
+        setProgressStatus("Restoring database...");
+
+        try {
+            await importData(restorePreview.fileData, (p) => {
+                setProgress(p);
+                setProgressStatus(`Restoring... ${p}%`);
+            }, excludedTables);
+
+            setProgress(100);
+            setProgressStatus("Restore Complete!");
+            toast("Restore complete! Reloading...", "success");
+
+            setTimeout(() => window.location.reload(), 1500);
+        } catch (e) {
+            console.error(e);
+            toast("Restore failed: " + String(e), "error");
+            setShowProgress(false);
+        }
+    };
+
 
     if (!token) {
         return (
@@ -210,21 +432,21 @@ export function GoogleDriveBackup() {
                     </button>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="flex gap-3">
                     <Button
                         onClick={handleBackup}
-                        disabled={isLoading}
-                        className="h-12 bg-primary text-primary-foreground hover:bg-primary/90 font-bold"
+                        disabled={showProgress}
+                        className="flex-1 h-11 bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-100 font-semibold shadow-sm transition-all active:scale-[0.98]"
                     >
-                        {isLoading ? <Loader2 className="animate-spin mr-2" /> : <Upload className="mr-2" size={18} />}
-                        Backup Now
+                        {showProgress ? <Loader2 className="animate-spin mr-2" size={18} /> : <Upload className="mr-2" size={18} />}
+                        Manual Backup
                     </Button>
                     <Button
                         variant="outline"
                         onClick={() => setShowBackups(!showBackups)}
-                        className="h-12 font-bold border-2"
+                        className="flex-1 h-11 font-medium border-neutral-200 dark:border-neutral-700 bg-white dark:bg-transparent hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 transition-all active:scale-[0.98]"
                     >
-                        {showBackups ? "Hide Files" : "View Backups"}
+                        {showBackups ? "Hide Backups" : "View Backups"}
                     </Button>
                 </div>
             </div>
@@ -261,7 +483,7 @@ export function GoogleDriveBackup() {
                                     <Button
                                         size="sm"
                                         variant="outline"
-                                        onClick={() => handleRestore(file.id, file.name)}
+                                        onClick={() => handleRestoreClick(file.id, file.name)}
                                         className="h-8 text-xs font-bold border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:border-rose-900/30 dark:text-rose-400 dark:hover:bg-rose-900/20"
                                     >
                                         <Download size={12} className="mr-1.5" /> Restore
@@ -273,14 +495,20 @@ export function GoogleDriveBackup() {
                 </div>
             )}
 
-            <ConfirmationModal
-                isOpen={confirmConfig.isOpen}
-                onClose={closeConfirm}
-                onConfirm={confirmConfig.onConfirm}
-                title={confirmConfig.title}
-                description={confirmConfig.description}
-                variant={confirmConfig.variant}
-                confirmText={confirmConfig.confirmText}
+            <ProgressModal
+                isOpen={showProgress}
+                title={progressStatus}
+                progress={progress}
+                status={progress < 100 ? "Please wait..." : "Done!"}
+            />
+
+            <RestorePreviewModal
+                isOpen={restorePreview.isOpen}
+                onClose={() => setRestorePreview(prev => ({ ...prev, isOpen: false }))}
+                onConfirm={confirmRestore}
+                backupName={restorePreview.backupName}
+                currentStats={restorePreview.currentStats}
+                backupStats={restorePreview.backupStats}
             />
         </div>
     );
