@@ -1,8 +1,12 @@
-import { useState, useEffect } from "react";
+import React, { Suspense, useState, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { supabase } from "./lib/supabase";
 
 import Layout from "./components/Layout";
+// Lazy load Insights pages to isolate errors
+const Insights = React.lazy(() => import("./pages/Insights"));
+const InsightsChat = React.lazy(() => import("./pages/InsightsChat"));
+const BusinessInsights = React.lazy(() => import("./pages/BusinessInsights"));
 import Customers from "./pages/Customers";
 import Products from "./pages/Products";
 import Dashboard from "./pages/Dashboard";
@@ -20,11 +24,15 @@ import SupplierPaymentDetail from "./pages/SupplierPaymentDetail";
 import ScrollToTop from "./components/ScrollToTop";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import LockScreen from "./components/LockScreen";
+import { useMorningNotifications } from "./hooks/useMorningNotifications";
 
 function AppContent() {
   const { isLocked } = useAuth();
   const [isDeviceAuthorized, setIsDeviceAuthorized] = useState<boolean | null>(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
+
+  // Initialize morning notifications
+  useMorningNotifications();
 
   useEffect(() => {
     checkDeviceAuth();
@@ -39,16 +47,24 @@ function AppContent() {
     } else {
       // Check if master PIN exists at all
       try {
-        await supabase
+        // Add timeout to prevent hanging if internet is slow/blocked
+        const checkPin = supabase
           .from('app_settings')
           .select('master_pin')
           .eq('id', 1)
           .single();
 
+        const timeout = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Timeout')), 5000)
+        );
+
+        await Promise.race([checkPin, timeout]);
+
         // If no master PIN exists, this is first-time setup
         // If master PIN exists but device not authorized, need verification
         setIsDeviceAuthorized(false);
       } catch {
+        // On error or timeout, default to unauthorized loop which handles setup/verification
         setIsDeviceAuthorized(false);
       }
     }
@@ -75,7 +91,22 @@ function AppContent() {
       {isLocked && <LockScreen />}
       <Routes>
         <Route path="/" element={<Layout />}>
-          <Route index element={<Dashboard />} />
+          <Route index element={
+            <Suspense fallback={<div className="p-10 text-center">Loading Insights...</div>}>
+              <Insights />
+            </Suspense>
+          } />
+          <Route path="insights/chat" element={
+            <Suspense fallback={<div className="p-10 text-center">Loading Chat...</div>}>
+              <InsightsChat />
+            </Suspense>
+          } />
+          <Route path="insights/business" element={
+            <Suspense fallback={<div className="p-10 text-center">Loading Business Insights...</div>}>
+              <BusinessInsights />
+            </Suspense>
+          } />
+          <Route path="dashboard" element={<Dashboard />} />
           <Route path="customers" element={<Customers />} />
           <Route path="products" element={<Products />} />
           <Route path="reports" element={<Reports />} />

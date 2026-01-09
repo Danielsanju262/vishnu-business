@@ -80,7 +80,8 @@ export function usePaymentNotifications() {
                         notification.onclick = function (e) {
                             e.preventDefault();
                             window.focus();
-                            navigate('/payment-reminders');
+                            // Navigate to Insights page (now the default page)
+                            navigate('/');
                             notification.close();
                         };
 

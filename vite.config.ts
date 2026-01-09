@@ -39,5 +39,8 @@ export default defineConfig({
   ],
   server: {
     host: true
+  },
+  build: {
+    target: 'es2015'
   }
 })

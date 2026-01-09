@@ -28,11 +28,18 @@ export default function MasterPinSetup({ onSuccess }: { onSuccess: () => void })
 
     const checkExistingPin = async () => {
         try {
-            const { data, error } = await supabase
+            const checkQuery = supabase
                 .from('app_settings')
                 .select('master_pin')
                 .eq('id', 1)
                 .single();
+
+            const timeout = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Timeout')), 5000)
+            );
+
+            // Use race to prevent hanging
+            const { data, error } = await Promise.race([checkQuery, timeout]) as any;
 
             if (error && error.code !== 'PGRST116') {
                 console.error(error);
@@ -41,6 +48,10 @@ export default function MasterPinSetup({ onSuccess }: { onSuccess: () => void })
             setHasExistingPin(!!data?.master_pin);
         } catch (e) {
             console.error(e);
+            // On timeout/error, assume no pin (or just let them try to create/enter)
+            // But for safety, if we can't connect, maybe we shouldn't assume 'no pin'.
+            // However, infinite loading is worse.
+            setHasExistingPin(false);
         } finally {
             setIsLoading(false);
         }

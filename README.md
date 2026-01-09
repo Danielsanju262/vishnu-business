@@ -4,6 +4,7 @@ A modern business management application for tracking sales, expenses, customers
 
 ## Features
 
+- 🧠 **Daily Insights** - AI-powered daily business assistant with tasks, insights, and chat
 - 📊 **Dashboard** - View today's revenue and profit at a glance
 - 💰 **Sales Management** - Record sales with customer and product selection
 - 💸 **Expense Tracking** - Track business expenses with quick presets
@@ -20,6 +21,7 @@ A modern business management application for tracking sales, expenses, customers
 - **Styling**: TailwindCSS
 - **Database**: Supabase (PostgreSQL)
 - **Real-time**: Supabase Realtime
+- **AI**: Google Gemini API (free tier)
 - **Authentication**: Custom PIN + WebAuthn (Fingerprint)
 
 ## Setup
@@ -34,12 +36,19 @@ npm install
 
 ### 2. Environment Setup
 
-Create a `.env` file with your Supabase credentials:
+Create a `.env` file with your credentials:
 
 ```env
 VITE_SUPABASE_URL=your_supabase_project_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+VITE_GEMINI_API_KEY=your_gemini_api_key
 ```
+
+**To get a free Gemini API key:**
+1. Go to [Google AI Studio](https://aistudio.google.com/apikey)
+2. Sign in with your Google account
+3. Click "Create API Key"
+4. Copy the key and add it to your `.env` file
 
 ### 3. Database Setup
 
