@@ -190,7 +190,7 @@ INSTRUCTIONS:
         }
 
         // Try to read rate limits from headers
-        const remainingMonth = response.headers.get('x-ratelimit-remaining-tokens-month');
+
         const limitMonth = response.headers.get('x-ratelimit-limit-tokens-month');
         const resetMonth = response.headers.get('x-ratelimit-reset-tokens-month') || response.headers.get('x-ratelimit-reset');
 
