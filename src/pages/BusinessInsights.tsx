@@ -878,107 +878,109 @@ export default function BusinessInsights() {
                     )}
 
                     {/* Product Details Modal - with Click Outside to Close */}
-                    {selectedProduct && (
-                        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/80 backdrop-blur-sm px-4 pb-4 pt-22 md:pt-32 animate-in fade-in"
-                            onClick={() => setSelectedProduct(null)}
-                        >
-                            <div
-                                className="bg-zinc-950 w-full max-w-lg rounded-3xl border border-zinc-800 overflow-hidden shadow-2xl flex flex-col max-h-[80vh] animate-in zoom-in-95 duration-200"
-                                onClick={(e) => e.stopPropagation()}
-                            >
-                                <div className="p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-900/50">
-                                    <div>
-                                        <h3 className="font-bold text-lg text-white">{selectedProduct.name}</h3>
-                                        <p className="text-xs text-zinc-400">Customer Wise Breakdown ({rangeType})</p>
-                                    </div>
-                                    <button onClick={() => setSelectedProduct(null)} className="p-2 bg-zinc-800 rounded-full text-zinc-400 hover:text-white">
-                                        <X size={16} />
-                                    </button>
-                                </div>
-                                <div className="p-4 overflow-y-auto space-y-2 max-h-[400px]">
-                                    {data.transactions
-                                        .filter(t => (t.products?.name === selectedProduct.name))
-                                        .sort((a, b) => b.quantity - a.quantity)
-                                        .map((t, i) => (
-                                            <div key={i} className="flex justify-between items-center p-3 bg-zinc-900 rounded-xl border border-zinc-800/50">
-                                                <div>
-                                                    <p className="text-sm font-bold text-zinc-200">{t.customers?.name || 'Walk-in'}</p>
-                                                    <p className="text-[10px] text-zinc-500">{format(new Date(t.date), 'dd MMM yyyy')}</p>
-                                                </div>
-                                                <div className="text-right">
-                                                    <p className="text-sm font-bold text-emerald-500">₹{(t.quantity * t.sell_price).toLocaleString()}</p>
-                                                    <p className="text-[10px] text-zinc-400">{t.quantity} {t.products?.unit}</p>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    {data.transactions.filter(t => t.products?.name === selectedProduct.name).length === 0 && (
-                                        <p className="text-center text-zinc-500 py-4">No transactions found.</p>
-                                    )}
-                                </div>
+                </div>
+            )}
+
+            {/* Product Details Modal - with Click Outside to Close */}
+            {selectedProduct && (
+                <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/80 backdrop-blur-sm px-4 pt-[160px] pb-[230px] animate-in fade-in"
+                    onClick={() => setSelectedProduct(null)}
+                >
+                    <div
+                        className="bg-zinc-950 w-full max-w-lg rounded-3xl border border-zinc-800 overflow-hidden shadow-2xl flex flex-col max-h-[80vh] animate-in zoom-in-95 duration-200 mt-1"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-900/50">
+                            <div>
+                                <h3 className="font-bold text-lg text-white">{selectedProduct.name}</h3>
+                                <p className="text-xs text-zinc-400">Customer Wise Breakdown ({rangeType})</p>
                             </div>
+                            <button onClick={() => setSelectedProduct(null)} className="p-2 bg-zinc-800 rounded-full text-zinc-400 hover:text-white">
+                                <X size={16} />
+                            </button>
                         </div>
-                    )}
-
-                    {/* Customer Details Modal - Product Wise Breakdown */}
-                    {selectedCustomer && (
-                        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/80 backdrop-blur-sm px-4 pb-4 pt-22 md:pt-32 animate-in fade-in"
-                            onClick={() => setSelectedCustomer(null)}
-                        >
-                            <div
-                                className="bg-zinc-950 w-full max-w-lg rounded-3xl border border-zinc-800 overflow-hidden shadow-2xl flex flex-col max-h-[80vh] animate-in zoom-in-95 duration-200"
-                                onClick={(e) => e.stopPropagation()}
-                            >
-                                <div className="p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-900/50">
-                                    <div>
-                                        <h3 className="font-bold text-lg text-white">{selectedCustomer.name}</h3>
-                                        <p className="text-xs text-zinc-400">Product Wise Breakdown ({rangeType})</p>
+                        <div className="p-4 overflow-y-auto space-y-2 max-h-[400px]">
+                            {data.transactions
+                                .filter(t => (t.products?.name === selectedProduct.name))
+                                .sort((a, b) => b.quantity - a.quantity)
+                                .map((t, i) => (
+                                    <div key={i} className="flex justify-between items-center p-3 bg-zinc-900 rounded-xl border border-zinc-800/50">
+                                        <div>
+                                            <p className="text-sm font-bold text-zinc-200">{t.customers?.name || 'Walk-in'}</p>
+                                            <p className="text-[10px] text-zinc-500">{format(new Date(t.date), 'dd MMM yyyy')}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-sm font-bold text-emerald-500">₹{(t.quantity * t.sell_price).toLocaleString()}</p>
+                                            <p className="text-[10px] text-zinc-400">{t.quantity} {t.products?.unit}</p>
+                                        </div>
                                     </div>
-                                    <button onClick={() => setSelectedCustomer(null)} className="p-2 bg-zinc-800 rounded-full text-zinc-400 hover:text-white">
-                                        <X size={16} />
-                                    </button>
-                                </div>
-                                <div className="p-4 overflow-y-auto space-y-2 max-h-[400px]">
-                                    {(() => {
-                                        // Aggregate products for this customer
-                                        const productStats: Record<string, { name: string; quantity: number; revenue: number; unit: string }> = {};
-                                        data.transactions
-                                            .filter(t => t.customer_id === selectedCustomer.id)
-                                            .forEach(t => {
-                                                const name = t.products?.name || 'Unknown';
-                                                if (!productStats[name]) {
-                                                    productStats[name] = { name, quantity: 0, revenue: 0, unit: t.products?.unit || '' };
-                                                }
-                                                productStats[name].quantity += t.quantity;
-                                                productStats[name].revenue += (t.quantity * t.sell_price);
-                                            });
+                                ))}
+                            {data.transactions.filter(t => t.products?.name === selectedProduct.name).length === 0 && (
+                                <p className="text-center text-zinc-500 py-4">No transactions found.</p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
-                                        const sortedProducts = Object.values(productStats).sort((a, b) => b.quantity - a.quantity);
-
-                                        if (sortedProducts.length === 0) {
-                                            return <p className="text-center text-zinc-500 py-4">No purchases found.</p>;
+            {/* Customer Details Modal - Product Wise Breakdown */}
+            {selectedCustomer && (
+                <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/80 backdrop-blur-sm px-4 pt-[260px] pb-[230px] animate-in fade-in"
+                    onClick={() => setSelectedCustomer(null)}
+                >
+                    <div
+                        className="bg-zinc-950 w-full max-w-lg rounded-3xl border border-zinc-800 overflow-hidden shadow-2xl flex flex-col max-h-[80vh] animate-in zoom-in-95 duration-200 mt-1"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-900/50">
+                            <div>
+                                <h3 className="font-bold text-lg text-white">{selectedCustomer.name}</h3>
+                                <p className="text-xs text-zinc-400">Product Wise Breakdown ({rangeType})</p>
+                            </div>
+                            <button onClick={() => setSelectedCustomer(null)} className="p-2 bg-zinc-800 rounded-full text-zinc-400 hover:text-white">
+                                <X size={16} />
+                            </button>
+                        </div>
+                        <div className="p-4 overflow-y-auto space-y-2 max-h-[400px]">
+                            {(() => {
+                                // Aggregate products for this customer
+                                const productStats: Record<string, { name: string; quantity: number; revenue: number; unit: string }> = {};
+                                data.transactions
+                                    .filter(t => t.customer_id === selectedCustomer.id)
+                                    .forEach(t => {
+                                        const name = t.products?.name || 'Unknown';
+                                        if (!productStats[name]) {
+                                            productStats[name] = { name, quantity: 0, revenue: 0, unit: t.products?.unit || '' };
                                         }
+                                        productStats[name].quantity += t.quantity;
+                                        productStats[name].revenue += (t.quantity * t.sell_price);
+                                    });
 
-                                        return sortedProducts.map((prod, i) => (
-                                            <div key={i} className="flex justify-between items-center p-3 bg-zinc-900 rounded-xl border border-zinc-800/50">
-                                                <div>
-                                                    <p className="text-sm font-bold text-zinc-200">{prod.name}</p>
-                                                    <div className="flex items-center gap-2">
-                                                        <span className={cn("text-[10px] px-1.5 py-0.5 rounded text-zinc-950 font-bold", i === 0 ? "bg-amber-500" : i === 1 ? "bg-zinc-400" : "bg-zinc-700 text-zinc-300")}>
-                                                            #{i + 1}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                                <div className="text-right">
-                                                    <p className="text-sm font-bold text-emerald-500">₹{prod.revenue.toLocaleString()}</p>
-                                                    <p className="text-[10px] text-zinc-400">{prod.quantity} {prod.unit}</p>
-                                                </div>
+                                const sortedProducts = Object.values(productStats).sort((a, b) => b.quantity - a.quantity);
+
+                                if (sortedProducts.length === 0) {
+                                    return <p className="text-center text-zinc-500 py-4">No purchases found.</p>;
+                                }
+
+                                return sortedProducts.map((prod, i) => (
+                                    <div key={i} className="flex justify-between items-center p-3 bg-zinc-900 rounded-xl border border-zinc-800/50">
+                                        <div>
+                                            <p className="text-sm font-bold text-zinc-200">{prod.name}</p>
+                                            <div className="flex items-center gap-2">
+                                                <span className={cn("text-[10px] px-1.5 py-0.5 rounded text-zinc-950 font-bold", i === 0 ? "bg-amber-500" : i === 1 ? "bg-zinc-400" : "bg-zinc-700 text-zinc-300")}>
+                                                    #{i + 1}
+                                                </span>
                                             </div>
-                                        ));
-                                    })()}
-                                </div>
-                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-sm font-bold text-emerald-500">₹{prod.revenue.toLocaleString()}</p>
+                                            <p className="text-[10px] text-zinc-400">{prod.quantity} {prod.unit}</p>
+                                        </div>
+                                    </div>
+                                ));
+                            })()}
                         </div>
-                    )}
+                    </div>
                 </div>
             )}
         </div>
