@@ -879,7 +879,7 @@ export default function BusinessInsights() {
 
                     {/* Product Details Modal - with Click Outside to Close */}
                     {selectedProduct && (
-                        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/80 backdrop-blur-sm px-4 pb-4 pt-36 md:pt-44 animate-in fade-in"
+                        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/80 backdrop-blur-sm px-4 pb-4 pt-52 md:pt-60 animate-in fade-in"
                             onClick={() => setSelectedProduct(null)}
                         >
                             <div
@@ -895,7 +895,7 @@ export default function BusinessInsights() {
                                         <X size={16} />
                                     </button>
                                 </div>
-                                <div className="p-4 overflow-y-auto space-y-2 flex-1">
+                                <div className="p-4 overflow-y-auto space-y-2 max-h-[400px]">
                                     {data.transactions
                                         .filter(t => (t.products?.name === selectedProduct.name))
                                         .sort((a, b) => b.quantity - a.quantity)
@@ -921,7 +921,7 @@ export default function BusinessInsights() {
 
                     {/* Customer Details Modal - Product Wise Breakdown */}
                     {selectedCustomer && (
-                        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/80 backdrop-blur-sm px-4 pb-4 pt-36 md:pt-44 animate-in fade-in"
+                        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/80 backdrop-blur-sm px-4 pb-4 pt-52 md:pt-60 animate-in fade-in"
                             onClick={() => setSelectedCustomer(null)}
                         >
                             <div
@@ -937,7 +937,7 @@ export default function BusinessInsights() {
                                         <X size={16} />
                                     </button>
                                 </div>
-                                <div className="p-4 overflow-y-auto space-y-2 flex-1">
+                                <div className="p-4 overflow-y-auto space-y-2 max-h-[400px]">
                                     {(() => {
                                         // Aggregate products for this customer
                                         const productStats: Record<string, { name: string; quantity: number; revenue: number; unit: string }> = {};
