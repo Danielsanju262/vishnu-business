@@ -27,6 +27,7 @@ export default function BusinessInsights() {
     // Filters
     const [rangeType, setRangeType] = useState<DateRangeType>("month");
     const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
+    const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
     const [selectedChartDay, setSelectedChartDay] = useState<string | null>(null);
     const chartRef = useRef<HTMLDivElement>(null);
     useDropdownClose(selectedChartDay !== null, () => setSelectedChartDay(null), chartRef);
@@ -720,17 +721,27 @@ export default function BusinessInsights() {
                                         <p className="text-sm text-muted-foreground text-center py-4">No customers in this period</p>
                                     ) : (
                                         customerInsights.topCustomers.map((customer, idx) => (
-                                            <div key={customer.id} className="flex items-center justify-between p-2.5 bg-muted/30 rounded-xl">
+                                            <div
+                                                key={customer.id}
+                                                onClick={() => setSelectedCustomer(customer)}
+                                                className="flex items-center justify-between p-2.5 bg-muted/30 rounded-xl cursor-pointer hover:bg-muted/50 active:bg-muted transition-all active:scale-[0.99] group border border-transparent hover:border-border/50"
+                                            >
                                                 <div className="flex items-center gap-2.5">
                                                     <span className={cn("w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black text-white", idx === 0 ? "bg-blue-500" : idx === 1 ? "bg-blue-400" : idx === 2 ? "bg-blue-300" : "bg-zinc-500")}>
                                                         {idx + 1}
                                                     </span>
                                                     <div>
-                                                        <p className="text-sm font-semibold text-foreground">{customer.name}</p>
+                                                        <div className="flex items-center gap-1.5">
+                                                            <p className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">{customer.name}</p>
+                                                            <ChevronRight size={12} className="text-muted-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity -ml-1" />
+                                                        </div>
                                                         <p className="text-[10px] text-muted-foreground">{customer.count} transactions</p>
                                                     </div>
                                                 </div>
-                                                <p className="text-sm font-bold text-emerald-500">₹{customer.revenue.toLocaleString()}</p>
+                                                <div className="flex items-center gap-2">
+                                                    <p className="text-sm font-bold text-emerald-500">₹{customer.revenue.toLocaleString()}</p>
+                                                    <ChevronRight size={16} className="text-muted-foreground/40 group-hover:text-foreground transition-colors" />
+                                                </div>
                                             </div>
                                         ))
                                     )}
@@ -868,11 +879,11 @@ export default function BusinessInsights() {
 
                     {/* Product Details Modal - with Click Outside to Close */}
                     {selectedProduct && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in"
+                        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/80 backdrop-blur-sm px-4 pb-4 pt-36 md:pt-44 animate-in fade-in"
                             onClick={() => setSelectedProduct(null)}
                         >
                             <div
-                                className="bg-zinc-950 w-full max-w-lg rounded-3xl border border-zinc-800 overflow-hidden shadow-2xl flex flex-col max-h-[80vh] animate-in zoom-in-95 duration-200"
+                                className="bg-zinc-950 w-full max-w-lg rounded-3xl border border-zinc-800 overflow-hidden shadow-2xl flex flex-col max-h-[80vh] animate-in zoom-in-95 duration-200 mt-2"
                                 onClick={(e) => e.stopPropagation()}
                             >
                                 <div className="p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-900/50">
@@ -903,6 +914,67 @@ export default function BusinessInsights() {
                                     {data.transactions.filter(t => t.products?.name === selectedProduct.name).length === 0 && (
                                         <p className="text-center text-zinc-500 py-4">No transactions found.</p>
                                     )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Customer Details Modal - Product Wise Breakdown */}
+                    {selectedCustomer && (
+                        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/80 backdrop-blur-sm px-4 pb-4 pt-36 md:pt-44 animate-in fade-in"
+                            onClick={() => setSelectedCustomer(null)}
+                        >
+                            <div
+                                className="bg-zinc-950 w-full max-w-lg rounded-3xl border border-zinc-800 overflow-hidden shadow-2xl flex flex-col max-h-[80vh] animate-in zoom-in-95 duration-200 mt-2"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <div className="p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-900/50">
+                                    <div>
+                                        <h3 className="font-bold text-lg text-white">{selectedCustomer.name}</h3>
+                                        <p className="text-xs text-zinc-400">Product Wise Breakdown ({rangeType})</p>
+                                    </div>
+                                    <button onClick={() => setSelectedCustomer(null)} className="p-2 bg-zinc-800 rounded-full text-zinc-400 hover:text-white">
+                                        <X size={16} />
+                                    </button>
+                                </div>
+                                <div className="p-4 overflow-y-auto space-y-2 flex-1">
+                                    {(() => {
+                                        // Aggregate products for this customer
+                                        const productStats: Record<string, { name: string; quantity: number; revenue: number; unit: string }> = {};
+                                        data.transactions
+                                            .filter(t => t.customer_id === selectedCustomer.id)
+                                            .forEach(t => {
+                                                const name = t.products?.name || 'Unknown';
+                                                if (!productStats[name]) {
+                                                    productStats[name] = { name, quantity: 0, revenue: 0, unit: t.products?.unit || '' };
+                                                }
+                                                productStats[name].quantity += t.quantity;
+                                                productStats[name].revenue += (t.quantity * t.sell_price);
+                                            });
+
+                                        const sortedProducts = Object.values(productStats).sort((a, b) => b.quantity - a.quantity);
+
+                                        if (sortedProducts.length === 0) {
+                                            return <p className="text-center text-zinc-500 py-4">No purchases found.</p>;
+                                        }
+
+                                        return sortedProducts.map((prod, i) => (
+                                            <div key={i} className="flex justify-between items-center p-3 bg-zinc-900 rounded-xl border border-zinc-800/50">
+                                                <div>
+                                                    <p className="text-sm font-bold text-zinc-200">{prod.name}</p>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={cn("text-[10px] px-1.5 py-0.5 rounded text-zinc-950 font-bold", i === 0 ? "bg-amber-500" : i === 1 ? "bg-zinc-400" : "bg-zinc-700 text-zinc-300")}>
+                                                            #{i + 1}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="text-sm font-bold text-emerald-500">₹{prod.revenue.toLocaleString()}</p>
+                                                    <p className="text-[10px] text-zinc-400">{prod.quantity} {prod.unit}</p>
+                                                </div>
+                                            </div>
+                                        ));
+                                    })()}
                                 </div>
                             </div>
                         </div>
