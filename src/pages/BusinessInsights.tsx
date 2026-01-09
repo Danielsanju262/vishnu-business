@@ -879,11 +879,11 @@ export default function BusinessInsights() {
 
                     {/* Product Details Modal - with Click Outside to Close */}
                     {selectedProduct && (
-                        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/80 backdrop-blur-sm px-4 pb-4 pt-36 md:pt-40 animate-in fade-in"
+                        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/80 backdrop-blur-sm px-4 pb-4 pt-22 md:pt-32 animate-in fade-in"
                             onClick={() => setSelectedProduct(null)}
                         >
                             <div
-                                className="bg-zinc-950 w-full max-w-lg rounded-3xl border border-zinc-800 overflow-hidden shadow-2xl flex flex-col max-h-[80vh] animate-in zoom-in-95 duration-200 mt-1"
+                                className="bg-zinc-950 w-full max-w-lg rounded-3xl border border-zinc-800 overflow-hidden shadow-2xl flex flex-col max-h-[80vh] animate-in zoom-in-95 duration-200"
                                 onClick={(e) => e.stopPropagation()}
                             >
                                 <div className="p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-900/50">
@@ -921,11 +921,11 @@ export default function BusinessInsights() {
 
                     {/* Customer Details Modal - Product Wise Breakdown */}
                     {selectedCustomer && (
-                        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/80 backdrop-blur-sm px-4 pb-4 pt-36 md:pt-40 animate-in fade-in"
+                        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/80 backdrop-blur-sm px-4 pb-4 pt-22 md:pt-32 animate-in fade-in"
                             onClick={() => setSelectedCustomer(null)}
                         >
                             <div
-                                className="bg-zinc-950 w-full max-w-lg rounded-3xl border border-zinc-800 overflow-hidden shadow-2xl flex flex-col max-h-[80vh] animate-in zoom-in-95 duration-200 mt-1"
+                                className="bg-zinc-950 w-full max-w-lg rounded-3xl border border-zinc-800 overflow-hidden shadow-2xl flex flex-col max-h-[80vh] animate-in zoom-in-95 duration-200"
                                 onClick={(e) => e.stopPropagation()}
                             >
                                 <div className="p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-900/50">
