@@ -32,16 +32,17 @@ export default function Layout() {
     // Updated Navigation: Insights → Home → Payments → Payables → Settings
     const navItems = [
         {
-            path: "/",
+            path: "/insights",
             icon: Lightbulb,
             label: "Insights",
-            isActive: (pathname: string) => pathname === "/" || pathname.startsWith("/insights")
+            isActive: (pathname: string) => pathname.startsWith("/insights")
         },
         {
-            path: "/dashboard",
+            path: "/",
             icon: LayoutDashboard,
             label: "Home",
             isActive: (pathname: string) =>
+                pathname === "/" ||
                 pathname === "/dashboard" ||
                 pathname.startsWith("/customers") ||
                 pathname.startsWith("/products") ||

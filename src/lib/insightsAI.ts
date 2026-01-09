@@ -41,6 +41,7 @@ async function getBusinessContext(): Promise<BusinessData> {
             product:products(name),
             customer:customers(name)
         `)
+        .is('deleted_at', null)
         .order('created_at', { ascending: false })
         .limit(20);
 
@@ -56,6 +57,7 @@ async function getBusinessContext(): Promise<BusinessData> {
     const { data: expenses } = await supabase
         .from('expenses')
         .select('date, amount, note, category')
+        .is('deleted_at', null)
         .order('date', { ascending: false })
         .limit(10);
 
@@ -190,9 +192,8 @@ INSTRUCTIONS:
         }
 
         // Try to read rate limits from headers
-
         const limitMonth = response.headers.get('x-ratelimit-limit-tokens-month');
-        const resetMonth = response.headers.get('x-ratelimit-reset-tokens-month') || response.headers.get('x-ratelimit-reset');
+        const resetMonth = response.headers.get('x-ratelimit-reset-tokens-month'); // Strict monthly reset
 
         // Fallback or parsed limit
         const apiLimit = limitMonth ? parseInt(limitMonth, 10) : 1000000;

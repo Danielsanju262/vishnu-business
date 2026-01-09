@@ -29,16 +29,16 @@ export default function InsightsChat() {
 
     // Initialize tokens - Persist until API reset time
     const [totalTokensUsed, setTotalTokensUsed] = useState(() => {
-        const storedResetTime = localStorage.getItem('ai_reset_timestamp');
-        const storedTokens = localStorage.getItem('ai_tokens_used');
+        const storedResetTime = localStorage.getItem('ai_reset_timestamp_v2');
+        const storedTokens = localStorage.getItem('ai_tokens_used_v2');
 
         // If we have a known reset time and we've passed it, reset the counter
         if (storedResetTime) {
             const resetTime = Number(storedResetTime);
             if (Date.now() > resetTime) {
                 // Reset limit reached
-                localStorage.setItem('ai_tokens_used', '0');
-                localStorage.removeItem('ai_reset_timestamp'); // Clear old reset time
+                localStorage.setItem('ai_tokens_used_v2', '0');
+                localStorage.removeItem('ai_reset_timestamp_v2'); // Clear old reset time
                 return 0;
             }
         }
@@ -48,11 +48,11 @@ export default function InsightsChat() {
     });
 
     const [tokenLimit, setTokenLimit] = useState(() => {
-        return Number(localStorage.getItem('ai_token_limit')) || 1000000;
+        return Number(localStorage.getItem('ai_token_limit_v2')) || 1000000;
     });
 
     const [resetTimestamp, setResetTimestamp] = useState<number | null>(() => {
-        const stored = localStorage.getItem('ai_reset_timestamp');
+        const stored = localStorage.getItem('ai_reset_timestamp_v2');
         return stored ? Number(stored) : null;
     });
 
@@ -61,18 +61,18 @@ export default function InsightsChat() {
 
     // Persist token usage
     useEffect(() => {
-        localStorage.setItem('ai_tokens_used', String(totalTokensUsed));
+        localStorage.setItem('ai_tokens_used_v2', String(totalTokensUsed));
     }, [totalTokensUsed]);
 
     // Persist token limit
     useEffect(() => {
-        localStorage.setItem('ai_token_limit', String(tokenLimit));
+        localStorage.setItem('ai_token_limit_v2', String(tokenLimit));
     }, [tokenLimit]);
 
     // Persist reset timestamp
     useEffect(() => {
         if (resetTimestamp) {
-            localStorage.setItem('ai_reset_timestamp', String(resetTimestamp));
+            localStorage.setItem('ai_reset_timestamp_v2', String(resetTimestamp));
         }
     }, [resetTimestamp]);
 
