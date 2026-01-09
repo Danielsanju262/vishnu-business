@@ -8,7 +8,7 @@ import { cn } from "../lib/utils";
 import { Modal } from "../components/ui/Modal";
 import { useDropdownClose } from "../hooks/useDropdownClose";
 import { ConfirmationModal } from "../components/ui/ConfirmationModal";
-import { useBrowserBackButton } from "../hooks/useBrowserBackButton";
+import { useHistorySyncedState } from "../hooks/useHistorySyncedState";
 
 type Customer = {
     id: string;
@@ -69,28 +69,28 @@ export default function CustomerPaymentDetail() {
     const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
     const [showMenu, setShowMenu] = useState(false);
 
-    // Modals & Forms...
-    const [showAddDue, setShowAddDue] = useState(false);
-    const [showReceivePayment, setShowReceivePayment] = useState(false);
+    // Modals & Forms - synced with browser history
+    const [showAddDue, setShowAddDue] = useHistorySyncedState(false, 'customerAddDue');
+    const [showReceivePayment, setShowReceivePayment] = useHistorySyncedState(false, 'customerReceive');
+    const [showEditDate, setShowEditDate] = useHistorySyncedState(false, 'customerEditDate');
     const [editingIndex, setEditingIndex] = useState<number | null>(null);
     const [dueAmount, setDueAmount] = useState("");
     const [dueDate, setDueDate] = useState("");
     const [receiveAmount, setReceiveAmount] = useState("");
-    const [showEditDate, setShowEditDate] = useState(false);
     const [newDueDate, setNewDueDate] = useState("");
 
-    // Handle browser back button
-    const isModalOpen = showAddDue || showReceivePayment || showEditDate;
-
-    useBrowserBackButton(() => {
-        if (showAddDue) {
-            setShowAddDue(false);
-        } else if (showReceivePayment) {
-            setShowReceivePayment(false);
-        } else if (showEditDate) {
-            setShowEditDate(false);
-        }
-    }, isModalOpen);
+    // Handle back navigation for other states
+    useEffect(() => {
+        const handlePopState = () => {
+            if (showMenu) setShowMenu(false);
+            if (isSelectionMode) {
+                setIsSelectionMode(false);
+                setSelectedIndices(new Set());
+            }
+        };
+        window.addEventListener('popstate', handlePopState);
+        return () => window.removeEventListener('popstate', handlePopState);
+    }, [showMenu, isSelectionMode]);
 
     const [confirmConfig, setConfirmConfig] = useState<{
         isOpen: boolean;

@@ -7,7 +7,7 @@ import { cn } from "../lib/utils";
 import { useToast } from "../components/toast-provider";
 import { useRealtimeTables } from "../hooks/useRealtimeSync";
 import { Modal } from "../components/ui/Modal";
-import { useBrowserBackButton } from "../hooks/useBrowserBackButton";
+import { useHistorySyncedStep } from "../hooks/useHistorySyncedStep";
 
 type Customer = { id: string; name: string };
 type Product = { id: string; name: string; unit: string; category: string };
@@ -74,17 +74,18 @@ export default function NewSale() {
 
     const closeConfirm = () => setConfirmConfig(prev => ({ ...prev, isOpen: false }));
 
-    // Workflow State -- Initialize based on restored data
-    const [step, setStep] = useState<"customer" | "cart" | "product" | "details">(() => {
+    // Workflow State -- Synced with browser history for proper back navigation
+    // Determine initial step based on stored data
+    const getInitialStep = (): "customer" | "cart" | "product" | "details" => {
         const storedCart = localStorage.getItem('vishnu_new_sale_cart');
         const hasCartItems = storedCart && JSON.parse(storedCart).length > 0;
+        return hasCartItems ? "cart" : "customer";
+    };
 
-        // If there are items in the cart, go to cart
-        if (hasCartItems) {
-            return "cart";
-        }
-        return "customer";
-    });
+    const [step, setStep] = useHistorySyncedStep<"customer" | "cart" | "product" | "details">(
+        getInitialStep(),
+        'newSaleStep'
+    );
 
     // Auto-redirect if cart is empty for 30s
     useEffect(() => {
@@ -293,31 +294,21 @@ export default function NewSale() {
         };
     }, [showPayableSupplierList]);
 
-    // Handle browser back button to mimic on-screen back button
-    // The hook now handles keyboard visibility and blur automatically
-    useBrowserBackButton(() => {
-        // Mimic the on-screen back button logic
-        if (step === "details") {
+    // Handle special case: when going back from details while editing, clear editing state
+    useEffect(() => {
+        const handlePopState = () => {
+            // If we were editing and navigated back, clear editing state
             if (editingIndex !== null) {
                 setEditingIndex(null);
                 setTempProd(null);
-                setStep("cart");
-            } else {
-                setStep("product");
             }
-        } else if (step === "product") {
-            setStep("cart");
-        } else if (step === "cart") {
-            setStep("customer");
-        } else if (step === "customer") {
-            navigate("/");
-        }
-    }, true); // Always handle back navigation
+        };
+
+        window.addEventListener('popstate', handlePopState);
+        return () => window.removeEventListener('popstate', handlePopState);
+    }, [editingIndex]);
 
     // --- Actions ---
-
-    // ... (rest of actions are unchanged, but we are inserting before them to keep context or just at top of component body. 
-    // Actually, let's insert this Effect near other Effects)
 
 
     const handleAddCustomer = async () => {

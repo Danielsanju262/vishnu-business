@@ -9,7 +9,7 @@ import { Link } from "react-router-dom";
 import { useRealtimeTable } from "../hooks/useRealtimeSync";
 import { Modal } from "../components/ui/Modal";
 import { useDropdownClose } from "../hooks/useDropdownClose";
-import { useBrowserBackButton } from "../hooks/useBrowserBackButton";
+import { useHistorySyncedState } from "../hooks/useHistorySyncedState";
 
 type Customer = {
     id: string;
@@ -47,14 +47,14 @@ export default function PaymentReminders() {
     const [setupRequired, setSetupRequired] = useState(false);
     const isFirstLoad = useRef(true);
 
-    // Quick Action Modals
+    // Quick Action Modals - synced with browser history
     const [quickActionCustomer, setQuickActionCustomer] = useState<{ id: string; name: string; reminder: PaymentReminder; totalBalance: number } | null>(null);
     const [actionType, setActionType] = useState<'add' | 'receive' | null>(null);
     const [amount, setAmount] = useState("");
     const [dueDate, setDueDate] = useState("");
 
-    // New Reminder Modal
-    const [showNewReminder, setShowNewReminder] = useState(false);
+    // New Reminder Modal - synced with browser history
+    const [showNewReminder, setShowNewReminder] = useHistorySyncedState(false, 'paymentNewReminder');
     const [newReminderCustomer, setNewReminderCustomer] = useState<string>("");
     const [newReminderCustomerSearch, setNewReminderCustomerSearch] = useState("");
     const [newReminderAmount, setNewReminderAmount] = useState("");
@@ -65,21 +65,20 @@ export default function PaymentReminders() {
     const [editDateCustomer, setEditDateCustomer] = useState<{ id: string; name: string } | null>(null);
     const [editDateValue, setEditDateValue] = useState("");
 
-    // Handle browser back button
-    const isModalOpen = showNewReminder || !!quickActionCustomer || !!editDateCustomer;
-
-    useBrowserBackButton(() => {
-        if (showNewReminder) {
-            setShowNewReminder(false);
-        } else if (quickActionCustomer) {
-            setQuickActionCustomer(null);
-            setActionType(null);
-            setAmount("");
-            setDueDate("");
-        } else if (editDateCustomer) {
-            setEditDateCustomer(null);
-        }
-    }, isModalOpen);
+    // Handle back navigation for modals
+    useEffect(() => {
+        const handlePopState = () => {
+            if (quickActionCustomer) {
+                setQuickActionCustomer(null);
+                setActionType(null);
+                setAmount("");
+                setDueDate("");
+            }
+            if (editDateCustomer) setEditDateCustomer(null);
+        };
+        window.addEventListener('popstate', handlePopState);
+        return () => window.removeEventListener('popstate', handlePopState);
+    }, [quickActionCustomer, editDateCustomer]);
 
     // Close dropdowns on ESC or click outside
     const listRef = useRef<HTMLDivElement>(null);

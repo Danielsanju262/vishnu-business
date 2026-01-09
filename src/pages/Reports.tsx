@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useCallback } from "react";
+import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import { ArrowLeft, Trash2, Calendar, ShoppingBag, Wallet, Edit2, ChevronDown, TrendingUp, TrendingDown, ArrowUpDown, X, ChevronRight, User, CheckCircle2, Circle, MoreVertical, Download } from "lucide-react";
 import Papa from "papaparse";
@@ -10,7 +10,7 @@ import { useToast } from "../components/toast-provider";
 import { Modal } from "../components/ui/Modal";
 import { useRealtimeTables } from "../hooks/useRealtimeSync";
 import { useDropdownClose } from "../hooks/useDropdownClose";
-import { useBrowserBackButton } from "../hooks/useBrowserBackButton";
+import { useHistorySyncedState } from "../hooks/useHistorySyncedState";
 
 type DateRangeType = "today" | "yesterday" | "week" | "month" | "custom";
 
@@ -34,9 +34,9 @@ export default function Reports() {
     const [data, setData] = useState<{ transactions: any[], expenses: any[] }>({ transactions: [], expenses: [] });
     const [combinedExpenses, setCombinedExpenses] = useState<any[]>([]);
 
-    // Detail Modal State
+    // Detail Modal State - synced with browser history
     const [selectedDetail, setSelectedDetail] = useState<'sales' | 'goods' | 'expenses' | null>(null);
-    const [selectedCustomer, setSelectedCustomer] = useState<string | null>(null); // For Customer Drill-down
+    const [selectedCustomer, setSelectedCustomer] = useState<string | null>(null);
 
     // Customer Report State
     const [customerSearch, setCustomerSearch] = useState("");
@@ -54,29 +54,26 @@ export default function Reports() {
     const [editExpenseTitle, setEditExpenseTitle] = useState("");
     const [editExpenseAmount, setEditExpenseAmount] = useState("");
 
-    // Bulk Select State
-    const [isSelectionMode, setIsSelectionMode] = useState(false);
+    // Bulk Select State - synced with browser history
+    const [isSelectionMode, setIsSelectionMode] = useHistorySyncedState(false, 'reportsSelection');
     const [selectedTransactionIds, setSelectedTransactionIds] = useState<Set<string>>(new Set());
     const [selectedExpenseIds, setSelectedExpenseIds] = useState<Set<string>>(new Set());
     const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
 
-    // Export State
-    const [showExportModal, setShowExportModal] = useState(false);
+    // Export State - synced with browser history
+    const [showExportModal, setShowExportModal] = useHistorySyncedState(false, 'reportsExportModal');
     const [isExporting, setIsExporting] = useState(false);
 
-    // Handle browser back button
-    // Handle browser back button
-    const isModalOpen = !!selectedDetail || showExportModal || showFilters;
-
-    useBrowserBackButton(() => {
-        if (selectedDetail) {
-            setSelectedDetail(null);
-        } else if (showExportModal) {
-            setShowExportModal(false);
-        } else if (showFilters) {
-            setShowFilters(false);
-        }
-    }, isModalOpen);
+    // Handle back navigation for modals
+    useEffect(() => {
+        const handlePopState = () => {
+            if (selectedDetail) setSelectedDetail(null);
+            if (activeMenuId) setActiveMenuId(null);
+            if (showFilters) setShowFilters(false);
+        };
+        window.addEventListener('popstate', handlePopState);
+        return () => window.removeEventListener('popstate', handlePopState);
+    }, [selectedDetail, activeMenuId, showFilters]);
 
     // Long Press Refs
     const timerRef = useRef<any>(null);

@@ -16,7 +16,7 @@ type Preset = {
 };
 
 import { ConfirmationModal } from "../components/ui/ConfirmationModal";
-import { useBrowserBackButton } from "../hooks/useBrowserBackButton";
+import { useHistorySyncedState } from "../hooks/useHistorySyncedState";
 
 export default function NewExpense() {
     const navigate = useNavigate();
@@ -33,17 +33,10 @@ export default function NewExpense() {
     const suggestionsRef = useRef<HTMLDivElement>(null);
     useDropdownClose(showSuggestions, () => setShowSuggestions(false), suggestionsRef);
 
-    // Presets Management
+    // Presets Management - synced with browser history for proper back navigation
     const [presets, setPresets] = useState<Preset[]>([]);
-    const [isManageMode, setIsManageMode] = useState(false);
-    const [isAddingPreset, setIsAddingPreset] = useState(false);
-
-    // Handle browser back button
-    useBrowserBackButton(() => {
-        if (isManageMode) {
-            setIsManageMode(false);
-        }
-    }, isManageMode);
+    const [isManageMode, setIsManageMode] = useHistorySyncedState(false, 'expenseManageMode');
+    const [isAddingPreset, setIsAddingPreset] = useHistorySyncedState(false, 'expenseAddingPreset');
 
     // Preset Form
     const [presetName, setPresetName] = useState("");

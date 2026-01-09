@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { Button } from "../components/ui/Button";
@@ -7,7 +7,7 @@ import { useToast } from "../components/toast-provider";
 import { cn } from "../lib/utils";
 import { useRealtimeTable } from "../hooks/useRealtimeSync";
 import { useDropdownClose } from "../hooks/useDropdownClose";
-import { useBrowserBackButton } from "../hooks/useBrowserBackButton";
+import { useHistorySyncedState } from "../hooks/useHistorySyncedState";
 
 type Supplier = {
     id: string;
@@ -20,19 +20,18 @@ export default function Suppliers() {
 
     const { toast } = useToast();
 
-    // Handle browser back button
-
-
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
     const [loading, setLoading] = useState(true);
-    const [isAdding, setIsAdding] = useState(false);
     const [newName, setNewName] = useState("");
     const [searchQuery, setSearchQuery] = useState("");
 
     const [editingId, setEditingId] = useState<string | null>(null);
     const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
-    const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+    // Modal/UI states - synced with browser history for proper back navigation
+    const [isAdding, setIsAdding] = useHistorySyncedState(false, 'suppliersAdding');
+    const [isSelectionMode, setIsSelectionMode] = useHistorySyncedState(false, 'suppliersSelection');
 
     const [confirmConfig, setConfirmConfig] = useState<{
         isOpen: boolean;
@@ -51,21 +50,14 @@ export default function Suppliers() {
 
     const closeConfirm = () => setConfirmConfig(prev => ({ ...prev, isOpen: false }));
 
-    const isStateActive = confirmConfig.isOpen || !!activeMenuId || isSelectionMode || isAdding;
-
-    useBrowserBackButton(() => {
-        if (confirmConfig.isOpen) {
-            closeConfirm();
-        } else if (activeMenuId) {
-            setActiveMenuId(null);
-        } else if (isSelectionMode) {
-            toggleSelectionMode();
-        } else if (isAdding) {
-            setIsAdding(false);
-            setNewName("");
-            setEditingId(null);
-        }
-    }, isStateActive);
+    // Close menus on back navigation
+    useEffect(() => {
+        const handlePopState = () => {
+            if (activeMenuId) setActiveMenuId(null);
+        };
+        window.addEventListener('popstate', handlePopState);
+        return () => window.removeEventListener('popstate', handlePopState);
+    }, [activeMenuId]);
 
     // Long Press for Selection
     const timerRef = useRef<any>(null);

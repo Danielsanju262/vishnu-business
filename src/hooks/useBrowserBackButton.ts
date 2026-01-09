@@ -1,21 +1,28 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { Capacitor } from '@capacitor/core';
-import { App } from '@capacitor/app';
 
-// Global state for web fallback
+// Global state for history trap (web/PWA)
 let globalTrapInitialized = false;
 let globalTrapCount = 0;
 const MIN_TRAP_COUNT = 5;
 
 /**
- * Hook to handle browser/hardware back button behavior across all platforms.
+ * Hook to handle back button behavior across all platforms and navigation methods.
  * 
- * - On native mobile (Capacitor): Uses native back button API
- * - On web/PWA: Falls back to history trap system
+ * Works with:
+ * - Hardware back button (Android legacy)
+ * - Edge swipe gestures (Android 10+)
+ * - Bottom gesture bar swipe up
+ * - Browser back button
+ * - In-app UI back buttons
  * 
- * @param onBack - Function to call when back button is pressed
+ * Strategy:
+ * - Let the system handle all back gestures/buttons via window.history.back()
+ * - Use popstate listener to intercept and handle navigation
+ * - Keep history trap for root screen to prevent app from closing
+ * 
+ * @param onBack - Function to call when back is triggered
  * @param shouldCallOnBack - If false, back is trapped but onBack won't be called
- * @param isRootScreen - If true and on native, pressing back will close the app
+ * @param isRootScreen - If true, back press is trapped (doesn't close app)
  */
 export function useBrowserBackButton(
     onBack: () => void,
@@ -26,7 +33,7 @@ export function useBrowserBackButton(
     const shouldCallRef = useRef(shouldCallOnBack);
     const isRootRef = useRef(isRootScreen);
 
-    // Track last back press time for throttling (web only)
+    // Track last back press time for throttling
     const lastBackPressRef = useRef<number>(0);
     // Track if keyboard was visible before back press
     const keyboardVisibleRef = useRef(false);
@@ -63,68 +70,9 @@ export function useBrowserBackButton(
         return isInputFocused;
     }, []);
 
-    // NATIVE: Use Capacitor's native back button handling
+    // Unified back handling via popstate - works for all platforms and navigation methods
     useEffect(() => {
-        if (!Capacitor.isNativePlatform()) {
-            return; // Skip on web, handled below
-        }
-
-        let listenerHandle: { remove: () => Promise<void> } | null = null;
-
-        const setupListener = async () => {
-            listenerHandle = await App.addListener('backButton', () => {
-                // Check if keyboard was visible - close it first
-                if (keyboardVisibleRef.current) {
-                    const activeElement = document.activeElement as HTMLElement;
-                    if (activeElement && activeElement.blur) {
-                        activeElement.blur();
-                    }
-                    return;
-                }
-
-                // If we should call onBack and have somewhere to go
-                if (shouldCallRef.current && onBackRef.current) {
-                    onBackRef.current();
-                } else if (isRootRef.current) {
-                    // On root screen with nothing to do - minimize app
-                    App.minimizeApp();
-                }
-            });
-        };
-
-        setupListener();
-
-        // Track keyboard visibility
-        const updateKeyboardState = () => {
-            keyboardVisibleRef.current = isKeyboardVisible();
-        };
-
-        document.addEventListener('focusin', updateKeyboardState);
-        document.addEventListener('focusout', updateKeyboardState);
-
-        if (window.visualViewport) {
-            window.visualViewport.addEventListener('resize', updateKeyboardState);
-        }
-
-        return () => {
-            if (listenerHandle) {
-                listenerHandle.remove();
-            }
-            document.removeEventListener('focusin', updateKeyboardState);
-            document.removeEventListener('focusout', updateKeyboardState);
-            if (window.visualViewport) {
-                window.visualViewport.removeEventListener('resize', updateKeyboardState);
-            }
-        };
-    }, [isKeyboardVisible]);
-
-    // WEB FALLBACK: Use history trap system for browsers/PWA
-    useEffect(() => {
-        if (Capacitor.isNativePlatform()) {
-            return; // Skip on native, handled above
-        }
-
-        // Initialize global trap system on first mount
+        // Initialize history trap on first mount (prevents app from closing at root)
         if (!globalTrapInitialized) {
             globalTrapInitialized = true;
             for (let i = 0; i < MIN_TRAP_COUNT; i++) {
@@ -149,10 +97,12 @@ export function useBrowserBackButton(
             window.visualViewport.addEventListener('resize', updateKeyboardState);
         }
 
+        // Handle all back navigation via popstate
+        // This catches: hardware back, edge swipes, gesture bar, browser back
         const handlePopState = () => {
             const now = Date.now();
 
-            // Decrement and replenish trap
+            // Replenish history trap (prevents app from closing)
             globalTrapCount--;
             window.history.pushState(
                 { trap: true, timestamp: now },
@@ -161,7 +111,7 @@ export function useBrowserBackButton(
             );
             globalTrapCount++;
 
-            // Replenish buffer if needed
+            // Ensure buffer is maintained
             if (globalTrapCount < MIN_TRAP_COUNT) {
                 for (let i = globalTrapCount; i < MIN_TRAP_COUNT; i++) {
                     window.history.pushState(
@@ -173,14 +123,14 @@ export function useBrowserBackButton(
                 }
             }
 
-            // Throttle rapid presses
+            // Throttle rapid back presses (250ms)
             const timeSinceLastPress = now - lastBackPressRef.current;
             if (timeSinceLastPress < 250 && timeSinceLastPress > 0) {
                 return;
             }
             lastBackPressRef.current = now;
 
-            // Handle keyboard
+            // If keyboard is open, close it first without navigating
             if (keyboardVisibleRef.current) {
                 const activeElement = document.activeElement as HTMLElement;
                 if (activeElement && activeElement.blur) {
@@ -192,7 +142,12 @@ export function useBrowserBackButton(
                 return;
             }
 
-            // Call onBack if we should
+            // If on root screen, back is trapped (don't navigate or close app)
+            if (isRootRef.current && !shouldCallRef.current) {
+                return; // Trapped - do nothing
+            }
+
+            // Call the onBack handler
             if (shouldCallRef.current && onBackRef.current) {
                 onBackRef.current();
             }
@@ -211,7 +166,7 @@ export function useBrowserBackButton(
     }, [isKeyboardVisible]);
 }
 
-// Helper function to reinitialize web traps (call after hard navigation)
+// Helper function to reinitialize traps (call after hard navigation if needed)
 export function reinitializeBackButtonTraps() {
     globalTrapInitialized = false;
     globalTrapCount = 0;

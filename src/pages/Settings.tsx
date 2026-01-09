@@ -10,7 +10,7 @@ import { supabase } from "../lib/supabase";
 import { useToast } from "../components/toast-provider";
 import { Modal } from "../components/ui/Modal";
 import { GoogleDriveBackup } from "../components/GoogleDriveBackup";
-import { useBrowserBackButton } from "../hooks/useBrowserBackButton";
+import { useHistorySyncedState } from "../hooks/useHistorySyncedState";
 
 // Collapsible Section Component
 const CollapsibleSection = ({
@@ -107,15 +107,21 @@ export default function Settings() {
         refreshDevices();
     }, [refreshDevices]);
 
+    // Modal states - synced with browser history for proper back navigation
+    const [isSetupSuperAdminOpen, setIsSetupSuperAdminOpen] = useHistorySyncedState(false, 'settingsSuperAdmin');
+    const [isChangePinOpen, setIsChangePinOpen] = useHistorySyncedState(false, 'settingsChangePin');
+    const [isRevokeModalOpen, setIsRevokeModalOpen] = useHistorySyncedState(false, 'settingsRevoke');
+    const [showDeauthConfirm, setShowDeauthConfirm] = useHistorySyncedState(false, 'settingsDeauth');
+    const [isExportModalOpen, setIsExportModalOpen] = useHistorySyncedState(false, 'settingsExport');
+    const [showMigrationHelp, setShowMigrationHelp] = useHistorySyncedState(false, 'settingsMigration');
+
     // Super Admin Setup State
-    const [isSetupSuperAdminOpen, setIsSetupSuperAdminOpen] = useState(false);
     const [superAdminEmail, setSuperAdminEmail] = useState('');
     const [superAdminPin, setSuperAdminPin] = useState('');
     const [confirmSuperAdminPin, setConfirmSuperAdminPin] = useState('');
     const [isSettingUpSuperAdmin, setIsSettingUpSuperAdmin] = useState(false);
 
     // PIN Change State
-    const [isChangePinOpen, setIsChangePinOpen] = useState(false);
     const [pinStep, setPinStep] = useState<'super_admin' | 'new' | 'confirm'>('super_admin');
     const [superAdminPinInput, setSuperAdminPinInput] = useState('');
     const [newPin, setNewPin] = useState('');
@@ -124,14 +130,17 @@ export default function Settings() {
     const [pinError, setPinError] = useState('');
 
     // Device Revoke State
-    const [isRevokeModalOpen, setIsRevokeModalOpen] = useState(false);
     const [deviceToRevoke, setDeviceToRevoke] = useState<string | null>(null);
     const [revokeSuperAdminPin, setRevokeSuperAdminPin] = useState('');
     const [isRevoking, setIsRevoking] = useState(false);
     const [revokeError, setRevokeError] = useState('');
 
-    // Deauthorize Confirmation State
-    const [showDeauthConfirm, setShowDeauthConfirm] = useState(false);
+    // Data Management State
+    const [exportStartDate, setExportStartDate] = useState(new Date().toISOString().split('T')[0]);
+    const [exportEndDate, setExportEndDate] = useState(new Date().toISOString().split('T')[0]);
+    const [isExporting, setIsExporting] = useState(false);
+    const [isImporting, setIsImporting] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const resetPinState = () => {
         setIsChangePinOpen(false);
@@ -158,38 +167,6 @@ export default function Settings() {
         setConfirmSuperAdminPin('');
         setIsSettingUpSuperAdmin(false);
     };
-
-    // Setup Super Admin
-    // State for showing migration instructions
-    const [showMigrationHelp, setShowMigrationHelp] = useState(false);
-
-    // Data Management State
-    const [isExportModalOpen, setIsExportModalOpen] = useState(false);
-    const [exportStartDate, setExportStartDate] = useState(new Date().toISOString().split('T')[0]);
-    const [exportEndDate, setExportEndDate] = useState(new Date().toISOString().split('T')[0]);
-    const [isExporting, setIsExporting] = useState(false);
-    const [isImporting, setIsImporting] = useState(false);
-    const fileInputRef = useRef<HTMLInputElement>(null);
-
-    // Handle browser back button
-    const isModalOpen = isSetupSuperAdminOpen || isChangePinOpen || isRevokeModalOpen || showDeauthConfirm || isExportModalOpen || showMigrationHelp;
-
-    // Handle browser back button
-    useBrowserBackButton(() => {
-        if (isSetupSuperAdminOpen) {
-            resetSuperAdminSetup();
-        } else if (isChangePinOpen) {
-            resetPinState();
-        } else if (isRevokeModalOpen) {
-            resetRevokeState();
-        } else if (showDeauthConfirm) {
-            setShowDeauthConfirm(false);
-        } else if (isExportModalOpen) {
-            setIsExportModalOpen(false);
-        } else if (showMigrationHelp) {
-            setShowMigrationHelp(false);
-        }
-    }, isModalOpen);
 
     const REQUIRED_CSV_HEADERS = [
         "Date", "Customer Name", "Product Name", "Quantity", "Unit", "Sell Price", "Buy Price", "Is Deleted"
@@ -557,7 +534,7 @@ export default function Settings() {
                     <div className="space-y-0">
                         <div className="flex justify-between items-center py-3 border-b border-neutral-100 dark:border-neutral-800">
                             <span className="text-sm text-neutral-500 dark:text-neutral-400 font-medium">Version</span>
-                            <span className="text-sm font-semibold text-neutral-900 dark:text-white bg-neutral-100 dark:bg-neutral-800 px-2.5 py-1 rounded-md">v3.8.0</span>
+                            <span className="text-sm font-semibold text-neutral-900 dark:text-white bg-neutral-100 dark:bg-neutral-800 px-2.5 py-1 rounded-md">v3.9.0</span>
                         </div>
 
 

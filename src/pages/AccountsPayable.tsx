@@ -9,7 +9,7 @@ import { Link } from "react-router-dom";
 import { useRealtimeTable } from "../hooks/useRealtimeSync";
 import { Modal } from "../components/ui/Modal";
 import { useDropdownClose } from "../hooks/useDropdownClose";
-import { useBrowserBackButton } from "../hooks/useBrowserBackButton";
+import { useHistorySyncedState } from "../hooks/useHistorySyncedState";
 
 type Supplier = {
     id: string;
@@ -47,14 +47,14 @@ export default function AccountsPayable() {
     const [setupRequired, setSetupRequired] = useState(false);
     const isFirstLoad = useRef(true);
 
-    // Quick Action Modals
+    // Quick Action Modals - synced with browser history
     const [quickActionSupplier, setQuickActionSupplier] = useState<{ id: string; name: string; payable: Payable; totalBalance: number } | null>(null);
     const [actionType, setActionType] = useState<'add' | 'pay' | null>(null);
     const [amount, setAmount] = useState("");
     const [dueDate, setDueDate] = useState("");
 
-    // New Payable Modal
-    const [showNewPayable, setShowNewPayable] = useState(false);
+    // New Payable Modal - synced with browser history
+    const [showNewPayable, setShowNewPayable] = useHistorySyncedState(false, 'payableNewPayable');
     const [newPayableSupplier, setNewPayableSupplier] = useState<string>("");
     const [newPayableSupplierSearch, setNewPayableSupplierSearch] = useState("");
     const [newPayableAmount, setNewPayableAmount] = useState("");
@@ -65,21 +65,20 @@ export default function AccountsPayable() {
     const [editDateSupplier, setEditDateSupplier] = useState<{ id: string; name: string } | null>(null);
     const [editDateValue, setEditDateValue] = useState("");
 
-    // Handle browser back button
-    const isModalOpen = showNewPayable || !!quickActionSupplier || !!editDateSupplier;
-
-    useBrowserBackButton(() => {
-        if (showNewPayable) {
-            setShowNewPayable(false);
-        } else if (quickActionSupplier) {
-            setQuickActionSupplier(null);
-            setActionType(null);
-            setAmount("");
-            setDueDate("");
-        } else if (editDateSupplier) {
-            setEditDateSupplier(null);
-        }
-    }, isModalOpen);
+    // Handle back navigation for modals
+    useEffect(() => {
+        const handlePopState = () => {
+            if (quickActionSupplier) {
+                setQuickActionSupplier(null);
+                setActionType(null);
+                setAmount("");
+                setDueDate("");
+            }
+            if (editDateSupplier) setEditDateSupplier(null);
+        };
+        window.addEventListener('popstate', handlePopState);
+        return () => window.removeEventListener('popstate', handlePopState);
+    }, [quickActionSupplier, editDateSupplier]);
 
     // Close dropdowns on ESC or click outside
     const listRef = useRef<HTMLDivElement>(null);

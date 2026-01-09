@@ -7,7 +7,7 @@ import { Link } from "react-router-dom";
 import { cn } from "../lib/utils";
 import { useRealtimeTables } from "../hooks/useRealtimeSync";
 import { Modal } from "../components/ui/Modal";
-import { useBrowserBackButton } from "../hooks/useBrowserBackButton";
+import { useHistorySyncedState } from "../hooks/useHistorySyncedState";
 
 export default function Dashboard() {
     const { lockApp } = useAuth();
@@ -18,7 +18,6 @@ export default function Dashboard() {
     });
 
     const [userName, setUserName] = useState("Vishnu");
-    const [isEditingName, setIsEditingName] = useState(false);
     const [isLoadingStats, setIsLoadingStats] = useState(true);
     const [statsError, setStatsError] = useState<string | null>(null);
 
@@ -28,29 +27,11 @@ export default function Dashboard() {
         start: format(new Date(), 'yyyy-MM-dd'),
         end: format(new Date(), 'yyyy-MM-dd')
     });
-    const [showFilterDropdown, setShowFilterDropdown] = useState(false);
-    const [showCustomDateModal, setShowCustomDateModal] = useState(false);
 
-    const isModalOpen = showCustomDateModal || showFilterDropdown || isEditingName;
-
-    // Dashboard is the root screen
-    // When modals are open, pressing back should close them
-    // When no modals are open and on native, allow app to minimize
-    useBrowserBackButton(() => {
-        if (showCustomDateModal) {
-            setShowCustomDateModal(false);
-            return;
-        }
-        if (showFilterDropdown) {
-            setShowFilterDropdown(false);
-            return;
-        }
-        if (isEditingName) {
-            setIsEditingName(false);
-            return;
-        }
-        // At Dashboard root with no modals open - on native this will minimize app
-    }, isModalOpen, !isModalOpen); // isRootScreen = true when no modals are open
+    // Modal states - synced with browser history for proper back navigation
+    const [showFilterDropdown, setShowFilterDropdown] = useHistorySyncedState(false, 'dashboardFilter');
+    const [showCustomDateModal, setShowCustomDateModal] = useHistorySyncedState(false, 'dashboardCustomDate');
+    const [isEditingName, setIsEditingName] = useHistorySyncedState(false, 'dashboardEditName');
 
     const dropdownRef = useRef<HTMLDivElement>(null);
 
