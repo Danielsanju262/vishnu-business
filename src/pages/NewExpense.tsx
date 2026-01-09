@@ -281,11 +281,11 @@ export default function NewExpense() {
                 <div className="fixed top-0 left-0 right-0 z-50 bg-white dark:bg-gray-900 border-b border-border shadow-sm px-3 py-3 md:px-4 flex items-center justify-between transition-all w-full mb-4">
                     {isManageMode ? (
                         <button
-                            onClick={() => setIsManageMode(false)}
+                            onClick={() => window.history.back()}
                             onKeyDown={(e) => {
                                 if (e.key === "Enter" || e.key === " ") {
                                     e.preventDefault();
-                                    setIsManageMode(false);
+                                    window.history.back();
                                 }
                             }}
                             tabIndex={0}
@@ -296,7 +296,7 @@ export default function NewExpense() {
                         </button>
                     ) : (
                         <button
-                            onClick={() => navigate("/")}
+                            onClick={() => window.history.back()}
                             onKeyDown={(e) => {
                                 if (e.key === "Enter" || e.key === " ") {
                                     e.preventDefault();
@@ -362,7 +362,7 @@ export default function NewExpense() {
                     {isAddingPreset ? (
                         <div className="bg-card p-5 rounded-3xl border border-border shadow-md space-y-4 animate-in zoom-in-95">
                             <div className="flex items-center gap-3 mb-2">
-                                <button onClick={() => setIsAddingPreset(false)} className="p-1 -ml-1 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-full transition-all duration-200 active:scale-95">
+                                <button onClick={() => window.history.back()} className="p-1 -ml-1 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-full transition-all duration-200 active:scale-95">
                                     <ArrowLeft size={20} />
                                 </button>
                                 <span className="font-bold text-base text-foreground">{editingPresetId ? "Edit Expense Type" : "New Expense Type"}</span>

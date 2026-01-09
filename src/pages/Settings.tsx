@@ -505,12 +505,12 @@ export default function Settings() {
         <div className="min-h-screen bg-background p-3 md:p-4 pb-10 animate-in fade-in w-full md:max-w-2xl md:mx-auto">
             {/* Header - Enhanced with better spacing and hover states */}
             <div className="flex items-center gap-3 mb-5 md:mb-6">
-                <Link
-                    to="/"
+                <button
+                    onClick={() => window.history.back()}
                     className="p-3 -ml-2 rounded-xl bg-white/5 dark:bg-white/5 hover:bg-white/10 dark:hover:bg-white/10 active:bg-white/15 dark:active:bg-white/15 text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-all duration-200 border border-transparent hover:border-white/10 dark:hover:border-white/10"
                 >
                     <ArrowLeft size={20} strokeWidth={2.5} />
-                </Link>
+                </button>
                 <div className="flex-1">
                     {/* Breadcrumb - Improved spacing and contrast */}
                     <div className="flex items-center gap-2 text-xs text-neutral-500 dark:text-neutral-500 mb-0.5 tracking-wide">

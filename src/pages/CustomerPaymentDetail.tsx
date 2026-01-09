@@ -1033,7 +1033,7 @@ export default function CustomerPaymentDetail() {
                         ) : (
                             <div className="flex items-center gap-3">
                                 <button
-                                    onClick={() => navigate('/payment-reminders')}
+                                    onClick={() => window.history.back()}
                                     className="p-2 -ml-1 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-all duration-150 active:scale-95"
                                 >
                                     <ArrowLeft size={18} strokeWidth={2.5} />

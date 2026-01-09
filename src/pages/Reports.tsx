@@ -488,9 +488,9 @@ export default function Reports() {
                     <div className="flex flex-col gap-3">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                                <Link to="/" className="p-2 -ml-2 rounded-full hover:bg-accent hover:text-foreground text-muted-foreground transition interactive active:scale-95 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1">
+                                <button onClick={() => window.history.back()} className="p-2 -ml-2 rounded-full hover:bg-accent hover:text-foreground text-muted-foreground transition interactive active:scale-95 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1">
                                     <ArrowLeft size={20} />
-                                </Link>
+                                </button>
                                 <div>
                                     {/* Breadcrumb - Hidden on mobile */}
                                     <div className="hidden md:flex items-center gap-1.5 text-xs text-muted-foreground mb-0.5">

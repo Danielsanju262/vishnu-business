@@ -209,9 +209,9 @@ export default function Customers() {
                 </div>
             ) : (
                 <div className="fixed top-0 left-0 right-0 z-40 bg-white dark:bg-gray-900 border-b border-border shadow-sm px-3 py-3 md:px-4 flex items-center justify-between gap-4">
-                    <Link to="/" className="p-3 -ml-2 rounded-full hover:bg-accent hover:text-foreground text-muted-foreground transition interactive active:scale-95 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1">
+                    <button onClick={() => window.history.back()} className="p-3 -ml-2 rounded-full hover:bg-accent hover:text-foreground text-muted-foreground transition interactive active:scale-95 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1">
                         <ArrowLeft size={20} />
-                    </Link>
+                    </button>
                     <div className="flex-1">
                         {/* Breadcrumb */}
                         <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">

@@ -655,44 +655,10 @@ export default function NewSale() {
             {/* Glassmorphism Header */}
             <div className="fixed top-0 left-0 right-0 md:mx-auto w-full md:max-w-lg z-50 bg-white dark:bg-gray-900 border-b border-border shadow-sm px-3 py-3 md:px-4 flex items-center justify-between transition-all mb-4">
                 <button
-                    onClick={() => {
-                        if (step === "details") {
-                            if (editingIndex !== null) {
-                                // Cancel edit and go back to cart
-                                setEditingIndex(null);
-                                setTempProd(null);
-                                setStep("cart");
-                                return;
-                            }
-                            setStep("product");
-                            return;
-                        }
-                        if (step === "product") {
-                            // If product search input is focused, blur it first (close keyboard)
-                            if (productSearchInputRef.current && document.activeElement === productSearchInputRef.current) {
-                                productSearchInputRef.current.blur();
-                                return;
-                            }
-                            setStep("cart");
-                            return;
-                        }
-                        if (step === "cart") { setStep("customer"); return; }
-                        if (step === "customer") {
-                            // If customer search input is focused, blur it first (close keyboard)
-                            if (customerSearchInputRef.current && document.activeElement === customerSearchInputRef.current) {
-                                customerSearchInputRef.current.blur();
-                                return;
-                            }
-                            navigate("/");
-                            return;
-                        }
-                        navigate("/");
-                    }}
+                    onClick={() => window.history.back()}
                     onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
                             e.preventDefault();
-                            if (step === "details") { setStep("product"); return; }
-                            if (step === "product") { setStep("cart"); return; }
                             if (step === "cart") { setStep("customer"); return; }
                             navigate("/");
                         }

@@ -406,9 +406,9 @@ export default function AccountsPayable() {
             <div className="fixed top-0 left-0 right-0 z-50 bg-white dark:bg-zinc-900 border-b border-border px-3 py-3 md:px-4 md:py-4">
                 <div className="flex items-center justify-between w-full">
                     <div className="flex items-center gap-3">
-                        <Link to="/" className="p-2 -ml-1 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-all duration-150 active:scale-95">
+                        <button onClick={() => window.history.back()} className="p-2 -ml-1 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-all duration-150 active:scale-95">
                             <ArrowLeft size={18} strokeWidth={2.5} />
-                        </Link>
+                        </button>
                         <div>
                             <div className="flex items-center gap-1.5 text-[10px] uppercase font-bold tracking-widest text-zinc-500 dark:text-zinc-500 mb-0.5">
                                 <Link to="/" className="hover:text-zinc-900 dark:hover:text-white transition-colors">Home</Link>
