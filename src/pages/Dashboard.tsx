@@ -460,12 +460,22 @@ export default function Dashboard() {
                                     // Auto-open next picker
                                     setTimeout(() => {
                                         const endDateInput = document.getElementById('dash-end-date') as HTMLInputElement;
-                                        if (endDateInput && 'showPicker' in endDateInput) {
-                                            try {
-                                                (endDateInput as any).showPicker();
-                                            } catch (err) { }
+                                        if (endDateInput) {
+                                            // iOS often requires focus before interaction or as a fallback
+                                            endDateInput.focus();
+                                            // Try standard showPicker
+                                            if ('showPicker' in endDateInput) {
+                                                try {
+                                                    (endDateInput as any).showPicker();
+                                                } catch (err) {
+                                                    console.warn('showPicker failed', err);
+                                                }
+                                            } else {
+                                                // Fallback for others
+                                                (endDateInput as HTMLElement).click();
+                                            }
                                         }
-                                    }, 500);
+                                    }, 200);
                                 }}
                                 className="w-full bg-secondary/50 border border-border rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
                             />
