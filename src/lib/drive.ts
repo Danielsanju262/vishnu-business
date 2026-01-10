@@ -43,19 +43,34 @@ export const uploadToDrive = async (accessToken: string, fileName: string, conte
 };
 
 export const listBackups = async (accessToken: string) => {
-    // List files created by this app or matching our pattern
-    // q: "name contains 'vishnu_backup_' and trash = false"
-    const q = encodeURIComponent("name contains 'vishnu_backup_' and trashed = false");
-    const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&orderBy=createdTime desc&pageSize=6&fields=files(id, name, createdTime, size)`, {
+    // Simplify query to avoid syntax errors. 
+    // 'drive.file' scope ensures we only see files we created anyway.
+    const params = new URLSearchParams({
+        q: "trashed = false",
+        orderBy: 'createdTime desc',
+        pageSize: '10', // Fetch a few more to filter client side
+        fields: 'files(id,name,createdTime,size)'
+    });
+
+    const res = await fetch(`https://www.googleapis.com/drive/v3/files?${params.toString()}`, {
         headers: {
             'Authorization': `Bearer ${accessToken}`
         }
     });
 
     if (!res.ok) {
-        throw new Error('List failed: ' + res.statusText);
+        let errorMsg = res.statusText;
+        try {
+            const errBody = await res.json();
+            if (errBody.error?.message) errorMsg = errBody.error.message;
+        } catch (e) { }
+        throw new Error(`List failed (${res.status}): ${errorMsg}`);
     }
-    return res.json();
+
+    const data = await res.json();
+    // Client-side filter to be safe
+    const files = (data.files || []).filter((f: any) => f.name && f.name.includes('vishnu_backup_'));
+    return { files };
 };
 
 export const downloadFile = async (accessToken: string, fileId: string) => {

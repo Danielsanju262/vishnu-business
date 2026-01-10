@@ -245,13 +245,17 @@ export function GoogleDriveBackup() {
             setBackups((data.files || []).slice(0, 5));
         } catch (e) {
             console.error(e);
-            if (String(e).includes('401')) {
+            if (String(e).includes('401') || String(e).toLowerCase().includes('auth')) {
                 // Token expired
                 setToken(null);
                 localStorage.removeItem('vishnu_gdrive_token');
                 toast("Session expired. Please reconnect.", "warning");
             } else {
-                toast("Failed to list backups", "error");
+                // For any other error, also disconnect to force a fresh state, as it's likely a permission/scope issue
+                console.error("Backup listing error:", e);
+                setToken(null);
+                localStorage.removeItem('vishnu_gdrive_token');
+                toast("Connection issue: " + (e as Error).message + ". Please reconnect.", "error");
             }
         } finally {
             setIsLoading(false);
