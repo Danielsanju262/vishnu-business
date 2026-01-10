@@ -18,68 +18,109 @@ export function useMorningNotifications() {
     }, []);
 
     useEffect(() => {
-        if (isLoading || tasks.length === 0) return;
+        if (isLoading) return;
 
         const checkAndShowNotification = () => {
             const now = new Date();
             const todayStr = format(now, 'yyyy-MM-dd');
-            const lastShown = localStorage.getItem('last_morning_notification_date');
-
-            // Logic: 
-            // 1. If it's past 7 AM and we haven't shown it today, show it.
-            // 2. But we don't want to show it late at night if they open the app then. 
-            //    Let's say show it if it's between 7 AM and 12 PM.
-
             const currentHour = now.getHours();
-            const isMorning = currentHour >= 7 && currentHour < 12;
 
-            if (isMorning && lastShown !== todayStr) {
-                if ('Notification' in window && Notification.permission === 'granted') {
-                    const taskCount = tasks.length;
+            // --- 7 AM Notification ---
+            // Run loop between 7 AM and 10 AM (in case they open app late morning)
+            const isMorning = currentHour >= 7 && currentHour < 10;
+            const lastMorningShown = localStorage.getItem('last_morning_notification_date');
 
-                    try {
-                        // Try Service Worker registration first for potentially better mobile support
-                        if (navigator.serviceWorker && navigator.serviceWorker.ready) {
-                            navigator.serviceWorker.ready.then(registration => {
-                                registration.showNotification("Daily Business Tasks", {
-                                    body: `You have ${taskCount} tasks to complete today. Ask AI for business insights!`,
-                                    icon: '/vite.svg', // Fallback icon
-                                    tag: 'morning-insight',
-                                    data: { url: '/?action=view_tasks' }
-                                });
-                            });
-                        } else {
-                            // Fallback to standard Notification API
-                            const notification = new Notification("Daily Business Tasks", {
-                                body: `You have ${taskCount} tasks to complete today. Ask AI for business insights!`,
-                                icon: '/vite.svg',
-                            });
+            if (isMorning && lastMorningShown !== todayStr && tasks.length > 0) {
+                // Check backup status
+                const backupDate = localStorage.getItem('vishnu_last_auto_backup');
+                const backupDone = backupDate === now.toDateString();
 
-                            notification.onclick = () => {
-                                window.focus();
-                                window.location.href = '/?action=view_tasks';
-                            };
-                        }
-
-                        localStorage.setItem('last_morning_notification_date', todayStr);
-                    } catch (e) {
-                        console.error("Failed to show notification", e);
-                    }
+                // If it's early morning (7:00 - 7:15) and backup isn't done yet,
+                // wait for it to complete so we can include the backup success message.
+                // The interval will check again every minute.
+                if (!backupDone && now.getMinutes() < 15) {
+                    return;
                 }
+
+                if ('Notification' in window && Notification.permission === 'granted') {
+                    // Breakdown tasks
+                    const paymentReminders = tasks.filter(t => t.source === 'payments').length;
+                    const payables = tasks.filter(t => t.source === 'payables').length;
+                    const otherTasks = tasks.length - paymentReminders - payables;
+
+                    let bodyParts = [];
+                    if (paymentReminders > 0) bodyParts.push(`${paymentReminders} payment reminder${paymentReminders !== 1 ? 's' : ''}`);
+                    if (payables > 0) bodyParts.push(`${payables} payable${payables !== 1 ? 's' : ''}`);
+                    if (otherTasks > 0) bodyParts.push(`${otherTasks} other task${otherTasks !== 1 ? 's' : ''}`);
+
+                    let body = `You have ${tasks.length} tasks: ${bodyParts.join(', ')}.`;
+
+                    if (backupDone) {
+                        body += " Your data is backed up.";
+                    }
+
+                    sendNotification("Daily Business Update", body, todayStr, 'morning');
+                }
+            }
+
+            // --- 9 PM Notification ---
+            // Run loop between 9 PM and 11 PM
+            const isEvening = currentHour >= 21 && currentHour < 23;
+            const lastEveningShown = localStorage.getItem('last_evening_notification_date');
+
+            if (isEvening && lastEveningShown !== todayStr && tasks.length > 0) {
+                if ('Notification' in window && Notification.permission === 'granted') {
+                    sendNotification(
+                        "Pending Tasks",
+                        "You haven't completed your tasks yet. Do it now!",
+                        todayStr,
+                        'evening'
+                    );
+                }
+            }
+        };
+
+        const sendNotification = (title: string, body: string, dateStr: string, type: 'morning' | 'evening') => {
+            try {
+                // Try Service Worker first
+                if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+                    navigator.serviceWorker.ready.then(registration => {
+                        registration.showNotification(title, {
+                            body: body,
+                            icon: '/vite.svg',
+                            tag: `${type}-insight-${dateStr}`,
+                            data: { url: '/insights' }
+                        });
+                    });
+                } else {
+                    // Fallback
+                    const notification = new Notification(title, {
+                        body: body,
+                        icon: '/vite.svg',
+                    });
+
+                    notification.onclick = () => {
+                        window.focus();
+                        window.location.href = '/insights';
+                    };
+                }
+
+                // Mark as shown
+                if (type === 'morning') {
+                    localStorage.setItem('last_morning_notification_date', dateStr);
+                } else {
+                    localStorage.setItem('last_evening_notification_date', dateStr);
+                }
+            } catch (e) {
+                console.error("Failed to show notification", e);
             }
         };
 
         // Check immediately
         checkAndShowNotification();
 
-        // Set up a checker that runs every minute to catch 7 AM if app is open
-        const intervalId = setInterval(() => {
-            const now = new Date();
-            if (now.getHours() === 7 && now.getMinutes() === 0) {
-                // Force check
-                checkAndShowNotification();
-            }
-        }, 60000);
+        // Check every minute
+        const intervalId = setInterval(checkAndShowNotification, 60000);
 
         return () => clearInterval(intervalId);
     }, [tasks, isLoading]);

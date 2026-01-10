@@ -235,7 +235,7 @@ export function GoogleDriveBackup() {
         setIsLoading(true);
         try {
             const data = await listBackups(accessToken);
-            setBackups(data.files || []);
+            setBackups((data.files || []).slice(0, 5));
         } catch (e) {
             console.error(e);
             if (String(e).includes('401')) {
@@ -404,7 +404,10 @@ export function GoogleDriveBackup() {
                 </div>
 
                 {/* Regular Backup Toggle */}
-                <div className="flex items-center justify-between p-3 bg-neutral-50 dark:bg-neutral-800/50 rounded-xl mb-4 border border-neutral-100 dark:border-neutral-800">
+                <div
+                    onClick={toggleAutoBackup}
+                    className="flex items-center justify-between p-3 bg-neutral-50 dark:bg-neutral-800/50 rounded-xl mb-4 border border-neutral-100 dark:border-neutral-800 cursor-pointer active:scale-[0.98] transition-all"
+                >
                     <div className="flex items-center gap-3">
                         <div className="p-2 bg-blue-100 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 rounded-lg">
                             <RefreshCw size={18} />
@@ -416,27 +419,23 @@ export function GoogleDriveBackup() {
                             </p>
                         </div>
                     </div>
-                    <button
-                        onClick={toggleAutoBackup}
+                    <div
                         className={cn(
-                            "relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
-                            isAutoBackupEnabled ? "bg-primary" : "bg-neutral-200 dark:bg-neutral-700"
+                            "w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all",
+                            isAutoBackupEnabled
+                                ? "border-primary bg-primary"
+                                : "border-neutral-300 dark:border-neutral-600 bg-transparent"
                         )}
                     >
-                        <span
-                            className={cn(
-                                "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
-                                isAutoBackupEnabled ? "translate-x-6" : "translate-x-1"
-                            )}
-                        />
-                    </button>
+                        {isAutoBackupEnabled && <div className="w-2.5 h-2.5 rounded-full bg-white animate-in zoom-in-50" />}
+                    </div>
                 </div>
 
-                <div className="flex gap-3">
+                <div className="flex flex-col sm:flex-row gap-3">
                     <Button
                         onClick={handleBackup}
                         disabled={showProgress}
-                        className="flex-1 h-11 bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-100 font-semibold shadow-sm transition-all active:scale-[0.98]"
+                        className="flex-1 h-12 sm:h-11 bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-100 font-semibold shadow-sm transition-all active:scale-[0.98]"
                     >
                         {showProgress ? <Loader2 className="animate-spin mr-2" size={18} /> : <Upload className="mr-2" size={18} />}
                         Manual Backup
@@ -444,7 +443,7 @@ export function GoogleDriveBackup() {
                     <Button
                         variant="outline"
                         onClick={() => setShowBackups(!showBackups)}
-                        className="flex-1 h-11 font-medium border-neutral-200 dark:border-neutral-700 bg-white dark:bg-transparent hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 transition-all active:scale-[0.98]"
+                        className="flex-1 h-12 sm:h-11 font-medium border-neutral-200 dark:border-neutral-700 bg-white dark:bg-transparent hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 transition-all active:scale-[0.98]"
                     >
                         {showBackups ? "Hide Backups" : "View Backups"}
                     </Button>

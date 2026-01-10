@@ -26,6 +26,15 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import LockScreen from "./components/LockScreen";
 import { useMorningNotifications } from "./hooks/useMorningNotifications";
 
+import { useDeepLinkBackHandler } from "./hooks/useDeepLinkBackHandler";
+import { useAutoBackup } from "./hooks/useAutoBackup";
+
+// Component to handle deep link back navigation (must be inside Router)
+function DeepLinkBackHandler() {
+  useDeepLinkBackHandler();
+  return null;
+}
+
 function AppContent() {
   const { isLocked } = useAuth();
   const [isDeviceAuthorized, setIsDeviceAuthorized] = useState<boolean | null>(null);
@@ -33,6 +42,8 @@ function AppContent() {
 
   // Initialize morning notifications
   useMorningNotifications();
+  // Initialize auto backup
+  useAutoBackup();
 
   useEffect(() => {
     checkDeviceAuth();
@@ -87,6 +98,7 @@ function AppContent() {
 
   return (
     <Router>
+      <DeepLinkBackHandler />
       <ScrollToTop />
       {isLocked && <LockScreen />}
       <Routes>
