@@ -469,28 +469,30 @@ export default function BusinessInsights() {
                                                     value={startDate}
                                                     onChange={(e) => {
                                                         const newStart = e.target.value;
-                                                        // Force blur to close picker cleanly
-                                                        e.target.blur();
-
                                                         setStartDate(newStart);
-                                                        // Ensure end date is not before start date
                                                         if (endDate < newStart) {
                                                             setEndDate(newStart);
                                                         }
-                                                        // Auto-open end date picker after a short delay
-                                                        setTimeout(() => {
-                                                            const endDateInput = document.getElementById('bi-end-date') as HTMLInputElement;
-                                                            if (endDateInput) {
-                                                                endDateInput.focus();
-                                                                if ('showPicker' in endDateInput) {
-                                                                    try {
-                                                                        (endDateInput as any).showPicker();
-                                                                    } catch (err) { }
-                                                                } else {
-                                                                    (endDateInput as any).click();
+                                                        // Flag for next step on blur
+                                                        (e.target as any).dataset.shouldOpenNext = "true";
+                                                    }}
+                                                    onBlur={(e) => {
+                                                        if ((e.target as any).dataset.shouldOpenNext === "true") {
+                                                            (e.target as any).dataset.shouldOpenNext = "false";
+                                                            setTimeout(() => {
+                                                                const endDateInput = document.getElementById('bi-end-date') as HTMLInputElement;
+                                                                if (endDateInput) {
+                                                                    endDateInput.focus();
+                                                                    if ('showPicker' in endDateInput) {
+                                                                        try {
+                                                                            (endDateInput as any).showPicker();
+                                                                        } catch (err) { }
+                                                                    } else {
+                                                                        (endDateInput as any).click();
+                                                                    }
                                                                 }
-                                                            }
-                                                        }, 500);
+                                                            }, 250);
+                                                        }
                                                     }}
                                                     className="w-full px-3 py-3 md:py-2 bg-accent rounded-lg border border-border/50 text-xs font-bold text-foreground focus:ring-2 focus:ring-primary outline-none h-12 md:h-auto"
                                                 />
