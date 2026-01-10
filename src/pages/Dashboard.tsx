@@ -453,53 +453,32 @@ export default function Dashboard() {
                                 value={customDateRange.start}
                                 onChange={(e) => {
                                     const newStart = e.target.value;
+                                    // Force blur to close the current picker cleanly on iOS
+                                    e.target.blur();
+
                                     setCustomDateRange(prev => {
                                         const end = prev.end < newStart ? newStart : prev.end;
                                         return { start: newStart, end };
                                     });
-                                    // Mark that we should open the next picker when this one closes (onBlur)
-                                    // This ensures the user has clicked "Done" or properly left the field
-                                    if (window.navigator && window.navigator.vibrate) {
-                                        window.navigator.vibrate(50);
-                                    }
-
-                                    // Use a temporary property on the input to flag next step, 
-                                    // or just set a global flag/ref if we had one. 
-                                    // simpler: use a small timeout in onBlur that checks if date changed?
-                                    // Actually, let's just use the fact that if they changed it, they likely want to proceed.
-                                    // We'll set a class or data attribute to find later? No.
-
-                                    // Let's rely on the state update.
-                                    // We can just auto-focus the next one in a purely sequential manner
-                                    // BUT we must wait for 'Done'.
-
-                                    // Best approach: Set a 'data-next' attribute or similar trigger?
-                                    // No, let's use a mutable ref in the component body.
-                                    // Since I can't add `useRef` easily in this `replace_file_content` block without seeing the top of the file 
-                                    // (I can, but it's risky to assume line numbers),
-                                    // I'll use a hack: set a property on the DOM element itself.
-                                    (e.target as any).dataset.shouldOpenNext = "true";
-                                }}
-                                onBlur={(e) => {
-                                    // Check if we should proceed
-                                    if ((e.target as any).dataset.shouldOpenNext === "true") {
-                                        (e.target as any).dataset.shouldOpenNext = "false";
-
-                                        // Wait a moment for the UI to settle after "Done"
-                                        setTimeout(() => {
-                                            const endDateInput = document.getElementById('dash-end-date') as HTMLInputElement;
-                                            if (endDateInput) {
-                                                endDateInput.focus();
-                                                if ('showPicker' in endDateInput) {
-                                                    try {
-                                                        (endDateInput as any).showPicker();
-                                                    } catch (err) { }
-                                                } else {
-                                                    (endDateInput as HTMLElement).click();
+                                    // Auto-open next picker - delayed to allow "Done" action to settle
+                                    setTimeout(() => {
+                                        const endDateInput = document.getElementById('dash-end-date') as HTMLInputElement;
+                                        if (endDateInput) {
+                                            // iOS often requires focus before interaction or as a fallback
+                                            endDateInput.focus();
+                                            // Try standard showPicker
+                                            if ('showPicker' in endDateInput) {
+                                                try {
+                                                    (endDateInput as any).showPicker();
+                                                } catch (err) {
+                                                    console.warn('showPicker failed', err);
                                                 }
+                                            } else {
+                                                // Fallback for others
+                                                (endDateInput as HTMLElement).click();
                                             }
-                                        }, 250);
-                                    }
+                                        }
+                                    }, 500);
                                 }}
                                 className="w-full bg-secondary/50 border border-border rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
                             />
