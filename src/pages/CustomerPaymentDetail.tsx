@@ -65,9 +65,9 @@ export default function CustomerPaymentDetail() {
     const [loading, setLoading] = useState(true);
 
     // Selection Mode State
-    const [isSelectionMode, setIsSelectionMode] = useState(false);
+    const [isSelectionMode, setIsSelectionMode] = useHistorySyncedState(false, 'customerSelectionMode');
     const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
-    const [showMenu, setShowMenu] = useState(false);
+    const [showMenu, setShowMenu] = useHistorySyncedState(false, 'customerMenu');
 
     // Modals & Forms - synced with browser history
     const [showAddDue, setShowAddDue] = useHistorySyncedState(false, 'customerAddDue');
@@ -79,18 +79,12 @@ export default function CustomerPaymentDetail() {
     const [receiveAmount, setReceiveAmount] = useState("");
     const [newDueDate, setNewDueDate] = useState("");
 
-    // Handle back navigation for other states
+    // Side effects for state changes
     useEffect(() => {
-        const handlePopState = () => {
-            if (showMenu) setShowMenu(false);
-            if (isSelectionMode) {
-                setIsSelectionMode(false);
-                setSelectedIndices(new Set());
-            }
-        };
-        window.addEventListener('popstate', handlePopState);
-        return () => window.removeEventListener('popstate', handlePopState);
-    }, [showMenu, isSelectionMode]);
+        if (!isSelectionMode) {
+            setSelectedIndices(new Set());
+        }
+    }, [isSelectionMode]);
 
     const [confirmConfig, setConfirmConfig] = useState<{
         isOpen: boolean;

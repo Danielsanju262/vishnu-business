@@ -211,7 +211,7 @@ export default function Products() {
     );
 
     return (
-        <div className="min-h-screen bg-background pb-28 md:pb-32 w-full md:max-w-2xl md:mx-auto px-3 md:px-4">
+        <div className="min-h-screen bg-background pb-6 w-full md:max-w-2xl md:mx-auto px-3 md:px-4">
             {/* Header */}
             {isSelectionMode ? (
                 <div className="fixed top-0 left-0 right-0 z-40 bg-white dark:bg-gray-900 px-4 py-3 border-b border-border shadow-sm flex items-center justify-between">
@@ -292,7 +292,7 @@ export default function Products() {
                         <input
                             type="text"
                             placeholder="Search products..."
-                            className="w-full px-4 h-12 rounded-xl bg-background border-2 border-border focus:border-ring transition-all"
+                            className="w-full px-4 h-12 rounded-xl bg-background border-2 border-zinc-200 dark:border-zinc-700 focus:border-ring transition-all"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                         />

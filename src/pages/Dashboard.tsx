@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../lib/supabase";
-import { Plus, Minus, TrendingUp, Users, Package, FileText, ChevronRight, Edit3, Check, LogOut, Truck, Calendar, ChevronDown, Lightbulb, CheckCircle2, Clock, AlertTriangle } from "lucide-react";
+import { Plus, Minus, TrendingUp, Users, Package, FileText, ChevronRight, Edit3, Check, LogOut, Truck, Calendar, ChevronDown } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 import { Link } from "react-router-dom";
@@ -8,9 +8,7 @@ import { cn } from "../lib/utils";
 import { useRealtimeTables } from "../hooks/useRealtimeSync";
 import { Modal } from "../components/ui/Modal";
 import { useHistorySyncedState } from "../hooks/useHistorySyncedState";
-import { useInsightsGenerator } from "../hooks/useInsightsGenerator";
-import { useSearchParams } from "react-router-dom";
-import { SNOOZE_OPTIONS } from "../types/insightTypes";
+
 
 export default function Dashboard() {
     const { lockApp } = useAuth();
@@ -35,24 +33,7 @@ export default function Dashboard() {
     const [showFilterDropdown, setShowFilterDropdown] = useHistorySyncedState(false, 'dashboardFilter');
     const [showCustomDateModal, setShowCustomDateModal] = useHistorySyncedState(false, 'dashboardCustomDate');
     const [isEditingName, setIsEditingName] = useHistorySyncedState(false, 'dashboardEditName');
-    const [searchParams] = useSearchParams();
 
-    // Insights State
-    const {
-        tasks,
-        markAsDone,
-        snoozeItem,
-    } = useInsightsGenerator();
-
-    const [expandedSections, setExpandedSections] = useState({
-        tasks: searchParams.get('action') === 'view_tasks',
-    });
-
-    // Snooze modal state
-    const [isSnoozeModalOpen, setIsSnoozeModalOpen] = useHistorySyncedState(false, 'dashboardSnooze');
-    const [snoozeItemId, setSnoozeItemId] = useState<string | null>(null);
-    const [customSnoozeDate, setCustomSnoozeDate] = useState("");
-    const [customSnoozeTime, setCustomSnoozeTime] = useState("09:00");
 
     const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -96,46 +77,7 @@ export default function Dashboard() {
         return { revenue, netProfit };
     }
 
-    // --- Insights Logic ---
-    const toggleSection = (section: 'tasks') => {
-        setExpandedSections(prev => ({
-            ...prev,
-            [section]: !prev[section],
-        }));
-    };
 
-    const handleSnooze = (id: string) => {
-        setSnoozeItemId(id);
-        setIsSnoozeModalOpen(true);
-    };
-
-    const closeSnoozeModal = () => {
-        setIsSnoozeModalOpen(false);
-        setSnoozeItemId(null);
-        setCustomSnoozeDate("");
-    };
-
-    const confirmSnooze = async (hours: number) => {
-        if (!snoozeItemId) return;
-        await snoozeItem(snoozeItemId, hours);
-        closeSnoozeModal();
-    };
-
-    const confirmCustomSnooze = async () => {
-        if (!snoozeItemId || !customSnoozeDate) return;
-        const dateTime = new Date(`${customSnoozeDate}T${customSnoozeTime}`);
-        const hoursFromNow = Math.max(1, Math.ceil((dateTime.getTime() - Date.now()) / (1000 * 60 * 60)));
-        await snoozeItem(snoozeItemId, hoursFromNow);
-        closeSnoozeModal();
-    };
-
-    const getSeverityIcon = (severity: string) => {
-        switch (severity) {
-            case 'warning': return <AlertTriangle size={16} className="text-amber-400" />;
-            case 'success': return <TrendingUp size={16} className="text-emerald-400" />;
-            default: return <Lightbulb size={16} className="text-blue-400" />;
-        }
-    };
 
 
     const getDateRange = useCallback(() => {
@@ -216,7 +158,7 @@ export default function Dashboard() {
     ];
 
     return (
-        <div className="space-y-6 px-4 pt-6 pb-28 md:px-6 md:pt-8 md:pb-32 w-full md:max-w-lg md:mx-auto animate-in fade-in">
+        <div className="space-y-6 px-4 pt-6 pb-6 md:px-6 md:pt-8 md:pb-8 w-full md:max-w-lg md:mx-auto animate-in fade-in">
             {/* Header */}
             <div className="space-y-1.5">
                 {/* Date at top */}
@@ -296,69 +238,7 @@ export default function Dashboard() {
                     </button>
                 </div>
 
-                {/* Today's Tasks Button */}
-                {tasks.length > 0 && (
-                    <div className="pt-2">
-                        <button
-                            onClick={() => toggleSection('tasks')}
-                            className={cn(
-                                "w-full flex items-center justify-between p-3 rounded-xl transition-all border border-white/5",
-                                expandedSections.tasks ? "bg-emerald-500/10 border-emerald-500/20" : "bg-white/5 hover:bg-white/10"
-                            )}
-                        >
-                            <div className="flex items-center gap-3">
-                                <div className={cn("p-2 rounded-lg bg-emerald-500/20")}>
-                                    <CheckCircle2 size={18} className="text-emerald-400" />
-                                </div>
-                                <span className="font-semibold text-foreground">Today's Tasks</span>
-                                <span className="px-2 py-0.5 bg-white/10 rounded-full text-xs font-medium">
-                                    {tasks.length}
-                                </span>
-                            </div>
-                            <ChevronDown
-                                size={20}
-                                className={cn(
-                                    "text-muted-foreground transition-transform duration-200",
-                                    expandedSections.tasks && "rotate-180"
-                                )}
-                            />
-                        </button>
 
-                        {expandedSections.tasks && (
-                            <div className="space-y-2 mt-2 pl-2">
-                                {tasks.map(task => (
-                                    <div key={task.id} className="p-3 bg-zinc-900/50 rounded-xl border border-white/5 space-y-2">
-                                        <div className="flex items-start gap-3">
-                                            {getSeverityIcon(task.severity)}
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-sm font-medium text-foreground">{task.title}</p>
-                                                {task.description && (
-                                                    <p className="text-xs text-muted-foreground mt-0.5">{task.description}</p>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-2 pl-7">
-                                            <button
-                                                onClick={() => markAsDone(task.id)}
-                                                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-lg text-xs font-medium transition-all"
-                                            >
-                                                <Check size={14} />
-                                                Done
-                                            </button>
-                                            <button
-                                                onClick={() => handleSnooze(task.id)}
-                                                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white/5 hover:bg-white/10 text-muted-foreground rounded-lg text-xs font-medium transition-all"
-                                            >
-                                                <Clock size={14} />
-                                                Later
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                )}
             </div>
 
 
@@ -602,55 +482,7 @@ export default function Dashboard() {
                 </div>
             </Modal>
 
-            {/* Snooze Modal */}
-            <Modal
-                isOpen={isSnoozeModalOpen}
-                onClose={closeSnoozeModal}
-                title={<span className="text-lg font-bold">Remind Me Later</span>}
-            >
-                <div className="space-y-4">
-                    {/* Quick Options */}
-                    <div className="space-y-2">
-                        {SNOOZE_OPTIONS.filter(o => o.value > 0).map((option) => (
-                            <button
-                                key={option.value}
-                                onClick={() => confirmSnooze(option.value)}
-                                className="w-full flex items-center gap-3 p-3 bg-white/5 hover:bg-white/10 active:bg-white/15 rounded-xl text-left transition-all"
-                            >
-                                <Clock size={18} className="text-muted-foreground" />
-                                <span className="text-sm font-medium">{option.label}</span>
-                            </button>
-                        ))}
-                    </div>
 
-                    {/* Custom Date/Time */}
-                    <div className="pt-3 border-t border-white/10 space-y-3">
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Custom Time</p>
-                        <div className="grid grid-cols-2 gap-3">
-                            <input
-                                type="date"
-                                value={customSnoozeDate}
-                                onChange={(e) => setCustomSnoozeDate(e.target.value)}
-                                min={format(new Date(), 'yyyy-MM-dd')}
-                                className="bg-secondary/50 border border-border rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
-                            />
-                            <input
-                                type="time"
-                                value={customSnoozeTime}
-                                onChange={(e) => setCustomSnoozeTime(e.target.value)}
-                                className="bg-secondary/50 border border-border rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
-                            />
-                        </div>
-                        <button
-                            onClick={confirmCustomSnooze}
-                            disabled={!customSnoozeDate}
-                            className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-600/50 disabled:cursor-not-allowed text-white text-sm font-bold rounded-xl transition-all"
-                        >
-                            Set Custom Reminder
-                        </button>
-                    </div>
-                </div>
-            </Modal>
         </div>
     );
 }

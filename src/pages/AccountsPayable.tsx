@@ -50,6 +50,7 @@ export default function AccountsPayable() {
 
     // Quick Action Modals - synced with browser history
     const [quickActionSupplier, setQuickActionSupplier] = useState<{ id: string; name: string; payable: Payable; totalBalance: number } | null>(null);
+    const [isQuickActionOpen, setIsQuickActionOpen] = useHistorySyncedState(false, 'payableQuickAction');
     const [actionType, setActionType] = useState<'add' | 'pay' | null>(null);
     const [amount, setAmount] = useState("");
     const [dueDate, setDueDate] = useState("");
@@ -62,25 +63,30 @@ export default function AccountsPayable() {
     const [newPayableDueDate, setNewPayableDueDate] = useState("");
     const [showSupplierList, setShowSupplierList] = useState(false);
 
+    // Search for main list
+    const [searchQuery, setSearchQuery] = useState("");
+
     // Edit Due Date Modal
     const [editDateSupplier, setEditDateSupplier] = useState<{ id: string; name: string } | null>(null);
+    const [isEditDateOpen, setIsEditDateOpen] = useHistorySyncedState(false, 'payableEditDate');
     const [editDateValue, setEditDateValue] = useState("");
     const [pendingNewSupplierName, setPendingNewSupplierName] = useState<string | null>(null);
 
-    // Handle back navigation for modals
+    // Sync data state with history state visibility
     useEffect(() => {
-        const handlePopState = () => {
-            if (quickActionSupplier) {
-                setQuickActionSupplier(null);
-                setActionType(null);
-                setAmount("");
-                setDueDate("");
-            }
-            if (editDateSupplier) setEditDateSupplier(null);
-        };
-        window.addEventListener('popstate', handlePopState);
-        return () => window.removeEventListener('popstate', handlePopState);
-    }, [quickActionSupplier, editDateSupplier]);
+        if (!isQuickActionOpen) {
+            setQuickActionSupplier(null);
+            setActionType(null);
+            setAmount("");
+            setDueDate("");
+        }
+    }, [isQuickActionOpen]);
+
+    useEffect(() => {
+        if (!isEditDateOpen) {
+            setEditDateSupplier(null);
+        }
+    }, [isEditDateOpen]);
 
     // Close dropdowns on ESC or click outside
     const listRef = useRef<HTMLDivElement>(null);
@@ -272,10 +278,7 @@ export default function AccountsPayable() {
     };
 
     const closeQuickAction = () => {
-        setQuickActionSupplier(null);
-        setActionType(null);
-        setAmount("");
-        setDueDate("");
+        setIsQuickActionOpen(false);
     };
 
     const handleUpdateDueDate = async () => {
@@ -294,7 +297,7 @@ export default function AccountsPayable() {
             toast("Failed to update due date", "error");
         } else {
             toast("Due date updated for all pending items", "success");
-            setEditDateSupplier(null);
+            setIsEditDateOpen(false);
             setEditDateValue("");
             loadData();
         }
@@ -383,6 +386,10 @@ export default function AccountsPayable() {
 
     const filteredSuppliersForNewPayable = suppliers.filter(c =>
         c.name.toLowerCase().includes(newPayableSupplierSearch.toLowerCase())
+    );
+
+    const filteredGroupedSuppliers = groupedSuppliers.filter(s =>
+        s.supplierName.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
     const getDueStatus = (dateStr: string) => {
@@ -485,7 +492,20 @@ export default function AccountsPayable() {
 
             <div className="min-h-screen bg-background text-foreground px-3 md:px-4 pb-32 animate-in fade-in w-full md:max-w-2xl md:mx-auto">
 
-                <div className="h-24 md:h-28" />
+                <div className="h-23.5 md:h-28" />
+
+                {/* Search Bar */}
+                {!loading && groupedSuppliers.length > 0 && (
+                    <div className="relative mb-4">
+                        <input
+                            type="text"
+                            placeholder="Search suppliers..."
+                            className="w-full px-4 h-12 rounded-xl bg-zinc-100 dark:bg-zinc-800/50 border-2 border-zinc-200 dark:border-zinc-700 focus:border-orange-500 focus:bg-background outline-none transition-all placeholder:text-zinc-400 font-bold text-zinc-900 dark:text-white"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                        />
+                    </div>
+                )}
 
                 {/* Total Stats */}
                 {!loading && groupedSuppliers.length > 0 && (
@@ -493,12 +513,12 @@ export default function AccountsPayable() {
                         <div>
                             <p className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-0.5">Total to be Paid</p>
                             <p className="text-xs text-zinc-400 dark:text-zinc-500 font-medium">
-                                {groupedSuppliers.length} pending supplier{groupedSuppliers.length !== 1 ? 's' : ''}
+                                {filteredGroupedSuppliers.length} supplier{filteredGroupedSuppliers.length !== 1 ? 's' : ''} found
                             </p>
                         </div>
                         <div className="text-right">
                             <p className="text-xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight">
-                                ₹{groupedSuppliers.reduce((sum, g) => sum + g.totalBalance, 0).toLocaleString()}
+                                ₹{filteredGroupedSuppliers.reduce((sum, g) => sum + g.totalBalance, 0).toLocaleString()}
                             </p>
                         </div>
                     </div>
@@ -518,9 +538,13 @@ export default function AccountsPayable() {
                         <p className="font-bold text-zinc-800 dark:text-zinc-200 text-base">No pending payables</p>
                         <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-2 max-w-xs mx-auto">All payments are up to date</p>
                     </div>
+                ) : filteredGroupedSuppliers.length === 0 ? (
+                    <div className="text-center py-12 px-6">
+                        <p className="text-zinc-500 font-medium">No results found for "{searchQuery}"</p>
+                    </div>
                 ) : (
                     <div className="space-y-3">
-                        {groupedSuppliers.map(supplier => {
+                        {filteredGroupedSuppliers.map(supplier => {
                             const dueStatus = getDueStatus(supplier.earliestDueDate);
 
                             return (
@@ -553,6 +577,7 @@ export default function AccountsPayable() {
                                                         e.stopPropagation();
                                                         setEditDateSupplier({ id: supplier.supplierId, name: supplier.supplierName });
                                                         setEditDateValue(supplier.earliestDueDate);
+                                                        setIsEditDateOpen(true);
                                                     }}
                                                     onKeyDown={(e) => {
                                                         if (e.key === "Enter" || e.key === " ") {
@@ -560,6 +585,7 @@ export default function AccountsPayable() {
                                                             e.stopPropagation();
                                                             setEditDateSupplier({ id: supplier.supplierId, name: supplier.supplierName });
                                                             setEditDateValue(supplier.earliestDueDate);
+                                                            setIsEditDateOpen(true);
                                                         }
                                                     }}
                                                     className="p-2.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-1"
@@ -587,6 +613,7 @@ export default function AccountsPayable() {
                                                 e.stopPropagation();
                                                 setQuickActionSupplier({ id: supplier.supplierId, name: supplier.supplierName, payable: supplier.primaryPayable, totalBalance: supplier.totalBalance });
                                                 setActionType('add');
+                                                setIsQuickActionOpen(true);
                                             }}
                                             className="flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white py-3 px-3 rounded-xl text-xs font-bold transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-orange-300 focus-visible:ring-offset-1"
                                         >
@@ -598,6 +625,7 @@ export default function AccountsPayable() {
                                                 e.stopPropagation();
                                                 setQuickActionSupplier({ id: supplier.supplierId, name: supplier.supplierName, payable: supplier.primaryPayable, totalBalance: supplier.totalBalance });
                                                 setActionType('pay');
+                                                setIsQuickActionOpen(true);
                                             }}
                                             className="flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white py-3 px-3 rounded-xl text-xs font-bold transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-1"
                                         >
@@ -614,7 +642,7 @@ export default function AccountsPayable() {
 
             {/* Quick Action Modal */}
             <Modal
-                isOpen={!!quickActionSupplier && !!actionType}
+                isOpen={isQuickActionOpen && !!quickActionSupplier}
                 onClose={closeQuickAction}
                 title={<h2 className="text-lg font-bold">{actionType === 'add' ? 'Add New Payable' : 'Make Payment'}</h2>}
             >
@@ -775,8 +803,8 @@ export default function AccountsPayable() {
 
             {/* Edit Due Date Modal */}
             <Modal
-                isOpen={!!editDateSupplier}
-                onClose={() => setEditDateSupplier(null)}
+                isOpen={isEditDateOpen}
+                onClose={() => setIsEditDateOpen(false)}
                 title={<h2 className="text-lg font-bold">Edit Due Date</h2>}
             >
                 <div className="space-y-4">

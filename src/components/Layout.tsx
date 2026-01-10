@@ -75,7 +75,7 @@ export default function Layout() {
     const shouldShowNav = !hiddenNavRoutes.includes(location.pathname);
 
     return (
-        <div className="min-h-screen pb-28 md:pb-32 relative bg-background selection:bg-primary/20">
+        <div className={cn("min-h-screen relative bg-background selection:bg-primary/20", shouldShowNav && "pb-28 md:pb-32")}>
             <main className="h-full">
                 <Outlet />
             </main>

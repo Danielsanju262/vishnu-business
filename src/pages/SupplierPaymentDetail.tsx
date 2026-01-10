@@ -86,18 +86,18 @@ export default function SupplierPaymentDetail() {
     // Edit Due Date
     const [newDueDate, setNewDueDate] = useState("");
 
-    // Handle back navigation for other states
+    // Selection Mode State
+    const [isSelectionMode, setIsSelectionMode] = useHistorySyncedState(false, 'supplierSelectionMode');
+    const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
+    const [showMenu, setShowMenu] = useHistorySyncedState(false, 'supplierMenu');
+    const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Side effects for state changes
     useEffect(() => {
-        const handlePopState = () => {
-            if (showMenu) setShowMenu(false);
-            if (isSelectionMode) {
-                setIsSelectionMode(false);
-                setSelectedIndices(new Set());
-            }
-        };
-        window.addEventListener('popstate', handlePopState);
-        return () => window.removeEventListener('popstate', handlePopState);
-    }, []);
+        if (!isSelectionMode) {
+            setSelectedIndices(new Set());
+        }
+    }, [isSelectionMode]);
 
     const [confirmConfig, setConfirmConfig] = useState<{
         isOpen: boolean;
@@ -115,12 +115,6 @@ export default function SupplierPaymentDetail() {
     });
 
     const closeConfirm = () => setConfirmConfig(prev => ({ ...prev, isOpen: false }));
-
-    // Selection Mode State
-    const [isSelectionMode, setIsSelectionMode] = useState(false);
-    const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
-    const [showMenu, setShowMenu] = useState(false);
-    const timerRef = useRef<NodeJS.Timeout | null>(null);
 
     // Close menu on ESC or click outside
     useDropdownClose(showMenu, () => setShowMenu(false));

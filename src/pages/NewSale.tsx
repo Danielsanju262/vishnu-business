@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { format } from "date-fns";
 import { supabase } from "../lib/supabase";
 import { Button } from "../components/ui/Button";
 import { ArrowLeft, ChevronRight, Package, Plus, Trash2, ShoppingCart, User, X, ArrowRight, Calendar, MoreVertical, Edit2, CheckCircle2, Circle } from "lucide-react";
@@ -49,7 +50,7 @@ export default function NewSale() {
         return stored ? JSON.parse(stored) : [];
     });
 
-    const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+    const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
 
     // Payment Confirm State
     const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -637,7 +638,7 @@ export default function NewSale() {
                         supplier_id: payableSelectedSupplierId,
                         amount: pAmount,
                         // Validate/Format Date for Note
-                        due_date: payableDueDate || new Date().toISOString().split('T')[0],
+                        due_date: payableDueDate || format(new Date(), 'yyyy-MM-dd'),
                         note: `[${dateStr} ${timeStr}] Credit Purchase: ₹${pAmount.toLocaleString()}. Balance: ₹${pAmount.toLocaleString()} (Sale to ${selectedCust.name})`,
                         status: 'pending',
                         recorded_at: new Date().toISOString()
@@ -710,7 +711,7 @@ export default function NewSale() {
                     const { error: reminderError } = await supabase.from('payment_reminders').insert({
                         customer_id: selectedCust.id,
                         amount: remaining,
-                        due_date: outstandingDueDate || new Date().toISOString().split('T')[0],
+                        due_date: outstandingDueDate || format(new Date(), 'yyyy-MM-dd'),
                         status: 'pending',
                         note: noteStr
                     });
@@ -746,7 +747,7 @@ export default function NewSale() {
     // --- Render ---
 
     return (
-        <div className="w-full md:max-w-lg md:mx-auto min-h-screen bg-background flex flex-col animate-in fade-in pb-8">
+        <div className="w-full md:max-w-lg md:mx-auto min-h-screen bg-background flex flex-col animate-in fade-in pb-5">
             {/* Glassmorphism Header */}
             <div className="fixed top-0 left-0 right-0 md:mx-auto w-full md:max-w-lg z-50 bg-white dark:bg-gray-900 border-b border-border shadow-sm px-3 py-3 md:px-4 flex items-center justify-between transition-all mb-4">
                 <button
@@ -754,8 +755,7 @@ export default function NewSale() {
                     onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
                             e.preventDefault();
-                            if (step === "cart") { setStep("customer"); return; }
-                            navigate("/");
+                            window.history.back();
                         }
                     }}
                     tabIndex={0}
@@ -780,7 +780,7 @@ export default function NewSale() {
                         <div className="relative mb-6">
                             <input
                                 ref={customerSearchInputRef}
-                                className="w-full bg-accent/30 border border-border/30 px-4 py-3 md:py-2.5 rounded-xl focus:ring-2 focus:ring-primary focus:bg-background outline-none text-base text-foreground transition-all h-12 md:h-auto"
+                                className="w-full bg-accent/30 border-2 border-zinc-200 dark:border-zinc-700 px-4 py-3 md:py-2.5 rounded-xl focus:ring-2 focus:ring-primary focus:bg-background outline-none text-base text-foreground transition-all h-12 md:h-auto"
                                 placeholder="Search customer..."
                                 value={search}
                                 onChange={e => setSearch(e.target.value)}
@@ -875,11 +875,11 @@ export default function NewSale() {
                                 <p className="text-lg md:text-xl font-black">{selectedCust.name}</p>
                             </div>
                             <button
-                                onClick={() => setStep("customer")}
+                                onClick={() => setStep("customer", { replace: true })}
                                 onKeyDown={(e) => {
                                     if (e.key === "Enter" || e.key === " ") {
                                         e.preventDefault();
-                                        setStep("customer");
+                                        setStep("customer", { replace: true });
                                     }
                                 }}
                                 tabIndex={0}
@@ -1103,12 +1103,12 @@ export default function NewSale() {
                                 <div className="mt-4 space-y-3 animate-in slide-in-from-top-2 border-t border-border pt-4">
                                     {/* Supplier Search */}
                                     <div className="space-y-1.5 relative">
-                                        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Supplier</label>
+                                        <label className="text-[12.5px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Supplier</label>
                                         <div className="relative">
                                             <input
                                                 type="text"
                                                 placeholder="Search supplier..."
-                                                className="w-full bg-accent/50 border border-border/50 rounded-xl px-4 h-12 text-xs md:text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-background transition-all"
+                                                className="w-full bg-accent/50 border-2 border-zinc-200 dark:border-zinc-700 rounded-xl px-4 h-12 text-xs md:text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-background transition-all"
                                                 value={payableSupplierSearch}
                                                 onChange={e => {
                                                     setPayableSupplierSearch(e.target.value);
@@ -1151,7 +1151,7 @@ export default function NewSale() {
 
                                     <div className="grid grid-cols-2 gap-3">
                                         <div className="space-y-1.5">
-                                            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Amount to Pay</label>
+                                            <label className="text-[12.5px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Amount to Pay</label>
                                             <div className="relative">
                                                 <input
                                                     type="number"
@@ -1165,7 +1165,7 @@ export default function NewSale() {
                                             </div>
                                         </div>
                                         <div className="space-y-1.5">
-                                            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Due Date</label>
+                                            <label className="text-[12.5px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Due Date</label>
                                             <input
                                                 type="date"
                                                 className="w-full bg-accent/50 border border-border/50 rounded-xl px-3 h-12 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-background transition-all"
@@ -1180,22 +1180,19 @@ export default function NewSale() {
 
                         {/* Summary Footer */}
                         <div className="mt-6 bg-card border border-border rounded-3xl shadow-lg p-5 space-y-5 animate-in slide-in-from-bottom-6">
-                            <div className="flex justify-between items-end gap-8">
-                                <div className="flex-1">
-                                    <p className="text-sm text-muted-foreground font-medium mb-1">Total Amount</p>
-                                    <h2 className="text-3xl font-black text-foreground tracking-tight">₹ {cart.reduce((acc, item) => acc + (item.quantity * item.sellPrice), 0).toLocaleString()}</h2>
-                                </div>
-                                <div className="text-right flex flex-col items-end">
-                                    <label className="text-xs font-bold text-muted-foreground uppercase flex items-center justify-end gap-1.5 mb-1.5 px-1">
-                                        <Calendar size={12} /> Date
-                                    </label>
-                                    <input
-                                        type="date"
-                                        className="bg-accent/50 border border-border rounded-xl py-3 md:py-2.5 px-3 text-sm font-bold text-foreground outline-none focus:ring-2 focus:ring-primary focus:bg-background transition-all text-right min-w-[140px] shadow-sm appearance-none h-14 md:h-auto"
-                                        value={date}
-                                        onChange={e => setDate(e.target.value)}
-                                    />
-                                </div>
+                            <div className="grid grid-cols-[1fr_auto] gap-x-8 gap-y-1.5">
+                                <p className="text-xs font-bold text-muted-foreground uppercase px-1 whitespace-nowrap self-end">Total Amount</p>
+                                <label className="text-xs font-bold text-muted-foreground uppercase flex items-center gap-1.5 px-1 whitespace-nowrap self-end">
+                                    <Calendar size={18} /> Date
+                                </label>
+
+                                <h2 className="text-3xl font-black text-foreground tracking-tight whitespace-nowrap self-center">₹ {cart.reduce((acc, item) => acc + (item.quantity * item.sellPrice), 0).toLocaleString()}</h2>
+                                <input
+                                    type="date"
+                                    className="bg-accent/50 border border-border rounded-xl py-3 md:py-2.5 px-3 text-sm font-bold text-foreground outline-none focus:ring-2 focus:ring-primary focus:bg-background transition-all text-right min-w-[140px] shadow-sm appearance-none h-14 md:h-auto"
+                                    value={date}
+                                    onChange={e => setDate(e.target.value)}
+                                />
                             </div>
 
                             <Button
@@ -1268,7 +1265,7 @@ export default function NewSale() {
 
                                 {/* Credit Details */}
                                 {addToOutstanding && (
-                                    <div className="space-y-4 animate-in slide-in-from-top-2">
+                                    <div className="space-y-2 animate-in slide-in-from-top-2">
                                         <div>
                                             <label className="text-xs font-bold text-muted-foreground ml-1 uppercase tracking-wider">Paid Now</label>
                                             <div className="relative mt-1">
@@ -1277,7 +1274,7 @@ export default function NewSale() {
                                                     min="0"
                                                     step="0.01"
                                                     autoFocus
-                                                    className="w-full bg-background border-2 border-zinc-200 dark:border-zinc-700 focus:border-amber-500 dark:focus:border-amber-500 rounded-xl px-4 h-14 text-xl font-bold outline-none transition-all placeholder:text-muted-foreground/30"
+                                                    className="w-full bg-background border-2 border-zinc-200 dark:border-zinc-700 focus:border-amber-500 dark:focus:border-amber-500 rounded-xl px-4 h-14 text-2xl font-black outline-none transition-all placeholder:text-muted-foreground/30"
                                                     placeholder="0"
                                                     value={paidNowAmount}
                                                     onChange={e => setPaidNowAmount(e.target.value)}
@@ -1285,17 +1282,17 @@ export default function NewSale() {
                                             </div>
                                         </div>
 
-                                        <div className="flex items-center justify-between px-2">
-                                            <span className="text-sm font-bold text-foreground">Balance Due</span>
-                                            <span className="text-xl font-black text-amber-600 dark:text-amber-500">₹{remaining.toLocaleString()}</span>
+                                        <div className="flex items-center justify-end gap-4 px-4 py-2.5 bg-amber-50 dark:bg-amber-900/10 rounded-xl border border-amber-100 dark:border-amber-900/30">
+                                            <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Balance Due:</span>
+                                            <span className="text-2xl font-black text-amber-600 dark:text-amber-500">₹{remaining.toLocaleString()}</span>
                                         </div>
 
                                         {remaining > 0 && (
-                                            <div>
+                                            <div className="pt-5">
                                                 <label className="text-xs font-bold text-muted-foreground ml-1 uppercase tracking-wider">Due Date (Optional)</label>
                                                 <input
                                                     type="date"
-                                                    className="w-full mt-1 bg-background border-2 border-zinc-200 dark:border-zinc-700 focus:border-amber-500 dark:focus:border-amber-500 rounded-xl px-4 h-14 md:h-12 text-sm font-bold outline-none transition-all cursor-pointer"
+                                                    className="w-full mt-1 bg-background border-2 border-zinc-200 dark:border-zinc-700 focus:border-amber-500 dark:focus:border-amber-500 rounded-xl px-4 h-12 text-base font-bold outline-none transition-all cursor-pointer"
                                                     value={outstandingDueDate}
                                                     onChange={e => setOutstandingDueDate(e.target.value)}
                                                 />
@@ -1325,10 +1322,10 @@ export default function NewSale() {
                 {
                     step === "product" && (
                         <div className="flex-1 flex flex-col animate-in slide-in-from-right-4 duration-300">
-                            <div className="relative mb-6">
+                            <div className="relative mb-5">
                                 <input
                                     ref={productSearchInputRef}
-                                    className="w-full bg-accent/50 border border-border/50 px-4 py-3.5 rounded-2xl focus:ring-2 focus:ring-primary focus:bg-background outline-none text-lg text-foreground transition-all shadow-sm"
+                                    className="w-full bg-accent/50 border-2 border-zinc-200 dark:border-zinc-700 px-4 py-3.5 rounded-2xl focus:ring-2 focus:ring-primary focus:bg-background outline-none text-lg text-foreground transition-all shadow-sm"
                                     placeholder="Search product..."
                                     value={search}
                                     onChange={e => setSearch(e.target.value)}
@@ -1371,7 +1368,7 @@ export default function NewSale() {
                                     </div>
                                 </div>
                             ) : (
-                                <button onClick={() => { setIsAddingNew(true); setNewItemName(search); }} className="w-full p-4 mb-4 border-2 border-dashed border-border/60 rounded-2xl flex items-center justify-center text-primary font-bold hover:bg-primary/5 hover:border-primary/30 transition interactive text-sm group">
+                                <button onClick={() => { setIsAddingNew(true); setNewItemName(search); }} className="w-full p-4 mb-3 border-2 border-dashed border-border/60 rounded-2xl flex items-center justify-center text-primary font-bold hover:bg-primary/5 hover:border-primary/30 transition interactive text-sm group">
                                     <div className="p-1 bg-primary/10 rounded-full mr-3 group-hover:bg-primary group-hover:text-white transition-colors">
                                         <Plus size={16} />
                                     </div>
@@ -1379,7 +1376,7 @@ export default function NewSale() {
                                 </button>
                             )}
 
-                            <div className="grid grid-cols-2 gap-4 overflow-y-auto pb-4">
+                            <div className="grid grid-cols-2 gap-4 overflow-y-auto pb-4 pt-3">
                                 {products.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).map(p => (
                                     <button
                                         key={p.id}

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import Papa from "papaparse";
 import { Link } from "react-router-dom";
+import { format } from "date-fns";
 import { ArrowLeft, Database, Shield, Lock, Check, Fingerprint, LogOut, KeyRound, Loader2, Smartphone, Trash2, AlertTriangle, ShieldCheck, Clock, Mail, Download, Upload, ChevronDown, Cloud } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { cn } from "../lib/utils";
@@ -136,8 +137,8 @@ export default function Settings() {
     const [revokeError, setRevokeError] = useState('');
 
     // Data Management State
-    const [exportStartDate, setExportStartDate] = useState(new Date().toISOString().split('T')[0]);
-    const [exportEndDate, setExportEndDate] = useState(new Date().toISOString().split('T')[0]);
+    const [exportStartDate, setExportStartDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+    const [exportEndDate, setExportEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
     const [isExporting, setIsExporting] = useState(false);
     const [isImporting, setIsImporting] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -502,7 +503,7 @@ export default function Settings() {
     };
 
     return (
-        <div className="min-h-screen bg-background p-3 md:p-4 pb-10 animate-in fade-in w-full md:max-w-2xl md:mx-auto">
+        <div className="min-h-screen bg-background p-3 md:p-4 pb-6 animate-in fade-in w-full md:max-w-2xl md:mx-auto">
             {/* Header - Enhanced with better spacing and hover states */}
             <div className="flex items-center gap-3 mb-5 md:mb-6">
                 <button
@@ -534,7 +535,7 @@ export default function Settings() {
                     <div className="space-y-0">
                         <div className="flex justify-between items-center py-3 border-b border-neutral-100 dark:border-neutral-800">
                             <span className="text-sm text-neutral-500 dark:text-neutral-400 font-medium">Version</span>
-                            <span className="text-sm font-semibold text-neutral-900 dark:text-white bg-neutral-100 dark:bg-neutral-800 px-2.5 py-1 rounded-md">v5.0.0</span>
+                            <span className="text-sm font-semibold text-neutral-900 dark:text-white bg-neutral-100 dark:bg-neutral-800 px-2.5 py-1 rounded-md">v5.3.0</span>
                         </div>
 
 

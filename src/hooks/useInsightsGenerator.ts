@@ -16,9 +16,22 @@ interface UseInsightsGeneratorReturn {
 }
 
 export function useInsightsGenerator(): UseInsightsGeneratorReturn {
-    const [tasks, setTasks] = useState<InsightItem[]>([]);
-    const [insights, setInsights] = useState<InsightItem[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    // Initialize from localStorage if available
+    const [tasks, setTasks] = useState<InsightItem[]>(() => {
+        try {
+            const saved = localStorage.getItem('vishnu_insights_tasks');
+            return saved ? JSON.parse(saved) : [];
+        } catch { return []; }
+    });
+
+    const [insights, setInsights] = useState<InsightItem[]>(() => {
+        try {
+            const saved = localStorage.getItem('vishnu_insights_data');
+            return saved ? JSON.parse(saved) : [];
+        } catch { return []; }
+    });
+
+    const [isLoading, setIsLoading] = useState(tasks.length === 0);
     const [error, setError] = useState<string | null>(null);
 
     // Helper to create an insight item
@@ -331,8 +344,8 @@ export function useInsightsGenerator(): UseInsightsGeneratorReturn {
     }, []);
 
     // Load persisted items and merge with generated
-    const refreshInsights = useCallback(async () => {
-        setIsLoading(true);
+    const refreshInsights = useCallback(async (options?: { silent?: boolean }) => {
+        if (!options?.silent) setIsLoading(true);
         setError(null);
 
         try {
@@ -374,6 +387,10 @@ export function useInsightsGenerator(): UseInsightsGeneratorReturn {
             setTasks(generatedTasks);
             setInsights(mergedInsights);
 
+            // Save to localStorage
+            localStorage.setItem('vishnu_insights_tasks', JSON.stringify(generatedTasks));
+            localStorage.setItem('vishnu_insights_data', JSON.stringify(mergedInsights));
+
         } catch (err) {
             console.error('[Insights] Error refreshing:', err);
             setError('Failed to load insights. Please try again.');
@@ -385,6 +402,7 @@ export function useInsightsGenerator(): UseInsightsGeneratorReturn {
     // Mark a task as done (just remove from local state for tasks)
     const markAsDone = useCallback(async (id: string) => {
         setTasks(prev => prev.filter(t => t.id !== id));
+        // We could also update localStorage here, but next refresh will sync it.
     }, []);
 
     // Snooze an item
@@ -420,24 +438,23 @@ export function useInsightsGenerator(): UseInsightsGeneratorReturn {
             .eq('id', id);
     }, []);
 
-    // Initial load and focus listener
+    // Initial load
     useEffect(() => {
-        refreshInsights();
-
-        const onFocus = () => refreshInsights();
-        window.addEventListener('focus', onFocus);
-        return () => window.removeEventListener('focus', onFocus);
+        // If we have data in cache, we load silently (background update)
+        // If not, we show loading.
+        const hasData = tasks.length > 0;
+        refreshInsights({ silent: hasData });
     }, [refreshInsights]);
 
-    // Real-time updates
-    useRealtimeTables(['transactions', 'expenses', 'payment_reminders', 'accounts_payable'], refreshInsights);
+    // Real-time updates - always silent
+    useRealtimeTables(['transactions', 'expenses', 'payment_reminders', 'accounts_payable'], () => refreshInsights({ silent: true }));
 
     return {
         tasks,
         insights,
         isLoading,
         error,
-        refreshInsights,
+        refreshInsights: () => refreshInsights({ silent: false }), // Manual refresh shows loading
         markAsDone,
         snoozeItem,
         clearItem,

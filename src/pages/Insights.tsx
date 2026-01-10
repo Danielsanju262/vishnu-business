@@ -11,7 +11,7 @@ import {
     ChevronDown,
     ChevronRight,
     MessageCircle,
-    RefreshCw,
+
     Check,
 } from "lucide-react";
 import { cn } from "../lib/utils";
@@ -34,7 +34,7 @@ export default function Insights() {
 
     // Section expansion state - tasks collapsed by default
     const [expandedSections, setExpandedSections] = useState({
-        tasks: false,
+        tasks: true,
     });
 
     // Snooze modal state
@@ -170,13 +170,7 @@ export default function Insights() {
                             {format(new Date(), "EEEE, MMM d")}
                         </p>
                     </div>
-                    <button
-                        onClick={refreshInsights}
-                        disabled={isLoading}
-                        className="p-2.5 bg-white/5 hover:bg-white/10 active:bg-white/15 rounded-full transition-all disabled:opacity-50"
-                    >
-                        <RefreshCw size={18} className={cn("text-muted-foreground", isLoading && "animate-spin")} />
-                    </button>
+
                 </div>
             </header>
 

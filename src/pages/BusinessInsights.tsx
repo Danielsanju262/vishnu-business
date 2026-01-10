@@ -1,9 +1,10 @@
 import { useState, useMemo, useRef, useCallback } from "react";
 import { supabase } from "../lib/supabase";
-import { ArrowLeft, Calendar, ChevronDown, ChevronRight, TrendingUp, TrendingDown, Users, Wallet, ShoppingBag, Clock, BarChart3, ArrowUpRight, ArrowDownRight, X } from "lucide-react";
+import { ArrowLeft, Calendar, ChevronDown, ChevronRight, TrendingUp, TrendingDown, Users, Wallet, ShoppingBag, Clock, BarChart3, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { format, subDays, startOfWeek, startOfMonth, endOfWeek, endOfMonth } from "date-fns";
 import { Link } from "react-router-dom";
 import { Button } from "../components/ui/Button";
+import { Modal } from "../components/ui/Modal";
 import { cn } from "../lib/utils";
 import { useRealtimeTables } from "../hooks/useRealtimeSync";
 import { useDropdownClose } from "../hooks/useDropdownClose";
@@ -40,7 +41,7 @@ export default function BusinessInsights() {
 
     // View State  
     const [activeTab, setActiveTab] = useState<TabType>('summary');
-    const [isReceivablesOpen, setIsReceivablesOpen] = useState(false);
+    const [isReceivablesOpen, setIsReceivablesOpen] = useState(true);
 
     // Data State
     const [data, setData] = useState<InsightData>({
@@ -394,7 +395,7 @@ export default function BusinessInsights() {
     ];
 
     return (
-        <div className="min-h-screen bg-background pb-28 md:pb-32 w-full md:max-w-2xl md:mx-auto px-3 md:px-4">
+        <div className="min-h-screen bg-background pb-6 w-full md:max-w-2xl md:mx-auto px-3 md:px-4">
             {/* Header */}
             <div className="fixed top-0 left-0 right-0 z-40 bg-white dark:bg-gray-900 border-b border-border shadow-sm">
                 <div className="w-full px-3 md:px-4 py-3">
@@ -803,6 +804,31 @@ export default function BusinessInsights() {
                                 </div>
                             </div>
 
+                            {/* Quick Actions */}
+                            <div className="grid grid-cols-2 gap-3">
+                                <Link
+                                    to="/payment-reminders"
+                                    className="p-4 bg-card rounded-2xl border border-border/60 hover:border-emerald-500/50 transition-all group"
+                                >
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <Clock size={16} className="text-emerald-500" />
+                                        <p className="text-xs font-bold text-muted-foreground">Reminders</p>
+                                    </div>
+                                    <p className="text-lg font-black text-foreground group-hover:text-emerald-500 transition-colors">{data.paymentReminders.length}</p>
+                                </Link>
+
+                                <Link
+                                    to="/accounts-payable"
+                                    className="p-4 bg-card rounded-2xl border border-border/60 hover:border-rose-500/50 transition-all group"
+                                >
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <Wallet size={16} className="text-rose-500" />
+                                        <p className="text-xs font-bold text-muted-foreground">Payables</p>
+                                    </div>
+                                    <p className="text-lg font-black text-foreground group-hover:text-rose-500 transition-colors">{data.accountsPayable.length}</p>
+                                </Link>
+                            </div>
+
                             {/* Customer Wise Breakdown - ALL TIME */}
                             <div className="bg-card rounded-2xl border border-border/60 shadow-sm overflow-hidden">
                                 <button
@@ -849,31 +875,6 @@ export default function BusinessInsights() {
                                     </div>
                                 )}
                             </div>
-
-                            {/* Quick Actions */}
-                            <div className="grid grid-cols-2 gap-3">
-                                <Link
-                                    to="/payment-reminders"
-                                    className="p-4 bg-card rounded-2xl border border-border/60 hover:border-emerald-500/50 transition-all group"
-                                >
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <Clock size={16} className="text-emerald-500" />
-                                        <p className="text-xs font-bold text-muted-foreground">Reminders</p>
-                                    </div>
-                                    <p className="text-lg font-black text-foreground group-hover:text-emerald-500 transition-colors">{data.paymentReminders.length}</p>
-                                </Link>
-
-                                <Link
-                                    to="/accounts-payable"
-                                    className="p-4 bg-card rounded-2xl border border-border/60 hover:border-rose-500/50 transition-all group"
-                                >
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <Wallet size={16} className="text-rose-500" />
-                                        <p className="text-xs font-bold text-muted-foreground">Payables</p>
-                                    </div>
-                                    <p className="text-lg font-black text-foreground group-hover:text-rose-500 transition-colors">{data.accountsPayable.length}</p>
-                                </Link>
-                            </div>
                         </div>
                     )}
 
@@ -882,22 +883,20 @@ export default function BusinessInsights() {
             )}
 
             {/* Product Details Modal - with Click Outside to Close */}
-            {selectedProduct && (
-                <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/80 backdrop-blur-sm px-4 pt-[160px] pb-[230px] animate-in fade-in"
-                    onClick={() => setSelectedProduct(null)}
-                >
-                    <div
-                        className="bg-zinc-950 w-full max-w-lg rounded-3xl border border-zinc-800 overflow-hidden shadow-2xl flex flex-col max-h-[80vh] animate-in zoom-in-95 duration-200 mt-1"
-                        onClick={(e) => e.stopPropagation()}
-                    >
+            {/* Product Details Modal - with Click Outside to Close */}
+            {/* Product Details Modal */}
+            <Modal
+                isOpen={!!selectedProduct}
+                onClose={() => setSelectedProduct(null)}
+                className="bg-zinc-950 border-zinc-800 border max-w-lg p-0 overflow-hidden flex flex-col max-h-[85vh]"
+            >
+                {selectedProduct && (
+                    <>
                         <div className="p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-900/50">
                             <div>
                                 <h3 className="font-bold text-lg text-white">{selectedProduct.name}</h3>
                                 <p className="text-xs text-zinc-400">Customer Wise Breakdown ({rangeType})</p>
                             </div>
-                            <button onClick={() => setSelectedProduct(null)} className="p-2 bg-zinc-800 rounded-full text-zinc-400 hover:text-white">
-                                <X size={16} />
-                            </button>
                         </div>
                         <div className="p-4 overflow-y-auto space-y-2 max-h-[400px]">
                             {data.transactions
@@ -919,27 +918,35 @@ export default function BusinessInsights() {
                                 <p className="text-center text-zinc-500 py-4">No transactions found.</p>
                             )}
                         </div>
-                    </div>
-                </div>
-            )}
+                        {/* Summary Footer */}
+                        <div className="p-4 border-t border-zinc-800 bg-zinc-900/50">
+                            <div className="flex justify-between items-center">
+                                <p className="text-xs font-bold text-zinc-400 uppercase">Total Revenue</p>
+                                <p className="text-lg font-black text-emerald-500">
+                                    ₹{data.transactions
+                                        .filter(t => t.products?.name === selectedProduct.name)
+                                        .reduce((sum, t) => sum + (t.quantity * t.sell_price), 0)
+                                        .toLocaleString()}
+                                </p>
+                            </div>
+                        </div>
+                    </>
+                )}
+            </Modal>
 
-            {/* Customer Details Modal - Product Wise Breakdown */}
-            {selectedCustomer && (
-                <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/80 backdrop-blur-sm px-4 pt-[260px] pb-[230px] animate-in fade-in"
-                    onClick={() => setSelectedCustomer(null)}
-                >
-                    <div
-                        className="bg-zinc-950 w-full max-w-lg rounded-3xl border border-zinc-800 overflow-hidden shadow-2xl flex flex-col max-h-[80vh] animate-in zoom-in-95 duration-200 mt-1"
-                        onClick={(e) => e.stopPropagation()}
-                    >
+            {/* Customer Details Modal */}
+            <Modal
+                isOpen={!!selectedCustomer}
+                onClose={() => setSelectedCustomer(null)}
+                className="bg-zinc-950 border-zinc-800 border max-w-lg p-0 overflow-hidden flex flex-col max-h-[85vh]"
+            >
+                {selectedCustomer && (
+                    <>
                         <div className="p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-900/50">
                             <div>
                                 <h3 className="font-bold text-lg text-white">{selectedCustomer.name}</h3>
                                 <p className="text-xs text-zinc-400">Product Wise Breakdown ({rangeType})</p>
                             </div>
-                            <button onClick={() => setSelectedCustomer(null)} className="p-2 bg-zinc-800 rounded-full text-zinc-400 hover:text-white">
-                                <X size={16} />
-                            </button>
                         </div>
                         <div className="p-4 overflow-y-auto space-y-2 max-h-[400px]">
                             {(() => {
@@ -956,7 +963,7 @@ export default function BusinessInsights() {
                                         productStats[name].revenue += (t.quantity * t.sell_price);
                                     });
 
-                                const sortedProducts = Object.values(productStats).sort((a, b) => b.quantity - a.quantity);
+                                const sortedProducts = Object.values(productStats).sort((a, b) => b.revenue - a.revenue);
 
                                 if (sortedProducts.length === 0) {
                                     return <p className="text-center text-zinc-500 py-4">No purchases found.</p>;
@@ -980,9 +987,18 @@ export default function BusinessInsights() {
                                 ));
                             })()}
                         </div>
-                    </div>
-                </div>
-            )}
+                        {/* Summary Footer */}
+                        <div className="p-4 border-t border-zinc-800 bg-zinc-900/50">
+                            <div className="flex justify-between items-center">
+                                <p className="text-xs font-bold text-zinc-400 uppercase">Total Spent</p>
+                                <p className="text-lg font-black text-emerald-500">
+                                    ₹{selectedCustomer.revenue.toLocaleString()}
+                                </p>
+                            </div>
+                        </div>
+                    </>
+                )}
+            </Modal>
         </div>
     );
 }

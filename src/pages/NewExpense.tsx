@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from "react";
+import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { Button } from "../components/ui/Button";
@@ -25,7 +26,7 @@ export default function NewExpense() {
     // Form State
     const [title, setTitle] = useState("");
     const [amount, setAmount] = useState("");
-    const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+    const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [presetSearch, setPresetSearch] = useState("");
 
@@ -386,7 +387,7 @@ export default function NewExpense() {
                                         placeholder="Search expenses..."
                                         value={presetSearch}
                                         onChange={(e) => setPresetSearch(e.target.value)}
-                                        className="mb-4 bg-accent/50 border-border font-medium rounded-xl"
+                                        className="mb-4 bg-accent/50 border-2 border-zinc-200 dark:border-zinc-700 font-medium rounded-xl"
                                     />
                                     <div className="space-y-2.5 max-h-[500px] overflow-auto pr-1">
                                         {presets

@@ -3,7 +3,7 @@ import { supabase } from "../lib/supabase";
 import { ArrowLeft, Trash2, Calendar, ShoppingBag, Wallet, Edit2, ChevronDown, TrendingUp, TrendingDown, ArrowUpDown, X, ChevronRight, User, CheckCircle2, Circle, MoreVertical, Download } from "lucide-react";
 import Papa from "papaparse";
 import { Link } from "react-router-dom";
-import { subDays, startOfMonth, startOfWeek } from "date-fns";
+import { format, subDays, startOfMonth, startOfWeek, endOfWeek, endOfMonth } from "date-fns";
 import { Button } from "../components/ui/Button";
 import { cn } from "../lib/utils";
 import { useToast } from "../components/toast-provider";
@@ -24,8 +24,8 @@ export default function Reports() {
     const filterButtonRef = useRef<HTMLButtonElement>(null);
     const filterPanelRef = useRef<HTMLDivElement>(null);
     useDropdownClose(showFilters, () => setShowFilters(false), filterButtonRef, [filterPanelRef as React.RefObject<HTMLElement>]);
-    const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
-    const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+    const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+    const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
 
     // View State
     const [activeTab, setActiveTab] = useState<'profit' | 'customers' | 'activity'>('profit');
@@ -115,21 +115,25 @@ export default function Reports() {
         if (timerRef.current) clearTimeout(timerRef.current);
     };
 
+    const handleTouchMove = () => {
+        if (timerRef.current) clearTimeout(timerRef.current);
+    };
+
 
     // Close menu on ESC or click outside
     useDropdownClose(!!activeMenuId, () => setActiveMenuId(null));
 
     const getDateFilter = () => {
         const today = new Date();
-        const todayStr = today.toISOString().split('T')[0];
+        const todayStr = format(today, 'yyyy-MM-dd');
 
         if (rangeType === 'today') return { start: todayStr, end: todayStr };
         if (rangeType === 'yesterday') {
-            const yest = subDays(today, 1).toISOString().split('T')[0];
+            const yest = format(subDays(today, 1), 'yyyy-MM-dd');
             return { start: yest, end: yest };
         }
-        if (rangeType === 'week') return { start: startOfWeek(today).toISOString().split('T')[0], end: todayStr };
-        if (rangeType === 'month') return { start: startOfMonth(today).toISOString().split('T')[0], end: todayStr };
+        if (rangeType === 'week') return { start: format(startOfWeek(today, { weekStartsOn: 1 }), 'yyyy-MM-dd'), end: format(endOfWeek(today, { weekStartsOn: 1 }), 'yyyy-MM-dd') };
+        if (rangeType === 'month') return { start: format(startOfMonth(today), 'yyyy-MM-dd'), end: format(endOfMonth(today), 'yyyy-MM-dd') };
         return { start: startDate, end: endDate };
     };
 
@@ -481,7 +485,7 @@ export default function Reports() {
     };
 
     return (
-        <div className="min-h-screen bg-background pb-28 md:pb-32 w-full md:max-w-2xl md:mx-auto px-3 md:px-4">
+        <div className="min-h-screen bg-background pb-6 w-full md:max-w-2xl md:mx-auto px-3 md:px-4">
             {/* Header */}
             <div className="fixed top-0 left-0 right-0 z-40 bg-white dark:bg-gray-900 border-b border-border shadow-sm">
                 <div className="w-full px-3 md:px-4 py-3">
@@ -876,7 +880,7 @@ export default function Reports() {
                                     placeholder="Search customer..."
                                     value={customerSearch}
                                     onChange={e => setCustomerSearch(e.target.value)}
-                                    className="w-full bg-card px-4 py-3 md:py-2.5 rounded-xl border border-border text-sm font-semibold focus:ring-2 focus:ring-primary outline-none transition-all placeholder:font-medium h-12 md:h-auto"
+                                    className="w-full bg-card px-4 py-3 md:py-2.5 rounded-xl border-2 border-zinc-200 dark:border-zinc-700 text-sm font-semibold focus:ring-2 focus:ring-primary outline-none transition-all placeholder:font-medium h-12 md:h-auto"
                                 />
                             </div>
                             <button
@@ -1071,6 +1075,7 @@ export default function Reports() {
                                                         className="flex-1 min-w-0 select-none cursor-pointer pr-2"
                                                         onTouchStart={(e) => handleTransactionTouchStart(e, t.id, selectedTransactionIds.has(t.id))}
                                                         onTouchEnd={handleTouchEnd}
+                                                        onTouchMove={handleTouchMove}
                                                         onMouseDown={(e) => handleTransactionTouchStart(e, t.id, selectedTransactionIds.has(t.id))}
                                                         onMouseUp={handleTouchEnd}
                                                         onMouseLeave={handleTouchEnd}
@@ -1225,6 +1230,7 @@ export default function Reports() {
                                                             className="flex-1 cursor-pointer"
                                                             onTouchStart={(evt) => handleExpenseTouchStart(evt, e.id, selectedExpenseIds.has(e.id))}
                                                             onTouchEnd={handleTouchEnd}
+                                                            onTouchMove={handleTouchMove}
                                                             onMouseDown={(evt) => handleExpenseTouchStart(evt, e.id, selectedExpenseIds.has(e.id))}
                                                             onMouseUp={handleTouchEnd}
                                                             onMouseLeave={handleTouchEnd}
