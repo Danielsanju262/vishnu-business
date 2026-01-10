@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useGoogleLogin } from "@react-oauth/google";
-import { Cloud, Upload, Download, Loader2, FileJson, CheckCircle2, RefreshCw, AlertTriangle, ArrowRight, Database } from "lucide-react";
+import { Cloud, Upload, Download, Loader2, FileJson, CheckCircle2, RefreshCw, AlertTriangle, ArrowRight, Database, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "./ui/Button";
 import { useToast } from "./toast-provider";
 import { uploadToDrive, listBackups, downloadFile } from "../lib/drive";
@@ -217,6 +217,13 @@ export function GoogleDriveBackup() {
         const newState = !isAutoBackupEnabled;
         setIsAutoBackupEnabled(newState);
         localStorage.setItem('vishnu_backup_config', JSON.stringify({ enabled: newState }));
+
+        // If enabling, mark today as "done" so it doesn't run immediately. 
+        // It will run next time date changes and time > 7 AM.
+        if (newState) {
+            localStorage.setItem('vishnu_last_auto_backup', new Date().toDateString());
+        }
+
         toast(newState ? "Daily auto-backup enabled" : "Auto-backup disabled", "success");
     };
 
@@ -445,7 +452,15 @@ export function GoogleDriveBackup() {
                         onClick={() => setShowBackups(!showBackups)}
                         className="flex-1 h-12 sm:h-11 font-medium border-neutral-200 dark:border-neutral-700 bg-white dark:bg-transparent hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 transition-all active:scale-[0.98]"
                     >
-                        {showBackups ? "Hide Backups" : "View Backups"}
+                        {showBackups ? (
+                            <>
+                                Hide Backups <ChevronUp size={16} className="ml-2" />
+                            </>
+                        ) : (
+                            <>
+                                View Backups <ChevronDown size={16} className="ml-2" />
+                            </>
+                        )}
                     </Button>
                 </div>
             </div>
