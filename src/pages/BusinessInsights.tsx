@@ -469,8 +469,6 @@ export default function BusinessInsights() {
                                                     value={startDate}
                                                     onChange={(e) => {
                                                         const newStart = e.target.value;
-                                                        // Force blur to close picker cleanly
-                                                        e.target.blur();
 
                                                         setStartDate(newStart);
                                                         // Ensure end date is not before start date
@@ -490,7 +488,7 @@ export default function BusinessInsights() {
                                                                     (endDateInput as any).click();
                                                                 }
                                                             }
-                                                        }, 500);
+                                                        }, 200);
                                                     }}
                                                     className="w-full px-3 py-3 md:py-2 bg-accent rounded-lg border border-border/50 text-xs font-bold text-foreground focus:ring-2 focus:ring-primary outline-none h-12 md:h-auto"
                                                 />

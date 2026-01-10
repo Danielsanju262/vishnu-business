@@ -453,8 +453,6 @@ export default function Dashboard() {
                                 value={customDateRange.start}
                                 onChange={(e) => {
                                     const newStart = e.target.value;
-                                    // Force blur to close the current picker cleanly on iOS
-                                    e.target.blur();
 
                                     setCustomDateRange(prev => {
                                         const end = prev.end < newStart ? newStart : prev.end;
@@ -478,7 +476,7 @@ export default function Dashboard() {
                                                 (endDateInput as HTMLElement).click();
                                             }
                                         }
-                                    }, 500);
+                                    }, 200);
                                 }}
                                 className="w-full bg-secondary/50 border border-border rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
                             />
