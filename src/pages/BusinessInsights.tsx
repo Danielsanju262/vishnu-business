@@ -469,6 +469,9 @@ export default function BusinessInsights() {
                                                     value={startDate}
                                                     onChange={(e) => {
                                                         const newStart = e.target.value;
+                                                        // Force blur to close picker cleanly
+                                                        e.target.blur();
+
                                                         setStartDate(newStart);
                                                         // Ensure end date is not before start date
                                                         if (endDate < newStart) {
@@ -487,7 +490,7 @@ export default function BusinessInsights() {
                                                                     (endDateInput as any).click();
                                                                 }
                                                             }
-                                                        }, 200);
+                                                        }, 500);
                                                     }}
                                                     className="w-full px-3 py-3 md:py-2 bg-accent rounded-lg border border-border/50 text-xs font-bold text-foreground focus:ring-2 focus:ring-primary outline-none h-12 md:h-auto"
                                                 />
@@ -496,6 +499,7 @@ export default function BusinessInsights() {
                                                 <label className="text-[10px] font-bold text-muted-foreground uppercase mb-1 block ml-1">End Date</label>
                                                 <input
                                                     id="bi-end-date"
+                                                    key={startDate} // Force re-render for min attribute accuracy
                                                     type="date"
                                                     value={endDate}
                                                     min={startDate}

@@ -453,11 +453,14 @@ export default function Dashboard() {
                                 value={customDateRange.start}
                                 onChange={(e) => {
                                     const newStart = e.target.value;
+                                    // Force blur to close the current picker cleanly on iOS
+                                    e.target.blur();
+
                                     setCustomDateRange(prev => {
                                         const end = prev.end < newStart ? newStart : prev.end;
                                         return { start: newStart, end };
                                     });
-                                    // Auto-open next picker
+                                    // Auto-open next picker - delayed to allow "Done" action to settle
                                     setTimeout(() => {
                                         const endDateInput = document.getElementById('dash-end-date') as HTMLInputElement;
                                         if (endDateInput) {
@@ -475,7 +478,7 @@ export default function Dashboard() {
                                                 (endDateInput as HTMLElement).click();
                                             }
                                         }
-                                    }, 200);
+                                    }, 500);
                                 }}
                                 className="w-full bg-secondary/50 border border-border rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
                             />
@@ -484,6 +487,7 @@ export default function Dashboard() {
                             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">To</label>
                             <input
                                 id="dash-end-date"
+                                key={customDateRange.start} // Force re-render to ensure 'min' attribute updates correctly on iOS
                                 type="date"
                                 value={customDateRange.end}
                                 min={customDateRange.start}
