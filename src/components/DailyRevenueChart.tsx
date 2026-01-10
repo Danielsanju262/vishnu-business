@@ -191,10 +191,15 @@ export function DailyRevenueChart({ summaryStats, selectedChartDay, setSelectedC
                                             style={{ height: `${barHeight}%` }}
                                         >
                                             {/* Value Label */}
-                                            {(isSelected || (summaryStats.dailyData.length <= 10)) && displayValue > 0 && (
-                                                <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] font-bold text-foreground">
-                                                    {isSelected ? '' : ((displayValue >= 1000) ? `${(displayValue / 1000).toFixed(1)}k` : displayValue)}
-                                                </span>
+                                            {displayValue > 0 && (
+                                                <div className="absolute -top-6 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
+                                                    <span className="inline-block bg-black/80 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-sm">
+                                                        {(displayValue >= 1000) ?
+                                                            `${(displayValue / 1000).toFixed(1)}k` :
+                                                            displayValue
+                                                        }
+                                                    </span>
+                                                </div>
                                             )}
                                         </div>
 

@@ -268,8 +268,11 @@ export default function Dashboard() {
                                     key={filter}
                                     onClick={() => {
                                         if (filter === 'custom') {
-                                            setShowCustomDateModal(true);
                                             setShowFilterDropdown(false);
+                                            // Delay modal opening to allow history.back() from dropdown close to complete
+                                            setTimeout(() => {
+                                                setShowCustomDateModal(true);
+                                            }, 100);
                                         } else {
                                             setDateFilter(filter);
                                             setShowFilterDropdown(false);
@@ -445,40 +448,55 @@ export default function Dashboard() {
                         <div className="space-y-2">
                             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">From</label>
                             <input
+                                id="dash-start-date"
                                 type="date"
                                 value={customDateRange.start}
-                                onChange={(e) => setCustomDateRange(prev => ({ ...prev, start: e.target.value }))}
+                                onChange={(e) => {
+                                    const newStart = e.target.value;
+                                    setCustomDateRange(prev => {
+                                        const end = prev.end < newStart ? newStart : prev.end;
+                                        return { start: newStart, end };
+                                    });
+                                    // Auto-open next picker
+                                    setTimeout(() => {
+                                        const endDateInput = document.getElementById('dash-end-date') as HTMLInputElement;
+                                        if (endDateInput && 'showPicker' in endDateInput) {
+                                            try {
+                                                (endDateInput as any).showPicker();
+                                            } catch (err) { }
+                                        }
+                                    }, 500);
+                                }}
                                 className="w-full bg-secondary/50 border border-border rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
                             />
                         </div>
                         <div className="space-y-2">
                             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">To</label>
                             <input
+                                id="dash-end-date"
                                 type="date"
                                 value={customDateRange.end}
-                                onChange={(e) => setCustomDateRange(prev => ({ ...prev, end: e.target.value }))}
+                                min={customDateRange.start}
+                                onChange={(e) => {
+                                    setCustomDateRange(prev => ({ ...prev, end: e.target.value }));
+                                    setDateFilter('custom');
+                                    // Auto-close after selection
+                                    setShowCustomDateModal(false);
+                                }}
                                 className="w-full bg-secondary/50 border border-border rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
                             />
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-3 pt-2">
-                        <button
-                            onClick={() => setShowCustomDateModal(false)}
-                            className="flex-1 px-4 py-3 text-sm font-semibold text-muted-foreground hover:bg-secondary rounded-xl transition-all"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            onClick={() => {
-                                setDateFilter('custom');
-                                setShowCustomDateModal(false);
-                            }}
-                            className="flex-1 px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl shadow-lg shadow-emerald-900/20 active:scale-[0.98] transition-all"
-                        >
-                            Apply Filter
-                        </button>
-                    </div>
+                    <button
+                        onClick={() => {
+                            setDateFilter('custom');
+                            setShowCustomDateModal(false);
+                        }}
+                        className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white font-bold rounded-xl shadow-lg shadow-emerald-900/20 transition-all"
+                    >
+                        Apply Filter
+                    </button>
                 </div>
             </Modal>
 

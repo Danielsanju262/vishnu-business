@@ -570,25 +570,43 @@ export default function Reports() {
                                             <div className="flex-1">
                                                 <label className="text-[10px] font-bold text-muted-foreground uppercase mb-1 block ml-1">Start Date</label>
                                                 <input
+                                                    id="rep-start-date"
                                                     type="date"
                                                     value={startDate}
-                                                    onChange={(e) => { setStartDate(e.target.value); if (endDate < e.target.value) setEndDate(e.target.value); }}
+                                                    onChange={(e) => {
+                                                        const newStart = e.target.value;
+                                                        setStartDate(newStart);
+                                                        if (endDate < newStart) setEndDate(newStart);
+
+                                                        // Auto-open next picker
+                                                        setTimeout(() => {
+                                                            const endDateInput = document.getElementById('rep-end-date') as HTMLInputElement;
+                                                            if (endDateInput && 'showPicker' in endDateInput) {
+                                                                try {
+                                                                    (endDateInput as any).showPicker();
+                                                                } catch (err) { }
+                                                            }
+                                                        }, 500);
+                                                    }}
                                                     className="w-full px-3 py-3 md:py-2 bg-accent rounded-lg border border-border/50 text-xs font-bold text-foreground focus:ring-2 focus:ring-primary outline-none h-12 md:h-auto"
                                                 />
                                             </div>
                                             <div className="flex-1">
                                                 <label className="text-[10px] font-bold text-muted-foreground uppercase mb-1 block ml-1">End Date</label>
                                                 <input
+                                                    id="rep-end-date"
                                                     type="date"
                                                     value={endDate}
-                                                    onChange={(e) => setEndDate(e.target.value)}
+                                                    min={startDate}
+                                                    onChange={(e) => {
+                                                        setEndDate(e.target.value);
+                                                        // Auto-close after selection
+                                                        setShowFilters(false);
+                                                    }}
                                                     className="w-full px-3 py-3 md:py-2 bg-accent rounded-lg border border-border/50 text-xs font-bold text-foreground focus:ring-2 focus:ring-primary outline-none h-12 md:h-auto"
                                                 />
                                             </div>
                                         </div>
-                                        <Button size="sm" onClick={() => setShowFilters(false)} className="w-full bg-primary text-primary-foreground interactive">
-                                            Apply Filter
-                                        </Button>
                                     </div>
                                 )}
                             </div>

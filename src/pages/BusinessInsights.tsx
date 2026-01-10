@@ -3,7 +3,6 @@ import { supabase } from "../lib/supabase";
 import { ArrowLeft, Calendar, ChevronDown, ChevronRight, TrendingUp, TrendingDown, Users, Wallet, ShoppingBag, Clock, BarChart3, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { format, subDays, startOfWeek, startOfMonth, endOfWeek, endOfMonth } from "date-fns";
 import { Link } from "react-router-dom";
-import { Button } from "../components/ui/Button";
 import { Modal } from "../components/ui/Modal";
 import { cn } from "../lib/utils";
 import { useRealtimeTables } from "../hooks/useRealtimeSync";
@@ -465,25 +464,47 @@ export default function BusinessInsights() {
                                             <div className="flex-1">
                                                 <label className="text-[10px] font-bold text-muted-foreground uppercase mb-1 block ml-1">Start Date</label>
                                                 <input
+                                                    id="bi-start-date"
                                                     type="date"
                                                     value={startDate}
-                                                    onChange={(e) => { setStartDate(e.target.value); if (endDate < e.target.value) setEndDate(e.target.value); }}
+                                                    onChange={(e) => {
+                                                        const newStart = e.target.value;
+                                                        setStartDate(newStart);
+                                                        // Ensure end date is not before start date
+                                                        if (endDate < newStart) {
+                                                            setEndDate(newStart);
+                                                        }
+                                                        // Auto-open end date picker after a short delay
+                                                        setTimeout(() => {
+                                                            const endDateInput = document.getElementById('bi-end-date') as HTMLInputElement;
+                                                            if (endDateInput && 'showPicker' in endDateInput) {
+                                                                try {
+                                                                    (endDateInput as any).showPicker();
+                                                                } catch (err) {
+                                                                    // Ignore if not supported or blocked
+                                                                }
+                                                            }
+                                                        }, 500);
+                                                    }}
                                                     className="w-full px-3 py-3 md:py-2 bg-accent rounded-lg border border-border/50 text-xs font-bold text-foreground focus:ring-2 focus:ring-primary outline-none h-12 md:h-auto"
                                                 />
                                             </div>
                                             <div className="flex-1">
                                                 <label className="text-[10px] font-bold text-muted-foreground uppercase mb-1 block ml-1">End Date</label>
                                                 <input
+                                                    id="bi-end-date"
                                                     type="date"
                                                     value={endDate}
-                                                    onChange={(e) => setEndDate(e.target.value)}
+                                                    min={startDate}
+                                                    onChange={(e) => {
+                                                        setEndDate(e.target.value);
+                                                        // Auto-close after selection
+                                                        setShowFilters(false);
+                                                    }}
                                                     className="w-full px-3 py-3 md:py-2 bg-accent rounded-lg border border-border/50 text-xs font-bold text-foreground focus:ring-2 focus:ring-primary outline-none h-12 md:h-auto"
                                                 />
                                             </div>
                                         </div>
-                                        <Button size="sm" onClick={() => setShowFilters(false)} className="w-full bg-primary text-primary-foreground interactive">
-                                            Apply Filter
-                                        </Button>
                                     </div>
                                 )}
                             </div>
