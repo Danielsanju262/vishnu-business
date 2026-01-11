@@ -9,6 +9,7 @@ import { Modal } from "../components/ui/Modal";
 import { useDropdownClose } from "../hooks/useDropdownClose";
 import { ConfirmationModal } from "../components/ui/ConfirmationModal";
 import { useHistorySyncedState } from "../hooks/useHistorySyncedState";
+import { useMarkPayableViewed } from "../hooks/usePendingTaskCount";
 
 type Supplier = {
     id: string;
@@ -62,8 +63,14 @@ export default function SupplierPaymentDetail() {
     const { supplierId } = useParams<{ supplierId: string }>();
     const navigate = useNavigate();
     const { toast } = useToast();
+    const markPayableViewed = useMarkPayableViewed();
 
-
+    // Mark this supplier as viewed when the page loads
+    useEffect(() => {
+        if (supplierId) {
+            markPayableViewed(supplierId);
+        }
+    }, [supplierId, markPayableViewed]);
 
     const [supplier, setSupplier] = useState<Supplier | null>(null);
     const [payables, setPayables] = useState<Payable[]>([]);

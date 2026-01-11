@@ -9,6 +9,7 @@ import { Modal } from "../components/ui/Modal";
 import { useDropdownClose } from "../hooks/useDropdownClose";
 import { ConfirmationModal } from "../components/ui/ConfirmationModal";
 import { useHistorySyncedState } from "../hooks/useHistorySyncedState";
+import { useMarkPaymentViewed } from "../hooks/usePendingTaskCount";
 
 type Customer = {
     id: string;
@@ -53,8 +54,14 @@ export default function CustomerPaymentDetail() {
     const { customerId } = useParams<{ customerId: string }>();
     const navigate = useNavigate();
     const { toast } = useToast();
+    const markPaymentViewed = useMarkPaymentViewed();
 
-
+    // Mark this customer as viewed when the page loads
+    useEffect(() => {
+        if (customerId) {
+            markPaymentViewed(customerId);
+        }
+    }, [customerId, markPaymentViewed]);
 
     // ... (state vars)
     const [customer, setCustomer] = useState<Customer | null>(null);

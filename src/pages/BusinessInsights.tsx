@@ -656,8 +656,8 @@ export default function BusinessInsights() {
                             <div className="bg-gradient-to-br from-emerald-500/10 to-teal-500/10 rounded-2xl border border-emerald-500/20 p-4">
                                 <div className="flex justify-between items-start mb-2">
                                     <div>
-                                        <p className="text-xs font-bold text-emerald-600/70 uppercase tracking-widest mb-1">Total Sales</p>
-                                        <h3 className="text-2xl font-black text-foreground">₹{summaryStats.totalRevenue.toLocaleString()}</h3>
+                                        <p className="text-xs font-bold text-emerald-500 uppercase tracking-widest mb-1">Total Sales</p>
+                                        <h3 className="text-2xl font-black text-emerald-500">₹{summaryStats.totalRevenue.toLocaleString()}</h3>
                                     </div>
                                     <div className="p-2 bg-emerald-500/20 rounded-full text-emerald-600">
                                         <ShoppingBag size={20} />
@@ -720,8 +720,8 @@ export default function BusinessInsights() {
                             <div className="bg-gradient-to-br from-blue-500/10 to-indigo-500/10 rounded-2xl border border-blue-500/20 p-4">
                                 <div className="flex justify-between items-start mb-2">
                                     <div>
-                                        <p className="text-xs font-bold text-blue-600/70 uppercase tracking-widest mb-1">Active Customers</p>
-                                        <h3 className="text-2xl font-black text-foreground">{customerInsights.currentCustomerCount}</h3>
+                                        <p className="text-xs font-bold text-blue-500 uppercase tracking-widest mb-1">Active Customers</p>
+                                        <h3 className="text-2xl font-black text-blue-500">{customerInsights.currentCustomerCount}</h3>
                                     </div>
                                     <div className="p-2 bg-blue-500/20 rounded-full text-blue-600">
                                         <Users size={20} />
@@ -808,10 +808,10 @@ export default function BusinessInsights() {
                                 <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30">
                                     <div className="flex items-center gap-2 mb-2">
                                         <ArrowUpRight size={16} className="text-emerald-500" />
-                                        <p className="text-[10px] font-bold text-emerald-600 uppercase">To Collect</p>
+                                        <p className="text-[10px] font-bold text-emerald-500 uppercase">To Collect</p>
                                     </div>
                                     <p className="text-xs text-muted-foreground mb-1">Total Receivables</p>
-                                    <p className="text-xl font-black text-foreground">₹{cashFlowInsights.totalReceivables.toLocaleString()}</p>
+                                    <p className="text-xl font-black text-emerald-500">₹{cashFlowInsights.totalReceivables.toLocaleString()}</p>
                                     {cashFlowInsights.overdueReceivables > 0 && (
                                         <p className="text-[10px] font-bold text-rose-500 mt-1">₹{cashFlowInsights.overdueReceivables.toLocaleString()} overdue</p>
                                     )}
@@ -820,10 +820,10 @@ export default function BusinessInsights() {
                                 <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30">
                                     <div className="flex items-center gap-2 mb-2">
                                         <ArrowDownRight size={16} className="text-rose-500" />
-                                        <p className="text-[10px] font-bold text-rose-600 uppercase">To Pay</p>
+                                        <p className="text-[10px] font-bold text-rose-500 uppercase">To Pay</p>
                                     </div>
                                     <p className="text-xs text-muted-foreground mb-1">Total Payables</p>
-                                    <p className="text-xl font-black text-foreground">₹{cashFlowInsights.totalPayables.toLocaleString()}</p>
+                                    <p className="text-xl font-black text-rose-500">₹{cashFlowInsights.totalPayables.toLocaleString()}</p>
                                     {cashFlowInsights.overduePayables > 0 && (
                                         <p className="text-[10px] font-bold text-rose-500 mt-1">₹{cashFlowInsights.overduePayables.toLocaleString()} overdue</p>
                                     )}

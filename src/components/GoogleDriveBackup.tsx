@@ -1,12 +1,46 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useGoogleLogin } from "@react-oauth/google";
-import { Cloud, Upload, Download, Loader2, FileJson, CheckCircle2, RefreshCw, AlertTriangle, ArrowRight, Database, ChevronDown, ChevronUp } from "lucide-react";
+import { Cloud, Upload, Download, Loader2, FileJson, CheckCircle2, RefreshCw, AlertTriangle, ArrowRight, Database, ChevronDown, ChevronUp, LogIn } from "lucide-react";
 import { Button } from "./ui/Button";
 import { useToast } from "./toast-provider";
 import { uploadToDrive, listBackups, downloadFile } from "../lib/drive";
 import { exportData, importData, getBackupStats, getCurrentStats } from "../lib/backup";
 import { Modal } from "./ui/Modal";
 import { cn } from "../lib/utils";
+import {
+    exchangeCodeForTokens,
+    refreshAccessToken,
+    revokeTokens,
+    getStoredToken,
+    isAccessTokenValid,
+    hasRefreshToken,
+    isTokenExpiringSoon,
+    clearAllTokens,
+    getValidAccessToken,
+    storeAccessToken
+} from "../lib/googleOAuth";
+
+// Token storage keys (for backward compatibility check)
+const TOKEN_KEY = 'vishnu_gdrive_token';
+const TOKEN_EXPIRY_KEY = 'vishnu_gdrive_token_expiry';
+const HAS_REFRESH_TOKEN_KEY = 'vishnu_gdrive_has_refresh';
+
+// Check if we're using the new refresh token flow
+const isUsingRefreshTokenFlow = (): boolean => {
+    return localStorage.getItem(HAS_REFRESH_TOKEN_KEY) === 'true';
+};
+
+// Legacy token validation (for old users who haven't upgraded)
+const isLegacyTokenValid = (): boolean => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const expiryStr = localStorage.getItem(TOKEN_EXPIRY_KEY);
+
+    if (!token || !expiryStr) return false;
+
+    const expiry = parseInt(expiryStr, 10);
+    const bufferMs = 5 * 60 * 1000;
+    return Date.now() < (expiry - bufferMs);
+};
 
 // Progress Modal Component
 const ProgressModal = ({ isOpen, title, progress, status }: { isOpen: boolean; title: string; progress: number; status: string }) => {
@@ -174,11 +208,20 @@ const RestorePreviewModal = ({ isOpen, onClose, onConfirm, currentStats, backupS
 
 export function GoogleDriveBackup() {
     const { toast } = useToast();
-    const [token, setToken] = useState<string | null>(localStorage.getItem('vishnu_gdrive_token'));
+    const [token, setToken] = useState<string | null>(() => {
+        // Check for valid token (new flow or legacy)
+        if (isAccessTokenValid() || isLegacyTokenValid()) {
+            return getStoredToken();
+        }
+        return null;
+    });
     const [isLoading, setIsLoading] = useState(false);
     const [backups, setBackups] = useState<any[]>([]);
     const [showBackups, setShowBackups] = useState(false);
     const [isAutoBackupEnabled, setIsAutoBackupEnabled] = useState(false);
+    const [tokenExpiringSoon, setTokenExpiringSoon] = useState(false);
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const [isPersistentConnection, setIsPersistentConnection] = useState(hasRefreshToken());
 
     // Progress State
     const [progress, setProgress] = useState(0);
@@ -191,7 +234,7 @@ export function GoogleDriveBackup() {
         backupName: string;
         currentStats: any;
         backupStats: any;
-        fileData: any; // We store the downloaded file here to pass it to confirm
+        fileData: any;
     }>({
         isOpen: false,
         backupName: "",
@@ -218,8 +261,6 @@ export function GoogleDriveBackup() {
         setIsAutoBackupEnabled(newState);
         localStorage.setItem('vishnu_backup_config', JSON.stringify({ enabled: newState }));
 
-        // If enabling, mark today as "done" so it doesn't run immediately. 
-        // It will run next time date changes and time > 7 AM.
         if (newState) {
             localStorage.setItem('vishnu_last_auto_backup', new Date().toDateString());
         }
@@ -227,16 +268,123 @@ export function GoogleDriveBackup() {
         toast(newState ? "Daily auto-backup enabled" : "Auto-backup disabled", "success");
     };
 
-    const login = useGoogleLogin({
+    // Handle token refresh and expiry checking
+    useEffect(() => {
+        const checkAndRefreshToken = async () => {
+            // If we have a refresh token and access token is expiring soon, auto-refresh
+            if (hasRefreshToken() && isTokenExpiringSoon()) {
+                setIsRefreshing(true);
+                try {
+                    const result = await refreshAccessToken();
+                    setToken(result.access_token);
+                    setTokenExpiringSoon(false);
+                    console.log("Token auto-refreshed successfully");
+                } catch (e) {
+                    console.error("Auto-refresh failed:", e);
+                    // If refresh fails, clear everything
+                    handleDisconnect(false);
+                }
+                setIsRefreshing(false);
+            } else if (!hasRefreshToken() && token && !isAccessTokenValid() && !isLegacyTokenValid()) {
+                // Legacy flow: token expired and no refresh token
+                handleDisconnect(true);
+            }
+
+            // Update expiring soon state
+            if (token) {
+                setTokenExpiringSoon(isTokenExpiringSoon() && !hasRefreshToken());
+            }
+        };
+
+        checkAndRefreshToken();
+        const interval = setInterval(checkAndRefreshToken, 60000); // Check every minute
+
+        return () => clearInterval(interval);
+    }, [token]);
+
+    // Authorization Code Flow login (for persistent connection)
+    const loginWithAuthCode = useGoogleLogin({
+        flow: 'auth-code',
+        onSuccess: async (codeResponse) => {
+            setIsLoading(true);
+            try {
+                // Exchange code for tokens via Edge Function
+                const redirectUri = window.location.origin;
+                const result = await exchangeCodeForTokens(codeResponse.code, redirectUri);
+                setToken(result.access_token);
+                setIsPersistentConnection(true);
+                setTokenExpiringSoon(false);
+                toast("Connected to Google Drive (persistent)", "success");
+                fetchBackups(result.access_token);
+            } catch (e) {
+                console.error("Token exchange failed:", e);
+                toast("Failed to connect: " + (e as Error).message, "error");
+            }
+            setIsLoading(false);
+        },
+        onError: () => toast("Login Failed", "error"),
+        scope: 'https://www.googleapis.com/auth/drive.file',
+    });
+
+    // Implicit Flow login (fallback for quick connection)
+    const loginImplicit = useGoogleLogin({
         onSuccess: (codeResponse) => {
+            const expiresIn = codeResponse.expires_in || 3600;
+            storeAccessToken(codeResponse.access_token, expiresIn);
             setToken(codeResponse.access_token);
-            localStorage.setItem('vishnu_gdrive_token', codeResponse.access_token);
+            setIsPersistentConnection(false);
+            setTokenExpiringSoon(false);
             toast("Connected to Google Drive", "success");
             fetchBackups(codeResponse.access_token);
         },
         onError: () => toast("Login Failed", "error"),
         scope: 'https://www.googleapis.com/auth/drive.file'
     });
+
+    const handleDisconnect = useCallback(async (showToast: boolean = true) => {
+        if (hasRefreshToken()) {
+            await revokeTokens();
+        } else {
+            clearAllTokens();
+        }
+        setToken(null);
+        setIsPersistentConnection(false);
+        setTokenExpiringSoon(false);
+        setBackups([]);
+        if (showToast) {
+            toast("Disconnected from Google Drive", "info");
+        }
+    }, [toast]);
+
+    // Get a valid access token (refreshes if needed)
+    const ensureValidToken = async (): Promise<string | null> => {
+        // If current token is valid, return it
+        if (isAccessTokenValid() || isLegacyTokenValid()) {
+            return getStoredToken();
+        }
+
+        // Try to refresh if we have a refresh token
+        if (hasRefreshToken()) {
+            try {
+                setIsRefreshing(true);
+                const result = await refreshAccessToken();
+                setToken(result.access_token);
+                setIsRefreshing(false);
+                return result.access_token;
+            } catch (e) {
+                console.error("Token refresh failed:", e);
+                setIsRefreshing(false);
+                handleDisconnect(false);
+                toast("Session expired. Please reconnect.", "warning");
+                return null;
+            }
+        }
+
+        // No valid token and no refresh token
+        toast("Session expired. Please reconnect.", "warning");
+        handleDisconnect(false);
+        return null;
+    };
 
     const fetchBackups = async (accessToken: string) => {
         setIsLoading(true);
@@ -245,17 +393,27 @@ export function GoogleDriveBackup() {
             setBackups((data.files || []).slice(0, 5));
         } catch (e) {
             console.error(e);
-            if (String(e).includes('401') || String(e).toLowerCase().includes('auth')) {
-                // Token expired
-                setToken(null);
-                localStorage.removeItem('vishnu_gdrive_token');
-                toast("Session expired. Please reconnect.", "warning");
+            const errorStr = String(e).toLowerCase();
+            if (errorStr.includes('401') || errorStr.includes('auth') || errorStr.includes('invalid_token') || errorStr.includes('expired')) {
+                // Try to refresh token
+                if (hasRefreshToken()) {
+                    try {
+                        const result = await refreshAccessToken();
+                        setToken(result.access_token);
+                        // Retry the fetch
+                        const retryData = await listBackups(result.access_token);
+                        setBackups((retryData.files || []).slice(0, 5));
+                    } catch (refreshError) {
+                        handleDisconnect(false);
+                        toast("Session expired. Please reconnect.", "warning");
+                    }
+                } else {
+                    handleDisconnect(false);
+                    toast("Session expired. Please reconnect.", "warning");
+                }
             } else {
-                // For any other error, also disconnect to force a fresh state, as it's likely a permission/scope issue
                 console.error("Backup listing error:", e);
-                setToken(null);
-                localStorage.removeItem('vishnu_gdrive_token');
-                toast("Connection issue: " + (e as Error).message + ". Please reconnect.", "error");
+                toast("Failed to fetch backups: " + (e as Error).message, "error");
             }
         } finally {
             setIsLoading(false);
@@ -264,29 +422,35 @@ export function GoogleDriveBackup() {
 
     // Auto-fetch on mount if token exists
     useEffect(() => {
-        if (token) {
-            fetchBackups(token);
+        const initFetch = async () => {
+            const validToken = await ensureValidToken();
+            if (validToken) {
+                fetchBackups(validToken);
+            }
+        };
+        if (token || hasRefreshToken()) {
+            initFetch();
         }
     }, []);
 
     const handleBackup = async () => {
-        if (!token) return;
+        const validToken = await ensureValidToken();
+        if (!validToken) return;
+
         setShowProgress(true);
         setProgress(0);
         setProgressStatus("Preparing data...");
 
         try {
-            // 1. Export Data (0-90%)
             const data = await exportData((p) => {
-                setProgress(Math.round(p * 0.9)); // Scale to 90%
+                setProgress(Math.round(p * 0.9));
                 setProgressStatus(`Backing up data... ${Math.round(p)}%`);
             });
 
-            // 2. Upload (90-100%)
             setProgress(90);
             setProgressStatus("Uploading to Drive...");
             const fileName = `vishnu_backup_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
-            await uploadToDrive(token, fileName, data);
+            await uploadToDrive(validToken, fileName, data);
 
             setProgress(100);
             setProgressStatus("Complete!");
@@ -294,40 +458,56 @@ export function GoogleDriveBackup() {
 
             setTimeout(() => {
                 setShowProgress(false);
-                fetchBackups(token);
+                fetchBackups(validToken);
             }, 1000);
 
         } catch (e) {
             console.error(e);
-            toast("Backup failed", "error");
+            const errorStr = String(e).toLowerCase();
+            if (errorStr.includes('401') || errorStr.includes('auth') || errorStr.includes('expired')) {
+                // Try refresh and retry
+                if (hasRefreshToken()) {
+                    try {
+                        const newToken = await refreshAccessToken();
+                        setToken(newToken.access_token);
+                        toast("Token refreshed. Please try again.", "info");
+                    } catch {
+                        handleDisconnect(false);
+                        toast("Session expired. Please reconnect.", "warning");
+                    }
+                } else {
+                    handleDisconnect(false);
+                    toast("Session expired. Please reconnect.", "warning");
+                }
+            } else {
+                toast("Backup failed: " + (e as Error).message, "error");
+            }
             setShowProgress(false);
         }
     };
 
     const handleRestoreClick = async (fileId: string, fileName: string) => {
-        if (!token) return;
+        const validToken = await ensureValidToken();
+        if (!validToken) return;
+
         setShowProgress(true);
         setProgress(0);
         setProgressStatus("Downloading backup...");
 
         try {
-            // 1. Download
-            // We fake progress for download since it's one fetch
             const interval = setInterval(() => {
                 setProgress(p => p < 90 ? p + 5 : p);
             }, 150);
 
-            const file = await downloadFile(token, fileId);
+            const file = await downloadFile(validToken, fileId);
             clearInterval(interval);
             setProgress(100);
 
-            // 2. Prepare Preview
             setProgressStatus("Analyzing backup...");
             const jsonString = JSON.stringify(file);
             const backupStats = getBackupStats(jsonString);
             const currentStats = await getCurrentStats();
 
-            // Close progress to show preview
             setShowProgress(false);
 
             if (backupStats) {
@@ -344,7 +524,23 @@ export function GoogleDriveBackup() {
 
         } catch (e) {
             console.error(e);
-            toast("Failed to download backup", "error");
+            const errorStr = String(e).toLowerCase();
+            if (errorStr.includes('401') || errorStr.includes('auth') || errorStr.includes('expired')) {
+                if (hasRefreshToken()) {
+                    try {
+                        await refreshAccessToken();
+                        toast("Token refreshed. Please try again.", "info");
+                    } catch {
+                        handleDisconnect(false);
+                        toast("Session expired. Please reconnect.", "warning");
+                    }
+                } else {
+                    handleDisconnect(false);
+                    toast("Session expired. Please reconnect.", "warning");
+                }
+            } else {
+                toast("Failed to download backup: " + (e as Error).message, "error");
+            }
             setShowProgress(false);
         }
     };
@@ -376,7 +572,7 @@ export function GoogleDriveBackup() {
     };
 
 
-    if (!token) {
+    if (!token && !hasRefreshToken()) {
         return (
             <div className="bg-card border border-border rounded-2xl p-6 flex flex-col items-center text-center space-y-4 shadow-sm">
                 <div className="p-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-full">
@@ -388,9 +584,22 @@ export function GoogleDriveBackup() {
                         Connect your Google Drive to keep your business data safe.
                     </p>
                 </div>
-                <Button onClick={() => login()} className="font-bold bg-blue-600 hover:bg-blue-700 text-white w-full max-w-xs">
-                    Connect Google Drive
-                </Button>
+                <div className="w-full max-w-xs space-y-2">
+                    <Button
+                        onClick={() => loginWithAuthCode()}
+                        className="font-bold bg-blue-600 hover:bg-blue-700 text-white w-full"
+                        disabled={isLoading}
+                    >
+                        {isLoading ? <Loader2 className="animate-spin mr-2" size={18} /> : null}
+                        Connect (Stay Signed In)
+                    </Button>
+                    <button
+                        onClick={() => loginImplicit()}
+                        className="text-xs text-muted-foreground hover:text-foreground underline"
+                    >
+                        Quick connect (expires in 1 hour)
+                    </button>
+                </div>
             </div>
         );
     }
@@ -401,18 +610,77 @@ export function GoogleDriveBackup() {
             <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
-                        <div className="p-2 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 rounded-xl">
+                        <div className={cn(
+                            "p-2 rounded-xl",
+                            isPersistentConnection
+                                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                                : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                        )}>
                             <CheckCircle2 size={24} />
                         </div>
                         <div>
-                            <h3 className="font-bold text-foreground">Drive Connected</h3>
-                            <p className="text-xs text-muted-foreground">{backups.length} backups found</p>
+                            <h3 className="font-bold text-foreground">
+                                {isPersistentConnection ? "Drive Connected" : "Drive Connected (Temporary)"}
+                            </h3>
+                            <p className="text-xs text-muted-foreground">
+                                {isPersistentConnection
+                                    ? `${backups.length} backups • Auto-renewing`
+                                    : `${backups.length} backups • Expires soon`}
+                            </p>
                         </div>
                     </div>
-                    <Button variant="ghost" size="sm" onClick={() => { setToken(null); localStorage.removeItem('vishnu_gdrive_token'); }}>
+                    <Button variant="ghost" size="sm" onClick={() => handleDisconnect()}>
                         Disconnect
                     </Button>
                 </div>
+
+                {/* Upgrade to persistent connection banner */}
+                {!isPersistentConnection && (
+                    <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl mb-4 border border-blue-200 dark:border-blue-800">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-blue-100 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 rounded-lg">
+                                <RefreshCw size={18} />
+                            </div>
+                            <div>
+                                <p className="text-sm font-semibold text-blue-700 dark:text-blue-300">Upgrade Connection</p>
+                                <p className="text-[10px] text-blue-600 dark:text-blue-400">
+                                    Stay signed in permanently
+                                </p>
+                            </div>
+                        </div>
+                        <Button size="sm" onClick={() => loginWithAuthCode()} className="bg-blue-500 hover:bg-blue-600 text-white font-semibold h-8 px-3">
+                            <LogIn size={14} className="mr-1.5" /> Upgrade
+                        </Button>
+                    </div>
+                )}
+
+                {/* Token refreshing indicator */}
+                {isRefreshing && (
+                    <div className="flex items-center gap-2 p-3 bg-neutral-50 dark:bg-neutral-800/50 rounded-xl mb-4 border border-neutral-100 dark:border-neutral-800">
+                        <Loader2 size={16} className="animate-spin text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">Refreshing connection...</span>
+                    </div>
+                )}
+
+                {/* Token expiring soon warning (only for non-persistent) */}
+                {tokenExpiringSoon && !isPersistentConnection && (
+                    <div className="flex items-center justify-between p-3 bg-amber-50 dark:bg-amber-900/20 rounded-xl mb-4 border border-amber-200 dark:border-amber-800">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-amber-100 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400 rounded-lg">
+                                <AlertTriangle size={18} />
+                            </div>
+                            <div>
+                                <p className="text-sm font-semibold text-amber-700 dark:text-amber-300">Session Expiring Soon</p>
+                                <p className="text-[10px] text-amber-600 dark:text-amber-400">
+                                    Reconnect to continue using backup
+                                </p>
+                            </div>
+                        </div>
+                        <Button size="sm" onClick={() => loginWithAuthCode()} className="bg-amber-500 hover:bg-amber-600 text-white font-semibold h-8 px-3">
+                            <LogIn size={14} className="mr-1.5" /> Refresh
+                        </Button>
+                    </div>
+                )}
 
                 {/* Regular Backup Toggle */}
                 <div
@@ -445,7 +713,7 @@ export function GoogleDriveBackup() {
                 <div className="flex flex-col sm:flex-row gap-3">
                     <Button
                         onClick={handleBackup}
-                        disabled={showProgress}
+                        disabled={showProgress || isRefreshing}
                         className="flex-1 h-12 sm:h-11 bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-100 font-semibold shadow-sm transition-all active:scale-[0.98]"
                     >
                         {showProgress ? <Loader2 className="animate-spin mr-2" size={18} /> : <Upload className="mr-2" size={18} />}
@@ -474,7 +742,7 @@ export function GoogleDriveBackup() {
                 <div className="space-y-3 animate-in slide-in-from-top-2">
                     <div className="flex justify-between items-center px-1">
                         <h4 className="font-bold text-foreground text-sm uppercase tracking-wider">Available Backups</h4>
-                        <button onClick={() => fetchBackups(token)} className="p-1 text-muted-foreground hover:text-primary transition">
+                        <button onClick={() => token && fetchBackups(token)} className="p-1 text-muted-foreground hover:text-primary transition">
                             <RefreshCw size={14} className={cn(isLoading && "animate-spin")} />
                         </button>
                     </div>

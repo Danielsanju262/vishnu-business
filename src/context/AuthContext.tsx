@@ -85,6 +85,7 @@ interface AuthContextType {
     registerBiometrics: () => Promise<boolean>;
     authenticate: () => Promise<boolean>;
     authenticateMasterPin: (pin: string) => Promise<boolean>;
+    authenticateSuperAdmin: (pin: string) => Promise<boolean>;
     validateSuperAdminPin: (pin: string) => Promise<boolean>;
     disableBiometrics: () => void;
     revokeDeviceFingerprint: (deviceId: string, superAdminPin: string) => Promise<{ success: boolean; error?: string }>;
@@ -469,7 +470,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 toast("Unlocked!", "success");
                 return true;
             } else {
-                toast("Incorrect PIN", "error");
                 return false;
             }
         } catch (error) {
@@ -493,6 +493,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             return data?.super_admin_pin === pin;
         } catch (error) {
             console.error('Super Admin PIN validation error:', error);
+            return false;
+        }
+    };
+
+    // Authenticate using Super Admin PIN (for emergency access / forgot password)
+    const authenticateSuperAdmin = async (pin: string): Promise<boolean> => {
+        try {
+            // Validate Super Admin PIN
+            const isValid = await validateSuperAdminPin(pin);
+            if (!isValid) {
+                return false;
+            }
+
+            // Use current pin version from state (already fetched on load)
+            const serverPinVersion = currentPinVersion;
+
+            // Update local PIN version
+            localStorage.setItem('verified_pin_version', serverPinVersion.toString());
+            setDevicePinVersion(serverPinVersion);
+            setCanEnableBiometrics(true);
+
+            // SUCCESS: Mark Session as Active
+            sessionStorage.setItem('vb_session_active', 'true');
+            localStorage.setItem('app_locked', 'false'); // Sync other tabs
+
+            setIsLocked(false);
+
+            // Register/update device (without biometrics)
+            await registerDevice(false, serverPinVersion);
+
+            toast("Unlocked with Super Admin PIN!", "success");
+            return true;
+        } catch (error) {
+            console.error('Super Admin authentication error:', error);
+            toast("Error verifying Super Admin PIN", "error");
             return false;
         }
     };
@@ -617,6 +652,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             registerBiometrics,
             authenticate,
             authenticateMasterPin,
+            authenticateSuperAdmin,
             validateSuperAdminPin,
             disableBiometrics,
             revokeDeviceFingerprint,

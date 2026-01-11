@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import { ArrowLeft, Trash2, Calendar, ShoppingBag, Wallet, Edit2, ChevronDown, TrendingUp, TrendingDown, ArrowUpDown, X, ChevronRight, User, CheckCircle2, Circle, MoreVertical, Download } from "lucide-react";
 import Papa from "papaparse";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { format, subDays, startOfMonth, startOfWeek, endOfWeek, endOfMonth } from "date-fns";
 import { Button } from "../components/ui/Button";
 import { cn } from "../lib/utils";
@@ -17,9 +17,14 @@ type DateRangeType = "today" | "yesterday" | "week" | "month" | "custom";
 export default function Reports() {
 
     const { toast, confirm } = useToast();
+    const location = useLocation();
 
     // Filters
-    const [rangeType, setRangeType] = useState<DateRangeType>("today");
+    const [rangeType, setRangeType] = useState<DateRangeType>(() => {
+        // Check if we have a default filter passed in state
+        const state = location.state as { defaultFilter?: DateRangeType };
+        return state?.defaultFilter || "today";
+    });
     const [showFilters, setShowFilters] = useState(false);
     const filterButtonRef = useRef<HTMLButtonElement>(null);
     const filterPanelRef = useRef<HTMLDivElement>(null);
@@ -1016,88 +1021,86 @@ export default function Reports() {
                                 )}
 
                                 {data.transactions.map((t: any) => (
-                                    <div key={t.id} className={cn("bg-card p-3 md:p-4 rounded-xl shadow-sm border border-border/60 transition-all relative", isSelectionMode && selectedTransactionIds.has(t.id) && "ring-2 ring-primary bg-primary/5", activeMenuId === t.id && "z-[150]")}>
-                                        {isSelectionMode ? (
-                                            <div className="flex items-center cursor-pointer" onClick={() => toggleTransactionSelection(t.id)}>
-                                                <div className="mr-3 md:mr-4">
-                                                    {selectedTransactionIds.has(t.id) ?
-                                                        <CheckCircle2 className="text-primary fill-primary/20" /> :
-                                                        <Circle className="text-muted-foreground" />
-                                                    }
+                                    <div key={t.id} className={cn("bg-card p-3 md:p-4 rounded-xl shadow-sm border border-border/60 transition-all relative group touch-manipulation select-none", isSelectionMode && selectedTransactionIds.has(t.id) && "ring-2 ring-primary bg-primary/5", activeMenuId === t.id && "z-[150]")}>
+                                        {/* Editing Mode Override */}
+                                        {editingId === t.id ? (
+                                            <div className="space-y-4 animate-in fade-in">
+                                                <div className="flex justify-between items-center border-b border-border/50 pb-2">
+                                                    <span className="font-bold text-foreground">{t.products?.name}</span>
+                                                    <span className="text-[10px] text-primary font-black uppercase bg-primary/10 px-2 py-1 rounded-full">Editing Mode</span>
                                                 </div>
-                                                <div className="flex-1 min-w-0 opacity-80 pointer-events-none">
-                                                    <div className="font-bold text-foreground truncate text-sm md:text-base">{t.customers?.name}</div>
-                                                    <div className="text-[10px] md:text-xs text-muted-foreground flex items-center gap-1.5 mt-1 font-medium">
-                                                        <span>{t.products?.name}</span>
-                                                        <span className="w-1 h-1 rounded-full bg-muted-foreground/50" />
-                                                        <span>{t.quantity} {t.products?.unit}</span>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <div>
+                                                        <label className="text-[10px] text-muted-foreground font-bold uppercase block mb-1">Date</label>
+                                                        <input
+                                                            className="w-full p-2 bg-accent rounded-lg border border-border text-foreground font-bold text-center focus:ring-2 focus:ring-primary outline-none"
+                                                            type="date"
+                                                            value={editDate}
+                                                            onChange={e => setEditDate(e.target.value)}
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[10px] text-muted-foreground font-bold uppercase block mb-1">Qty</label>
+                                                        <input
+                                                            className="w-full p-2 bg-accent rounded-lg border border-border text-foreground font-bold text-center focus:ring-2 focus:ring-primary outline-none"
+                                                            type="number"
+                                                            value={editQty}
+                                                            onChange={e => setEditQty(e.target.value)}
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[10px] text-muted-foreground font-bold uppercase block mb-1">Sell ₹</label>
+                                                        <input
+                                                            className="w-full p-2 bg-accent rounded-lg border border-border text-foreground font-bold text-center focus:ring-2 focus:ring-primary outline-none"
+                                                            type="number"
+                                                            value={editPrice}
+                                                            onChange={e => setEditPrice(e.target.value)}
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[10px] text-muted-foreground font-bold uppercase block mb-1">Buy ₹</label>
+                                                        <input
+                                                            className="w-full p-2 bg-accent rounded-lg border border-border text-foreground font-bold text-center focus:ring-2 focus:ring-primary outline-none"
+                                                            type="number"
+                                                            value={editBuyPrice}
+                                                            onChange={e => setEditBuyPrice(e.target.value)}
+                                                        />
                                                     </div>
                                                 </div>
-                                                <div className="font-black text-emerald-600 dark:text-emerald-400 text-base md:text-lg pointer-events-none">₹{(t.quantity * t.sell_price).toLocaleString()}</div>
+                                                <div className="flex gap-2 pt-2">
+                                                    <Button className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold shadow-lg shadow-emerald-500/20" onClick={saveEdit}>Save Changes</Button>
+                                                    <Button variant="ghost" className="flex-1 hover:bg-destructive/10 hover:text-destructive" onClick={() => setEditingId(null)}>Cancel</Button>
+                                                </div>
                                             </div>
                                         ) : (
-                                            editingId === t.id ? (
-                                                <div className="space-y-4 animate-in fade-in">
-                                                    <div className="flex justify-between items-center border-b border-border/50 pb-2">
-                                                        <span className="font-bold text-foreground">{t.products?.name}</span>
-                                                        <span className="text-[10px] text-primary font-black uppercase bg-primary/10 px-2 py-1 rounded-full">Editing Mode</span>
-                                                    </div>
-                                                    <div className="grid grid-cols-2 gap-3">
-                                                        <div>
-                                                            <label className="text-[10px] text-muted-foreground font-bold uppercase block mb-1">Date</label>
-                                                            <input
-                                                                className="w-full p-2 bg-accent rounded-lg border border-border text-foreground font-bold text-center focus:ring-2 focus:ring-primary outline-none"
-                                                                type="date"
-                                                                value={editDate}
-                                                                onChange={e => setEditDate(e.target.value)}
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <label className="text-[10px] text-muted-foreground font-bold uppercase block mb-1">Qty</label>
-                                                            <input
-                                                                className="w-full p-2 bg-accent rounded-lg border border-border text-foreground font-bold text-center focus:ring-2 focus:ring-primary outline-none"
-                                                                type="number"
-                                                                value={editQty}
-                                                                onChange={e => setEditQty(e.target.value)}
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <label className="text-[10px] text-muted-foreground font-bold uppercase block mb-1">Sell ₹</label>
-                                                            <input
-                                                                className="w-full p-2 bg-accent rounded-lg border border-border text-foreground font-bold text-center focus:ring-2 focus:ring-primary outline-none"
-                                                                type="number"
-                                                                value={editPrice}
-                                                                onChange={e => setEditPrice(e.target.value)}
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <label className="text-[10px] text-muted-foreground font-bold uppercase block mb-1">Buy ₹</label>
-                                                            <input
-                                                                className="w-full p-2 bg-accent rounded-lg border border-border text-foreground font-bold text-center focus:ring-2 focus:ring-primary outline-none"
-                                                                type="number"
-                                                                value={editBuyPrice}
-                                                                onChange={e => setEditBuyPrice(e.target.value)}
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex gap-2 pt-2">
-                                                        <Button className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold shadow-lg shadow-emerald-500/20" onClick={saveEdit}>Save Changes</Button>
-                                                        <Button variant="ghost" className="flex-1 hover:bg-destructive/10 hover:text-destructive" onClick={() => setEditingId(null)}>Cancel</Button>
-                                                    </div>
-                                                </div>
-                                            ) : (
+                                            /* Normal Item View (Unified) */
+                                            <div className="flex items-center justify-between">
+                                                {/* Start/Left Section: Selection Checkbox & Main Content */}
                                                 <div
-                                                    className={cn("flex justify-between items-center gap-3 group relative transition-all", activeMenuId === t.id ? "z-50" : "z-0")}
+                                                    className="flex-1 flex items-center gap-3 cursor-pointer"
+                                                    onContextMenu={(e) => e.preventDefault()}
+                                                    onTouchStart={(e) => !isSelectionMode && handleTransactionTouchStart(e, t.id, selectedTransactionIds.has(t.id))}
+                                                    onTouchEnd={handleTouchEnd}
+                                                    onTouchMove={handleTouchMove}
+                                                    onMouseDown={(e) => !isSelectionMode && handleTransactionTouchStart(e, t.id, selectedTransactionIds.has(t.id))}
+                                                    onMouseUp={handleTouchEnd}
+                                                    onMouseLeave={handleTouchEnd}
+                                                    onClick={() => {
+                                                        if (isSelectionMode) toggleTransactionSelection(t.id);
+                                                    }}
                                                 >
-                                                    <div
-                                                        className="flex-1 min-w-0 select-none cursor-pointer pr-2"
-                                                        onTouchStart={(e) => handleTransactionTouchStart(e, t.id, selectedTransactionIds.has(t.id))}
-                                                        onTouchEnd={handleTouchEnd}
-                                                        onTouchMove={handleTouchMove}
-                                                        onMouseDown={(e) => handleTransactionTouchStart(e, t.id, selectedTransactionIds.has(t.id))}
-                                                        onMouseUp={handleTouchEnd}
-                                                        onMouseLeave={handleTouchEnd}
-                                                    >
+                                                    {/* Selection Checkbox */}
+                                                    {isSelectionMode && (
+                                                        <div className="flex items-center justify-center w-8 h-8 mr-1 animate-in fade-in zoom-in spin-in-12 duration-200">
+                                                            {selectedTransactionIds.has(t.id) ?
+                                                                <CheckCircle2 className="text-primary fill-primary/20" size={22} /> :
+                                                                <Circle className="text-muted-foreground" size={22} />
+                                                            }
+                                                        </div>
+                                                    )}
+
+                                                    {/* Main Content */}
+                                                    <div className={cn("flex-1 min-w-0 pointer-events-none transition-opacity", isSelectionMode ? "opacity-80" : "opacity-100")}>
                                                         <div className="font-bold text-foreground text-sm truncate pr-2">{t.customers?.name}</div>
                                                         <div className="flex flex-wrap gap-2 mt-2">
                                                             <div className="text-xs text-muted-foreground flex items-center gap-1 font-medium mr-2">
@@ -1108,8 +1111,15 @@ export default function Reports() {
                                                             </div>
                                                         </div>
                                                     </div>
-                                                    <div className="text-right flex items-center gap-0 md:gap-1 flex-shrink-0">
-                                                        <div className="font-black text-emerald-500 text-base md:text-lg whitespace-nowrap">₹{(t.quantity * t.sell_price).toLocaleString()}</div>
+                                                </div>
+
+                                                {/* End/Right Section: Amount & Menu */}
+                                                <div className="text-right flex items-center gap-1 md:gap-2 flex-shrink-0">
+                                                    <div className="font-black text-emerald-500 text-base md:text-lg whitespace-nowrap">
+                                                        ₹{(t.quantity * t.sell_price).toLocaleString()}
+                                                    </div>
+
+                                                    {!isSelectionMode && (
                                                         <div className="relative">
                                                             <button
                                                                 onClick={(e) => { e.stopPropagation(); setActiveMenuId(activeMenuId === t.id ? null : t.id); }}
@@ -1123,8 +1133,6 @@ export default function Reports() {
                                                                     role="menu"
                                                                     className="absolute right-0 top-full mt-1 w-36 bg-card dark:bg-zinc-900 border border-border rounded-xl shadow-2xl z-[200] overflow-hidden animate-in fade-in zoom-in-95 ring-1 ring-black/5 pointer-events-auto"
                                                                     onClick={(e) => e.stopPropagation()}
-                                                                    onMouseDown={(e) => e.stopPropagation()}
-                                                                    onTouchStart={(e) => e.stopPropagation()}
                                                                 >
                                                                     <div className="flex flex-col p-1">
                                                                         <button
@@ -1155,9 +1163,10 @@ export default function Reports() {
                                                                 </div>
                                                             )}
                                                         </div>
-                                                    </div>
+                                                    )}
                                                 </div>
-                                            ))}
+                                            </div>
+                                        )}
                                     </div>
                                 ))}
                             </div>
@@ -1186,148 +1195,149 @@ export default function Reports() {
                                         isSelectionMode && selectedExpenseIds.has(e.id) && "ring-2 ring-primary bg-primary/5",
                                         activeMenuId === e.id && "z-[150]"
                                     )}>
-                                        {isSelectionMode && e.type === 'manual' ? (
-                                            <div className="flex items-center cursor-pointer" onClick={() => toggleExpenseSelection(e.id)}>
-                                                <div className="mr-3 md:mr-4">
-                                                    {selectedExpenseIds.has(e.id) ?
-                                                        <CheckCircle2 className="text-primary fill-primary/20" /> :
-                                                        <Circle className="text-muted-foreground" />
-                                                    }
+                                        {/* Expense Editing Mode */}
+                                        {editingExpenseId === e.id ? (
+                                            <div className="space-y-4 animate-in fade-in">
+                                                <div className="flex justify-between items-center border-b border-border/50 pb-2">
+                                                    <span className="font-bold text-foreground">Edit Expense</span>
                                                 </div>
-                                                <div className="flex-1 opacity-70 pointer-events-none">
-                                                    <div className="font-bold text-foreground text-sm">{e.title}</div>
-                                                    <div className="text-rose-600 font-bold text-base md:text-xl">-₹{e.amount.toLocaleString()}</div>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <div>
+                                                        <label className="text-[10px] text-muted-foreground font-bold uppercase block mb-1">Title</label>
+                                                        <input
+                                                            className="w-full p-2 bg-accent rounded-lg border border-border text-foreground font-bold focus:ring-2 focus:ring-primary outline-none"
+                                                            value={editExpenseTitle}
+                                                            onChange={evt => setEditExpenseTitle(evt.target.value)}
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[10px] text-muted-foreground font-bold uppercase block mb-1">Amount</label>
+                                                        <input
+                                                            className="w-full p-2 bg-accent rounded-lg border border-border text-foreground font-bold focus:ring-2 focus:ring-primary outline-none"
+                                                            type="number"
+                                                            value={editExpenseAmount}
+                                                            onChange={evt => setEditExpenseAmount(evt.target.value)}
+                                                        />
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        ) : isSelectionMode && e.type !== 'manual' ? (
-                                            <div className="flex items-center opacity-50 grayscale">
-                                                <div className="mr-4">
-                                                    <Circle className="text-muted-foreground/20" size={20} />
-                                                </div>
-                                                <div className="flex-1">
-                                                    <div className="font-bold text-foreground text-sm">{e.title}</div>
-                                                    <div className="text-[10px] text-muted-foreground uppercase">(Auto-generated)</div>
+                                                <div className="flex gap-2 pt-2">
+                                                    <Button className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold shadow-lg shadow-emerald-500/20" onClick={saveEditExpense}>Save</Button>
+                                                    <Button variant="ghost" className="flex-1 hover:bg-destructive/10 hover:text-destructive" onClick={() => setEditingExpenseId(null)}>Cancel</Button>
                                                 </div>
                                             </div>
                                         ) : (
-                                            <>
-                                                {editingExpenseId === e.id ? (
-                                                    <div className="space-y-4 animate-in fade-in">
-                                                        <div className="flex justify-between items-center border-b border-border/50 pb-2">
-                                                            <span className="font-bold text-foreground">Edit Expense</span>
+                                            /* Unified Expense Item View */
+                                            <div className={cn("flex items-center justify-between", e.type !== 'manual' && isSelectionMode && "opacity-50 grayscale")}>
+                                                {/* Left Content */}
+                                                <div
+                                                    className="flex-1 flex items-center gap-3 cursor-pointer"
+                                                    onContextMenu={(event) => event.preventDefault()}
+                                                    onTouchStart={(evt) => !isSelectionMode && e.type === 'manual' && handleExpenseTouchStart(evt, e.id, selectedExpenseIds.has(e.id))}
+                                                    onTouchEnd={handleTouchEnd}
+                                                    onTouchMove={handleTouchMove}
+                                                    onMouseDown={(evt) => !isSelectionMode && e.type === 'manual' && handleExpenseTouchStart(evt, e.id, selectedExpenseIds.has(e.id))}
+                                                    onMouseUp={handleTouchEnd}
+                                                    onMouseLeave={handleTouchEnd}
+                                                    onClick={() => {
+                                                        if (isSelectionMode && e.type === 'manual') toggleExpenseSelection(e.id);
+                                                    }}
+                                                >
+                                                    {/* Selection Checkbox */}
+                                                    {isSelectionMode && (
+                                                        <div className="flex items-center justify-center w-8 h-8 mr-1 animate-in fade-in zoom-in spin-in-12 duration-200">
+                                                            {e.type !== 'manual' ? (
+                                                                <Circle className="text-muted-foreground/20" size={22} />
+                                                            ) : selectedExpenseIds.has(e.id) ? (
+                                                                <CheckCircle2 className="text-primary fill-primary/20" size={22} />
+                                                            ) : (
+                                                                <Circle className="text-muted-foreground" size={22} />
+                                                            )}
                                                         </div>
-                                                        <div className="grid grid-cols-2 gap-3">
-                                                            <div>
-                                                                <label className="text-[10px] text-muted-foreground font-bold uppercase block mb-1">Title</label>
-                                                                <input
-                                                                    className="w-full p-2 bg-accent rounded-lg border border-border text-foreground font-bold focus:ring-2 focus:ring-primary outline-none"
-                                                                    value={editExpenseTitle}
-                                                                    onChange={evt => setEditExpenseTitle(evt.target.value)}
-                                                                />
-                                                            </div>
-                                                            <div>
-                                                                <label className="text-[10px] text-muted-foreground font-bold uppercase block mb-1">Amount</label>
-                                                                <input
-                                                                    className="w-full p-2 bg-accent rounded-lg border border-border text-foreground font-bold focus:ring-2 focus:ring-primary outline-none"
-                                                                    type="number"
-                                                                    value={editExpenseAmount}
-                                                                    onChange={evt => setEditExpenseAmount(evt.target.value)}
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                        <div className="flex gap-2 pt-2">
-                                                            <Button className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold shadow-lg shadow-emerald-500/20" onClick={saveEditExpense}>Save</Button>
-                                                            <Button variant="ghost" className="flex-1 hover:bg-destructive/10 hover:text-destructive" onClick={() => setEditingExpenseId(null)}>Cancel</Button>
-                                                        </div>
-                                                    </div>
-                                                ) : (
-                                                    <div
-                                                        className="flex justify-between items-center group select-none"
-                                                    >
-                                                        <div
-                                                            className="flex-1 cursor-pointer"
-                                                            onTouchStart={(evt) => handleExpenseTouchStart(evt, e.id, selectedExpenseIds.has(e.id))}
-                                                            onTouchEnd={handleTouchEnd}
-                                                            onTouchMove={handleTouchMove}
-                                                            onMouseDown={(evt) => handleExpenseTouchStart(evt, e.id, selectedExpenseIds.has(e.id))}
-                                                            onMouseUp={handleTouchEnd}
-                                                            onMouseLeave={handleTouchEnd}
-                                                        >
-                                                            <div className="font-bold text-foreground text-sm">{e.title}</div>
-                                                            <div className="flex flex-wrap gap-2 mt-2">
-                                                                {e.type === 'cogs' && (
-                                                                    <div className="text-xs text-muted-foreground flex items-center gap-1 font-medium mr-2">
-                                                                        <span>{e.raw.quantity} {e.raw.products?.unit}</span>
-                                                                        <span className="text-rose-500">@ ₹{e.raw.buy_price}/-</span>
-                                                                    </div>
-                                                                )}
-                                                                {e.type === 'cogs' || e.isGhee ? (
-                                                                    <span className="bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 text-[9px] font-extrabold px-2 py-0.5 rounded-md uppercase tracking-wide">
-                                                                        Goods Cost
-                                                                    </span>
-                                                                ) : (
-                                                                    <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[9px] font-extrabold px-2 py-0.5 rounded-md uppercase tracking-wide">
-                                                                        Manual Expense
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                        <div className="text-right flex items-center gap-3 md:gap-4">
-                                                            <div className="font-black text-rose-600 dark:text-rose-400 text-base md:text-lg">-₹{e.amount.toLocaleString()}</div>
-                                                            {e.type === 'manual' && (
-                                                                <div className="relative">
-                                                                    <button
-                                                                        onClick={(evt) => { evt.stopPropagation(); setActiveMenuId(activeMenuId === e.id ? null : e.id); }}
-                                                                        className={cn(
-                                                                            "p-1.5 text-muted-foreground hover:bg-accent active:bg-accent rounded-lg transition ml-2",
-                                                                            "opacity-100"
-                                                                        )}
-                                                                    >
-                                                                        <MoreVertical size={16} />
-                                                                    </button>
+                                                    )}
 
-                                                                    {activeMenuId === e.id && (
-                                                                        <div
-                                                                            role="menu"
-                                                                            className="absolute right-0 top-full mt-1 w-36 bg-card dark:bg-zinc-900 border border-border rounded-xl shadow-2xl z-[200] overflow-hidden animate-in fade-in zoom-in-95 ring-1 ring-black/5 pointer-events-auto"
-                                                                            onClick={(e) => e.stopPropagation()}
-                                                                            onMouseDown={(e) => e.stopPropagation()}
-                                                                            onTouchStart={(e) => e.stopPropagation()}
+                                                    {/* Main Expense Info */}
+                                                    <div className={cn("flex-1 min-w-0 pointer-events-none transition-opacity", isSelectionMode ? "opacity-70" : "opacity-100")}>
+                                                        <div className="font-bold text-foreground text-sm">{e.title}</div>
+                                                        <div className="flex flex-wrap gap-2 mt-2">
+                                                            {e.type === 'cogs' && (
+                                                                <div className="text-xs text-muted-foreground flex items-center gap-1 font-medium mr-2">
+                                                                    <span>{e.raw.quantity} {e.raw.products?.unit}</span>
+                                                                    <span className="text-rose-500">@ ₹{e.raw.buy_price}/-</span>
+                                                                </div>
+                                                            )}
+                                                            {e.type === 'cogs' || e.isGhee ? (
+                                                                <span className="bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 text-[9px] font-extrabold px-2 py-0.5 rounded-md uppercase tracking-wide">
+                                                                    Goods Cost
+                                                                </span>
+                                                            ) : (
+                                                                <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[9px] font-extrabold px-2 py-0.5 rounded-md uppercase tracking-wide">
+                                                                    Manual Expense
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        {isSelectionMode && e.type === 'manual' && (
+                                                            <div className="text-rose-600 font-bold text-base mt-1">-₹{e.amount.toLocaleString()}</div>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {/* Right Content */}
+                                                <div className="text-right flex items-center gap-1 md:gap-3 flex-shrink-0">
+                                                    {(!isSelectionMode || e.type !== 'manual') && (
+                                                        <div className="font-black text-rose-600 dark:text-rose-400 text-base md:text-lg">-₹{e.amount.toLocaleString()}</div>
+                                                    )}
+
+                                                    {/* Menu - Hidden in Selection Mode */}
+                                                    {!isSelectionMode && e.type === 'manual' && (
+                                                        <div className="relative">
+                                                            <button
+                                                                onClick={(evt) => { evt.stopPropagation(); setActiveMenuId(activeMenuId === e.id ? null : e.id); }}
+                                                                className={cn(
+                                                                    "p-1.5 text-muted-foreground hover:bg-accent active:bg-accent rounded-lg transition ml-2",
+                                                                    "opacity-100"
+                                                                )}
+                                                            >
+                                                                <MoreVertical size={16} />
+                                                            </button>
+
+                                                            {activeMenuId === e.id && (
+                                                                <div
+                                                                    role="menu"
+                                                                    className="absolute right-0 top-full mt-1 w-36 bg-card dark:bg-zinc-900 border border-border rounded-xl shadow-2xl z-[200] overflow-hidden animate-in fade-in zoom-in-95 ring-1 ring-black/5 pointer-events-auto"
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                >
+                                                                    <div className="flex flex-col p-1">
+                                                                        <button
+                                                                            onClick={(evt) => { evt.stopPropagation(); setActiveMenuId(null); startEditExpense(e); }}
+                                                                            className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-foreground hover:bg-accent active:bg-accent rounded-lg text-left"
                                                                         >
-                                                                            <div className="flex flex-col p-1">
-                                                                                <button
-                                                                                    onClick={(evt) => { evt.stopPropagation(); setActiveMenuId(null); startEditExpense(e); }}
-                                                                                    className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-foreground hover:bg-accent active:bg-accent rounded-lg text-left"
-                                                                                >
-                                                                                    <Edit2 size={14} /> Edit
-                                                                                </button>
-                                                                                <button
-                                                                                    onClick={(evt) => { evt.stopPropagation(); setActiveMenuId(null); deleteExpense(e.id); }}
-                                                                                    className="flex items-center gap-2 px-3 py-2.5 text-sm font-bold text-rose-500 hover:bg-rose-500/10 active:bg-rose-500/10 rounded-lg text-left"
-                                                                                >
-                                                                                    <Trash2 size={14} /> Delete
-                                                                                </button>
-                                                                                <div className="h-px bg-border/50 my-1" />
-                                                                                <button
-                                                                                    onClick={(evt) => {
-                                                                                        evt.stopPropagation();
-                                                                                        setActiveMenuId(null);
-                                                                                        toggleSelectionMode();
-                                                                                        toggleExpenseSelection(e.id);
-                                                                                    }}
-                                                                                    className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-foreground hover:bg-accent active:bg-accent rounded-lg text-left"
-                                                                                >
-                                                                                    <CheckCircle2 size={14} /> Select
-                                                                                </button>
-                                                                            </div>
-                                                                        </div>
-                                                                    )}
+                                                                            <Edit2 size={14} /> Edit
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={(evt) => { evt.stopPropagation(); setActiveMenuId(null); deleteExpense(e.id); }}
+                                                                            className="flex items-center gap-2 px-3 py-2.5 text-sm font-bold text-rose-500 hover:bg-rose-500/10 active:bg-rose-500/10 rounded-lg text-left"
+                                                                        >
+                                                                            <Trash2 size={14} /> Delete
+                                                                        </button>
+                                                                        <div className="h-px bg-border/50 my-1" />
+                                                                        <button
+                                                                            onClick={(evt) => {
+                                                                                evt.stopPropagation();
+                                                                                setActiveMenuId(null);
+                                                                                toggleSelectionMode();
+                                                                                toggleExpenseSelection(e.id);
+                                                                            }}
+                                                                            className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-foreground hover:bg-accent active:bg-accent rounded-lg text-left"
+                                                                        >
+                                                                            <CheckCircle2 size={14} /> Select
+                                                                        </button>
+                                                                    </div>
                                                                 </div>
                                                             )}
                                                         </div>
-                                                    </div>
-                                                )}
-                                            </>
+                                                    )}
+                                                </div>
+                                            </div>
                                         )}
                                     </div>
                                 ))}

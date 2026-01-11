@@ -370,6 +370,7 @@ export default function Dashboard() {
 
                                 <Link
                                     to="/reports"
+                                    state={{ defaultFilter: 'month' }}
                                     className="group flex items-center justify-center w-full py-4 md:py-3.5 bg-white/10 hover:bg-white/15 active:bg-white/20 active:scale-[0.98] backdrop-blur-sm border border-white/10 hover:border-white/20 text-white rounded-xl text-xs font-semibold tracking-wide transition-all duration-200 focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                                 >
                                     View Detailed Report

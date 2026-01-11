@@ -895,6 +895,7 @@ export default function NewSale() {
                                 <h3 className="font-bold text-foreground flex items-center gap-2">
                                     <ShoppingCart size={18} className="text-primary" />
                                     Cart Items <span className="text-xs bg-muted px-2 py-0.5 rounded-full">{cart.length}</span>
+                                    {/* Debug Log */ console.log("Rendering Cart:", cart.map(i => i.product.name))}
                                 </h3>
                             </div>
 

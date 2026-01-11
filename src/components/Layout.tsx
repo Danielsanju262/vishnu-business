@@ -3,11 +3,13 @@ import { LayoutDashboard, Settings, Wallet, Lightbulb } from "lucide-react";
 import { cn } from "../lib/utils";
 import { usePaymentNotifications } from "../hooks/usePaymentNotifications";
 import { useAutoBackup } from "../hooks/useAutoBackup";
+import { useNavBadgeCounts } from "../hooks/usePendingTaskCount";
 
 export default function Layout() {
     const location = useLocation();
     usePaymentNotifications();
     useAutoBackup();
+    const { insightsCount, paymentsCount, payablesCount } = useNavBadgeCounts();
 
     const RupeeTextIcon = ({ size = 24, className, strokeWidth }: any) => {
         return (
@@ -35,7 +37,9 @@ export default function Layout() {
             path: "/insights",
             icon: Lightbulb,
             label: "Insights",
-            isActive: (pathname: string) => pathname.startsWith("/insights")
+            isActive: (pathname: string) => pathname.startsWith("/insights"),
+            badgeCount: insightsCount,
+            badgeColor: "bg-rose-500 shadow-rose-500/30"
         },
         {
             path: "/",
@@ -48,25 +52,33 @@ export default function Layout() {
                 pathname.startsWith("/products") ||
                 pathname.startsWith("/reports") ||
                 pathname.startsWith("/sale") ||
-                pathname.startsWith("/expense")
+                pathname.startsWith("/expense"),
+            badgeCount: 0,
+            badgeColor: ""
         },
         {
             path: "/payment-reminders",
             icon: RupeeTextIcon,
             label: "Payments",
-            isActive: (pathname: string) => pathname.startsWith("/payment-reminders")
+            isActive: (pathname: string) => pathname.startsWith("/payment-reminders"),
+            badgeCount: paymentsCount,
+            badgeColor: "bg-emerald-500 shadow-emerald-500/30"
         },
         {
             path: "/accounts-payable",
             icon: Wallet,
             label: "Payables",
-            isActive: (pathname: string) => pathname.startsWith("/accounts-payable") || pathname.startsWith("/suppliers")
+            isActive: (pathname: string) => pathname.startsWith("/accounts-payable") || pathname.startsWith("/suppliers"),
+            badgeCount: payablesCount,
+            badgeColor: "bg-orange-500 shadow-orange-500/30"
         },
         {
             path: "/settings",
             icon: Settings,
             label: "Settings",
-            isActive: (pathname: string) => pathname.startsWith("/settings")
+            isActive: (pathname: string) => pathname.startsWith("/settings"),
+            badgeCount: 0,
+            badgeColor: ""
         },
     ];
 
@@ -112,6 +124,15 @@ export default function Layout() {
                                         className={cn("relative z-10 transition-transform duration-200", isActive ? "scale-110" : "group-hover:scale-105 group-active:scale-105")}
                                         strokeWidth={isActive ? 3 : 2}
                                     />
+                                    {/* Badge for this nav item */}
+                                    {item.badgeCount > 0 && (
+                                        <span className={cn(
+                                            "absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center px-1 text-white text-[10px] font-semibold rounded-full z-20 shadow-lg animate-in zoom-in",
+                                            item.badgeColor
+                                        )}>
+                                            {item.badgeCount > 99 ? "99+" : item.badgeCount}
+                                        </span>
+                                    )}
                                     {isActive && (
                                         <span className="absolute -bottom-0.5 w-1.5 h-1.5 bg-white rounded-full animate-in zoom-in" />
                                     )}
@@ -124,3 +145,4 @@ export default function Layout() {
         </div >
     );
 }
+
