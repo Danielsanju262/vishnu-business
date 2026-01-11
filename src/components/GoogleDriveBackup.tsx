@@ -16,19 +16,12 @@ import {
     hasRefreshToken,
     isTokenExpiringSoon,
     clearAllTokens,
-    getValidAccessToken,
     storeAccessToken
 } from "../lib/googleOAuth";
 
 // Token storage keys (for backward compatibility check)
 const TOKEN_KEY = 'vishnu_gdrive_token';
 const TOKEN_EXPIRY_KEY = 'vishnu_gdrive_token_expiry';
-const HAS_REFRESH_TOKEN_KEY = 'vishnu_gdrive_has_refresh';
-
-// Check if we're using the new refresh token flow
-const isUsingRefreshTokenFlow = (): boolean => {
-    return localStorage.getItem(HAS_REFRESH_TOKEN_KEY) === 'true';
-};
 
 // Legacy token validation (for old users who haven't upgraded)
 const isLegacyTokenValid = (): boolean => {
