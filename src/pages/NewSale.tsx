@@ -9,6 +9,7 @@ import { useToast } from "../components/toast-provider";
 import { useRealtimeTables } from "../hooks/useRealtimeSync";
 import { Modal } from "../components/ui/Modal";
 import { useHistorySyncedStep } from "../hooks/useHistorySyncedStep";
+import { ConfirmationModal } from "../components/ui/ConfirmationModal";
 
 type Customer = { id: string; name: string };
 type Product = { id: string; name: string; unit: string; category: string };
@@ -19,11 +20,11 @@ type CartItem = {
     buyPrice: number;
 };
 
-import { ConfirmationModal } from "../components/ui/ConfirmationModal";
-
 export default function NewSale() {
     const navigate = useNavigate();
     const { toast } = useToast();
+
+
 
     // Data State
     const [customers, setCustomers] = useState<Customer[]>([]);
@@ -895,7 +896,7 @@ export default function NewSale() {
                                 <h3 className="font-bold text-foreground flex items-center gap-2">
                                     <ShoppingCart size={18} className="text-primary" />
                                     Cart Items <span className="text-xs bg-muted px-2 py-0.5 rounded-full">{cart.length}</span>
-                                    {/* Debug Log */ console.log("Rendering Cart:", cart.map(i => i.product.name))}
+
                                 </h3>
                             </div>
 
