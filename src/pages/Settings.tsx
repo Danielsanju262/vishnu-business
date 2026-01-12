@@ -549,7 +549,7 @@ export default function Settings() {
                     <div className="space-y-0">
                         <div className="flex justify-between items-center py-3 border-b border-neutral-100 dark:border-neutral-800">
                             <span className="text-sm text-neutral-500 dark:text-neutral-400 font-medium">Version</span>
-                            <span className="text-sm font-semibold text-neutral-900 dark:text-white bg-neutral-100 dark:bg-neutral-800 px-2.5 py-1 rounded-md">v7.5.0</span>
+                            <span className="text-sm font-semibold text-neutral-900 dark:text-white bg-neutral-100 dark:bg-neutral-800 px-2.5 py-1 rounded-md">v7.6.0</span>
                         </div>
 
 
@@ -784,25 +784,45 @@ export default function Settings() {
                         <div className="p-4 rounded-xl bg-neutral-50 dark:bg-neutral-800/50 border border-neutral-200 dark:border-neutral-700">
                             <h3 className="text-sm font-semibold text-neutral-900 dark:text-white mb-2">Test Notifications</h3>
                             <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-4">
-                                Tap the button below, then <b>close the app immediately</b>. You should receive a notification after 10 seconds.
+                                Tap the button below, then <b>close the app immediately</b>. You should receive a notification shortly.
                             </p>
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                className="w-full"
-                                onClick={async () => {
-                                    const { showImmediateNotification } = await import('../lib/nativeNotifications');
-                                    await showImmediateNotification(
-                                        "🔔 Test Notification",
-                                        "This is a test notification! Your background alerts are working perfectly.",
-                                        "/settings"
-                                    );
-                                    toast("Notification scheduled in 10 seconds. Close app now!", "info");
-                                }}
-                            >
-                                <Bell className="w-4 h-4 mr-2" />
-                                Test Background Notification (10s Delay)
-                            </Button>
+                            <div className="space-y-2">
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="w-full"
+                                    onClick={async () => {
+                                        const { showImmediateNotification, createNotificationChannel } = await import('../lib/nativeNotifications');
+                                        await createNotificationChannel();
+                                        await showImmediateNotification(
+                                            "🔔 Test Notification",
+                                            "This is a test notification! Your background alerts are working perfectly.",
+                                            "/settings"
+                                        );
+                                        toast("Notification scheduled! Close app now!", "info");
+                                    }}
+                                >
+                                    <Bell className="w-4 h-4 mr-2" />
+                                    Test Background Notification
+                                </Button>
+
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="w-full text-xs"
+                                    onClick={async () => {
+                                        const { getPendingNotifications } = await import('../lib/nativeNotifications');
+                                        const pending = await getPendingNotifications();
+                                        if (pending.length === 0) {
+                                            toast("No pending notifications scheduled.", "info");
+                                        } else {
+                                            toast(`${pending.length} notification(s) pending`, "info");
+                                        }
+                                    }}
+                                >
+                                    View Pending Notifications (Debug)
+                                </Button>
+                            </div>
                         </div>
                     </div>
                 </CollapsibleSection>

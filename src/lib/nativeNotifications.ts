@@ -40,11 +40,38 @@ export async function requestNotificationPermission(): Promise<boolean> {
     }
 
     try {
+        // Create notification channel first (required for Android 8+)
+        await createNotificationChannel();
+
         const permission = await LocalNotifications.requestPermissions();
         return permission.display === 'granted';
     } catch (error) {
         console.error('[Notifications] Failed to request permission:', error);
         return false;
+    }
+}
+
+/**
+ * Create notification channel for Android 8+ (Oreo and above)
+ * This is REQUIRED for notifications to appear on modern Android devices.
+ */
+export async function createNotificationChannel(): Promise<void> {
+    if (!isNativePlatform()) return;
+
+    try {
+        await LocalNotifications.createChannel({
+            id: 'vishnu_business_reminders',
+            name: 'Business Reminders',
+            description: 'Payment reminders, task notifications, and business alerts',
+            importance: 5, // Max importance
+            visibility: 1, // Public
+            sound: 'default',
+            vibration: true,
+            lights: true,
+        });
+        console.log('[Notifications] Channel created successfully');
+    } catch (error) {
+        console.error('[Notifications] Failed to create channel:', error);
     }
 }
 
@@ -246,6 +273,7 @@ export async function schedulePaymentReminderNotification(count: number, totalAm
                     id: NOTIFICATION_IDS.PAYMENT_REMINDER,
                     title: '🌅 Morning Collection Reminder',
                     body: `Good morning! You have ${count} payment${count !== 1 ? 's' : ''} to collect today (Total: ₹${formattedAmount}).`,
+                    channelId: 'vishnu_business_reminders', // Required for Android 8+
                     schedule: {
                         at: scheduledTime,
                         allowWhileIdle: true,
