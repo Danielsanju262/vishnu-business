@@ -10,6 +10,7 @@ import { useDropdownClose } from "../hooks/useDropdownClose";
 import { ConfirmationModal } from "../components/ui/ConfirmationModal";
 import { useHistorySyncedState } from "../hooks/useHistorySyncedState";
 import { useMarkPayableViewed } from "../hooks/usePendingTaskCount";
+import { notifyPayablePaid } from "../lib/insightsEvents";
 
 type Supplier = {
     id: string;
@@ -520,6 +521,10 @@ export default function SupplierPaymentDetail() {
             toast(newBalance <= 0 ? "Fully paid!" : `Paid ₹${paid.toLocaleString()}`, "success");
             setShowMakePayment(false);
             setPaymentAmount("");
+
+            // Notify insights to refresh (auto-complete payable task)
+            notifyPayablePaid();
+
             loadData();
         }
     };

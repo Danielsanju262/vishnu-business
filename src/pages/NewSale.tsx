@@ -10,6 +10,7 @@ import { useRealtimeTables } from "../hooks/useRealtimeSync";
 import { Modal } from "../components/ui/Modal";
 import { useHistorySyncedStep } from "../hooks/useHistorySyncedStep";
 import { ConfirmationModal } from "../components/ui/ConfirmationModal";
+import { notifySaleAdded } from "../lib/insightsEvents";
 
 type Customer = { id: string; name: string };
 type Product = { id: string; name: string; unit: string; category: string };
@@ -740,6 +741,9 @@ export default function NewSale() {
         setPayableSelectedSupplierId("");
         setPayableAmount("");
         setPayableDueDate("");
+
+        // Notify insights to refresh (auto-complete 'no sales today' task)
+        notifySaleAdded();
 
         toast("Sale saved successfully!", "success");
         navigate("/");

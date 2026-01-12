@@ -10,6 +10,7 @@ import { useDropdownClose } from "../hooks/useDropdownClose";
 import { ConfirmationModal } from "../components/ui/ConfirmationModal";
 import { useHistorySyncedState } from "../hooks/useHistorySyncedState";
 import { useMarkPaymentViewed } from "../hooks/usePendingTaskCount";
+import { notifyPaymentCollected } from "../lib/insightsEvents";
 
 type Customer = {
     id: string;
@@ -719,6 +720,10 @@ export default function CustomerPaymentDetail() {
             toast(newBalance <= 0 ? "Fully paid!" : `Received ₹${received.toLocaleString()}`, "success");
             setShowReceivePayment(false);
             setReceiveAmount("");
+
+            // Notify insights to refresh (auto-complete payment task)
+            notifyPaymentCollected();
+
             loadData();
         }
     };

@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
 import { useGoogleLogin } from "@react-oauth/google";
-import { Cloud, Upload, Download, Loader2, FileJson, CheckCircle2, RefreshCw, AlertTriangle, ArrowRight, Database, ChevronDown, ChevronUp, LogIn } from "lucide-react";
+import { Cloud, Upload, Download, Loader2, FileJson, CheckCircle2, RefreshCw, AlertTriangle, ArrowRight, Database, ChevronDown, ChevronUp, LogIn, Server } from "lucide-react";
 import { Button } from "./ui/Button";
 import { useToast } from "./toast-provider";
 import { uploadToDrive, listBackups, downloadFile } from "../lib/drive";
 import { exportData, importData, getBackupStats, getCurrentStats } from "../lib/backup";
 import { Modal } from "./ui/Modal";
 import { cn } from "../lib/utils";
+import { setBackupEnabled, getBackupConfig, getLastBackupDate } from "../lib/serverBackup";
 import {
     exchangeCodeForTokens,
     refreshAccessToken,
@@ -216,6 +217,11 @@ export function GoogleDriveBackup() {
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [isPersistentConnection, setIsPersistentConnection] = useState(hasRefreshToken());
 
+    // Server Backup State
+    const [isServerBackupEnabled, setIsServerBackupEnabled] = useState(false);
+    const [lastServerBackup, setLastServerBackup] = useState<Date | null>(null);
+    const [isLoadingServerConfig, setIsLoadingServerConfig] = useState(true);
+
     // Progress State
     const [progress, setProgress] = useState(0);
     const [progressStatus, setProgressStatus] = useState("");
@@ -236,8 +242,9 @@ export function GoogleDriveBackup() {
         fileData: null
     });
 
-    // Load Auto Backup Config
+    // Load Auto Backup Config and Server Backup Config
     useEffect(() => {
+        // Local config
         const configStr = localStorage.getItem('vishnu_backup_config');
         if (configStr) {
             try {
@@ -246,6 +253,33 @@ export function GoogleDriveBackup() {
             } catch (e) {
                 console.error("Failed to parse backup config", e);
             }
+        }
+
+        // Server config
+        const loadServerConfig = async () => {
+            setIsLoadingServerConfig(true);
+            try {
+                const config = await getBackupConfig();
+                if (config) {
+                    setIsServerBackupEnabled(config.enabled);
+                    if (config.last_backup_at) {
+                        setLastServerBackup(new Date(config.last_backup_at));
+                    }
+                }
+                const lastBackup = await getLastBackupDate();
+                if (lastBackup) {
+                    setLastServerBackup(lastBackup);
+                }
+            } catch (e) {
+                console.error("Failed to load server backup config", e);
+            }
+            setIsLoadingServerConfig(false);
+        };
+
+        if (hasRefreshToken()) {
+            loadServerConfig();
+        } else {
+            setIsLoadingServerConfig(false);
         }
     }, []);
 
@@ -259,6 +293,25 @@ export function GoogleDriveBackup() {
         }
 
         toast(newState ? "Daily auto-backup enabled" : "Auto-backup disabled", "success");
+    };
+
+    const toggleServerBackup = async () => {
+        const newState = !isServerBackupEnabled;
+        setIsServerBackupEnabled(newState);
+
+        const success = await setBackupEnabled(newState);
+        if (success) {
+            toast(
+                newState
+                    ? "Server backup enabled! Backups will run at 7 AM daily even when app is closed."
+                    : "Server backup disabled",
+                "success"
+            );
+        } else {
+            // Revert on failure
+            setIsServerBackupEnabled(!newState);
+            toast("Failed to update server backup setting", "error");
+        }
     };
 
     // Handle token refresh and expiry checking
@@ -672,6 +725,57 @@ export function GoogleDriveBackup() {
                         <Button size="sm" onClick={() => loginWithAuthCode()} className="bg-amber-500 hover:bg-amber-600 text-white font-semibold h-8 px-3">
                             <LogIn size={14} className="mr-1.5" /> Refresh
                         </Button>
+                    </div>
+                )}
+
+                {/* Server Scheduled Backup Toggle - Only show if persistent connection */}
+                {isPersistentConnection && (
+                    <div
+                        onClick={isLoadingServerConfig ? undefined : toggleServerBackup}
+                        className={cn(
+                            "flex items-center justify-between p-3 rounded-xl mb-4 border cursor-pointer active:scale-[0.98] transition-all",
+                            isServerBackupEnabled
+                                ? "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800"
+                                : "bg-neutral-50 dark:bg-neutral-800/50 border-neutral-100 dark:border-neutral-800"
+                        )}
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className={cn(
+                                "p-2 rounded-lg",
+                                isServerBackupEnabled
+                                    ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400"
+                                    : "bg-neutral-200 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-400"
+                            )}>
+                                <Server size={18} />
+                            </div>
+                            <div>
+                                <p className="text-sm font-semibold text-neutral-900 dark:text-white">
+                                    ⏰ Scheduled Backup (7 AM Daily)
+                                </p>
+                                <p className="text-[10px] text-neutral-500 dark:text-neutral-400">
+                                    {isServerBackupEnabled
+                                        ? (lastServerBackup
+                                            ? `Last: ${lastServerBackup.toLocaleDateString()} ${lastServerBackup.toLocaleTimeString()}`
+                                            : "Runs server-side even when app is closed")
+                                        : "Enable for automatic cloud backups"
+                                    }
+                                </p>
+                            </div>
+                        </div>
+                        {isLoadingServerConfig ? (
+                            <Loader2 size={18} className="animate-spin text-muted-foreground" />
+                        ) : (
+                            <div
+                                className={cn(
+                                    "w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all",
+                                    isServerBackupEnabled
+                                        ? "border-emerald-500 bg-emerald-500"
+                                        : "border-neutral-300 dark:border-neutral-600 bg-transparent"
+                                )}
+                            >
+                                {isServerBackupEnabled && <div className="w-2.5 h-2.5 rounded-full bg-white animate-in zoom-in-50" />}
+                            </div>
+                        )}
                     </div>
                 )}
 

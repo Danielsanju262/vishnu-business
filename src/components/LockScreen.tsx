@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Fingerprint, Lock, KeyRound, Loader2, ShieldAlert, Eye, EyeOff, ShieldCheck, ArrowLeft, Clock } from 'lucide-react';
+import { Fingerprint, Lock, KeyRound, Loader2, ShieldAlert, Eye, EyeOff, ShieldCheck, ArrowLeft, Clock, Timer } from 'lucide-react';
 import { Button } from './ui/Button';
 import { useToast } from './toast-provider';
 
@@ -42,9 +42,11 @@ export default function LockScreen() {
         authenticate,
         authenticateMasterPin,
         authenticateSuperAdmin,
+        enableSecurityBypass,
         hasBiometrics,
         currentPinVersion,
-        devicePinVersion
+        devicePinVersion,
+        hasSuperAdminSetup
     } = useAuth();
     const { toast } = useToast();
     const [isAnimating, setIsAnimating] = useState(false);
@@ -59,6 +61,11 @@ export default function LockScreen() {
     const [showForgotPin, setShowForgotPin] = useState(false);
     const [superAdminPin, setSuperAdminPin] = useState("");
     const [revealSuperAdminPin, setRevealSuperAdminPin] = useState(false);
+
+    // Security bypass mode
+    const [showBypassMode, setShowBypassMode] = useState(false);
+    const [bypassPin, setBypassPin] = useState("");
+    const [revealBypassPin, setRevealBypassPin] = useState(false);
 
     // Lockout state
     const [lockoutState, setLockoutState] = useState<LockoutState>(getLockoutState);
@@ -222,6 +229,35 @@ export default function LockScreen() {
         setLoading(false);
     };
 
+    // Handle security bypass (skip login for 3 days)
+    const handleSecurityBypass = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        if (isLockedOut) {
+            return;
+        }
+
+        setLoading(true);
+
+        const result = await enableSecurityBypass(bypassPin);
+
+        if (!result.success) {
+            setError(true);
+            setBypassPin("");
+            setTimeout(() => setError(false), 500);
+            handleFailedAttempt();
+            if (result.error) {
+                toast(result.error, "error");
+            }
+        } else {
+            // Clear lockout on success
+            clearLockoutState();
+            setLockoutState(getDefaultLockoutState());
+        }
+
+        setLoading(false);
+    };
+
     const formatRemainingTime = (ms: number) => {
         const totalSeconds = Math.ceil(ms / 1000);
         const minutes = Math.floor(totalSeconds / 60);
@@ -294,7 +330,7 @@ export default function LockScreen() {
                 )}
 
                 {/* Forgot PIN Mode - Super Admin Entry */}
-                {showForgotPin && !isLockedOut ? (
+                {showForgotPin && !isLockedOut && !showBypassMode ? (
                     <form onSubmit={handleSuperAdminUnlock} className="w-full space-y-4 animate-in slide-in-from-bottom-4">
                         {/* Back button */}
                         <button
@@ -375,6 +411,90 @@ export default function LockScreen() {
                             disabled={loading || superAdminPin.length < 6}
                         >
                             {loading ? <Loader2 className="animate-spin" size={20} /> : "Unlock with Super Admin"}
+                        </Button>
+                    </form>
+                ) : showBypassMode && !isLockedOut ? (
+                    /* Security Bypass Mode - Skip login for 3 days */
+                    <form onSubmit={handleSecurityBypass} className="w-full space-y-4 animate-in slide-in-from-bottom-4">
+                        {/* Back button */}
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setShowBypassMode(false);
+                                setBypassPin("");
+                            }}
+                            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-2"
+                        >
+                            <ArrowLeft size={16} />
+                            Back
+                        </button>
+
+                        {/* Bypass label */}
+                        <div className="flex items-center justify-center gap-2 mb-2">
+                            <Timer size={16} className="text-emerald-500" />
+                            <span className="text-sm font-semibold text-foreground">Skip Login for 3 Days</span>
+                        </div>
+
+                        <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-left">
+                            <p className="text-xs text-emerald-600 dark:text-emerald-400">
+                                <strong>Super Admin Only:</strong> Enter your Super Admin PIN to temporarily disable security for 3 days. You can re-enable it anytime from Settings.
+                            </p>
+                        </div>
+
+                        <div
+                            className="relative z-[9999]"
+                            style={{ pointerEvents: 'auto' }}
+                        >
+                            <input
+                                type={revealBypassPin ? "tel" : "password"}
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                autoFocus
+                                value={bypassPin}
+                                onChange={e => setBypassPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                onTouchStart={(e) => {
+                                    e.stopPropagation();
+                                    e.currentTarget.focus();
+                                }}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    e.currentTarget.focus();
+                                }}
+                                placeholder="••••••"
+                                className={`w-full h-16 text-center text-2xl font-black tracking-[0.5em] rounded-2xl bg-secondary/50 border-2 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all pr-12 ${error ? 'border-rose-500 animate-shake' : 'border-border'}`}
+                                style={{
+                                    pointerEvents: 'auto',
+                                    touchAction: 'manipulation',
+                                    WebkitUserSelect: 'text',
+                                    userSelect: 'text'
+                                }}
+                                autoComplete="off"
+                                readOnly={false}
+                            />
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setRevealBypassPin(!revealBypassPin);
+                                }}
+                                className="absolute right-4 top-1/2 -translate-y-1/2 p-2 text-muted-foreground hover:text-foreground hover:bg-background/80 rounded-full transition-colors"
+                                tabIndex={-1}
+                            >
+                                {revealBypassPin ? (
+                                    <EyeOff size={24} />
+                                ) : (
+                                    <Eye size={24} />
+                                )}
+                            </button>
+                        </div>
+                        <Button
+                            className="w-full h-12 font-bold rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white"
+                            size="lg"
+                            type="submit"
+                            disabled={loading || bypassPin.length < 6}
+                        >
+                            {loading ? <Loader2 className="animate-spin" size={20} /> : "Enable 3-Day Bypass"}
                         </Button>
                     </form>
                 ) : showPin && !isLockedOut ? (
@@ -464,6 +584,18 @@ export default function LockScreen() {
                             >
                                 Forgot PIN?
                             </button>
+
+                            {/* Skip login option - only show if Super Admin is set up */}
+                            {hasSuperAdminSetup && (
+                                <button
+                                    type="button"
+                                    onClick={() => setShowBypassMode(true)}
+                                    className="text-sm text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 font-medium hover:underline active:underline py-2 transition-colors flex items-center justify-center gap-1.5"
+                                >
+                                    <Timer size={14} />
+                                    Skip login for 3 days
+                                </button>
+                            )}
                         </div>
                     </form>
                 ) : !isLockedOut ? (
@@ -488,6 +620,18 @@ export default function LockScreen() {
                             <KeyRound className="mr-2" size={20} />
                             Use Master PIN
                         </Button>
+
+                        {/* Skip login option on main screen - only show if Super Admin is set up */}
+                        {hasSuperAdminSetup && (
+                            <button
+                                type="button"
+                                onClick={() => setShowBypassMode(true)}
+                                className="w-full text-sm text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 font-medium hover:underline active:underline py-3 transition-colors flex items-center justify-center gap-1.5"
+                            >
+                                <Timer size={14} />
+                                Skip login for 3 days
+                            </button>
+                        )}
                     </div>
                 ) : null}
 

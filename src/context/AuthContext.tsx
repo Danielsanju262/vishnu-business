@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useToast } from '../components/toast-provider';
 import { supabase } from '../lib/supabase';
+import { showSecurityAlertNotification } from '../lib/nativeNotifications';
 
 // Helper to encode ArrayBuffer to Base64URL string
 const bufferToBase64url = (buffer: ArrayBuffer) => {
@@ -77,6 +78,71 @@ const clearLocalAuth = () => {
     localStorage.setItem('app_locked', 'true');
 };
 
+// Security bypass storage key - stores the expiration timestamp
+const SECURITY_BYPASS_KEY = 'security_bypass_until';
+
+// Helper to check if security bypass is active
+const isSecurityBypassActive = (): boolean => {
+    const bypassUntil = localStorage.getItem(SECURITY_BYPASS_KEY);
+    if (!bypassUntil) return false;
+    const expirationTime = parseInt(bypassUntil, 10);
+    if (isNaN(expirationTime)) return false;
+    return Date.now() < expirationTime;
+};
+
+// Helper to get remaining bypass time in days/hours
+const getSecurityBypassRemaining = (): { days: number; hours: number; isActive: boolean } => {
+    const bypassUntil = localStorage.getItem(SECURITY_BYPASS_KEY);
+    if (!bypassUntil) return { days: 0, hours: 0, isActive: false };
+    const expirationTime = parseInt(bypassUntil, 10);
+    if (isNaN(expirationTime)) return { days: 0, hours: 0, isActive: false };
+    const remaining = expirationTime - Date.now();
+    if (remaining <= 0) return { days: 0, hours: 0, isActive: false };
+    const days = Math.floor(remaining / (24 * 60 * 60 * 1000));
+    const hours = Math.floor((remaining % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
+    return { days, hours, isActive: true };
+};
+
+// Log login activity and check if device is authorized
+// If not authorized, trigger a security alert notification
+const logLoginActivity = async (
+    deviceId: string,
+    deviceName: string,
+    loginMethod: 'master_pin' | 'super_admin_pin' | 'biometrics' | 'security_bypass'
+): Promise<void> => {
+    try {
+        // Check if device is in authorized_devices table with fingerprint enabled
+        const { data: deviceData } = await supabase
+            .from('authorized_devices')
+            .select('id, fingerprint_enabled')
+            .eq('device_id', deviceId)
+            .single();
+
+        // Device is authorized if it exists AND has fingerprint enabled
+        // (or if it's the device doing the login - we'll register it after)
+        const isAuthorizedDevice = !!(deviceData && deviceData.fingerprint_enabled);
+
+        // Log the login activity
+        await supabase.from('login_activity').insert({
+            device_id: deviceId,
+            device_name: deviceName,
+            login_method: loginMethod,
+            is_authorized_device: isAuthorizedDevice
+        });
+
+        // If device is NOT authorized, send security alert to all devices
+        if (!isAuthorizedDevice) {
+            console.log('[Security] New device login detected:', deviceName);
+            // Show notification (this will appear on device where login happened
+            // and can be seen by user - for native devices with Capacitor)
+            await showSecurityAlertNotification(deviceName);
+        }
+    } catch (error) {
+        console.error('[Security] Failed to log login activity:', error);
+    }
+};
+
+
 interface AuthContextType {
     isLocked: boolean;
     hasBiometrics: boolean;
@@ -96,15 +162,29 @@ interface AuthContextType {
     devicePinVersion: number;
     hasSuperAdminSetup: boolean;
     currentDeviceId: string;
+    // Security bypass functions
+    isSecurityBypassed: boolean;
+    securityBypassRemaining: { days: number; hours: number; isActive: boolean };
+    enableSecurityBypass: (superAdminPin: string) => Promise<{ success: boolean; error?: string }>;
+    disableSecurityBypass: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { toast } = useToast();
+
+    // Security bypass state
+    const [isSecurityBypassed, setIsSecurityBypassed] = useState(isSecurityBypassActive);
+    const [securityBypassRemaining, setSecurityBypassRemaining] = useState(getSecurityBypassRemaining);
+
     // Initialize state strictly based on SessionStorage (cleared on app close)
     // AND LocalStorage (persisted manual lock)
+    // ALSO check for security bypass - if active, skip lock
     const [isLocked, setIsLocked] = useState(() => {
+        // 0. If security bypass is active, never lock
+        if (isSecurityBypassActive()) return false;
+
         // 1. If globally locked (manual lock from any tab), enforce it
         if (localStorage.getItem('app_locked') === 'true') return true;
 
@@ -263,11 +343,84 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // ... existing subscription code ...
     }, [checkAuthStatus, refreshDevices, updateDeviceActivity, deviceId, currentPinVersion, revokeLocalBiometrics]); // Re-add dependencies
 
+    // Periodically check security bypass expiration
+    useEffect(() => {
+        const checkBypassExpiration = () => {
+            const bypassActive = isSecurityBypassActive();
+            const remaining = getSecurityBypassRemaining();
+
+            setIsSecurityBypassed(bypassActive);
+            setSecurityBypassRemaining(remaining);
+
+            // If bypass just expired, lock the app
+            if (!bypassActive && localStorage.getItem(SECURITY_BYPASS_KEY)) {
+                localStorage.removeItem(SECURITY_BYPASS_KEY);
+                setIsLocked(true);
+                toast("Security bypass expired. Please authenticate.", "info");
+            }
+        };
+
+        // Check immediately
+        checkBypassExpiration();
+
+        // Check every minute
+        const interval = setInterval(checkBypassExpiration, 60 * 1000);
+        return () => clearInterval(interval);
+    }, [toast]);
+
     const lockApp = () => {
         sessionStorage.removeItem('vb_session_active'); // Kill session
         localStorage.setItem('app_locked', 'true');     // Sync other tabs
         setIsLocked(true);
         toast("App Locked", "success");
+    };
+
+    // Enable security bypass for 3 days (requires Super Admin PIN)
+    const enableSecurityBypass = async (superAdminPin: string): Promise<{ success: boolean; error?: string }> => {
+        try {
+            // Validate Super Admin PIN
+            const isValid = await validateSuperAdminPin(superAdminPin);
+            if (!isValid) {
+                return { success: false, error: 'Invalid Super Admin PIN' };
+            }
+
+            // Set bypass expiration to 3 days from now
+            const expirationTime = Date.now() + (3 * 24 * 60 * 60 * 1000);
+            localStorage.setItem(SECURITY_BYPASS_KEY, expirationTime.toString());
+
+            // Update state
+            setIsSecurityBypassed(true);
+            setSecurityBypassRemaining(getSecurityBypassRemaining());
+
+            // Unlock the app
+            sessionStorage.setItem('vb_session_active', 'true');
+            localStorage.setItem('app_locked', 'false');
+            setIsLocked(false);
+
+            toast("Security bypass enabled for 3 days!", "success");
+
+            // Log login activity for security monitoring
+            await logLoginActivity(deviceId, getDeviceName(), 'security_bypass');
+
+            return { success: true };
+        } catch (error) {
+            console.error('Failed to enable security bypass:', error);
+            return { success: false, error: 'Failed to enable security bypass' };
+        }
+    };
+
+    // Disable security bypass (re-enable security)
+    const disableSecurityBypass = () => {
+        localStorage.removeItem(SECURITY_BYPASS_KEY);
+        setIsSecurityBypassed(false);
+        setSecurityBypassRemaining({ days: 0, hours: 0, isActive: false });
+
+        // Lock the app
+        sessionStorage.removeItem('vb_session_active');
+        localStorage.setItem('app_locked', 'true');
+        setIsLocked(true);
+
+        toast("Security re-enabled. Please authenticate.", "success");
     };
 
     // Register or update this device in the database
@@ -423,6 +576,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 await updateDeviceActivity();
 
                 toast("Unlocked!", "success");
+
+                // Log login activity for security monitoring
+                await logLoginActivity(deviceId, getDeviceName(), 'biometrics');
+
                 return true;
             }
         } catch (error: any) {
@@ -468,6 +625,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 }
 
                 toast("Unlocked!", "success");
+
+                // Log login activity for security monitoring
+                await logLoginActivity(deviceId, getDeviceName(), 'master_pin');
+
                 return true;
             } else {
                 return false;
@@ -524,6 +685,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             await registerDevice(false, serverPinVersion);
 
             toast("Unlocked with Super Admin PIN!", "success");
+
+            // Log login activity for security monitoring
+            await logLoginActivity(deviceId, getDeviceName(), 'super_admin_pin');
+
             return true;
         } catch (error) {
             console.error('Super Admin authentication error:', error);
@@ -662,7 +827,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             currentPinVersion,
             devicePinVersion,
             hasSuperAdminSetup,
-            currentDeviceId: deviceId
+            currentDeviceId: deviceId,
+            // Security bypass
+            isSecurityBypassed,
+            securityBypassRemaining,
+            enableSecurityBypass,
+            disableSecurityBypass
         }}>
             {children}
         </AuthContext.Provider>

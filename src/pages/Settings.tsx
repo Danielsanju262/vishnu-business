@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import Papa from "papaparse";
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
-import { ArrowLeft, Database, Shield, Lock, Check, Fingerprint, LogOut, KeyRound, Loader2, Smartphone, Trash2, AlertTriangle, ShieldCheck, Clock, Mail, Download, Upload, ChevronDown, Cloud } from "lucide-react";
+import { ArrowLeft, Database, Shield, Lock, Check, Fingerprint, LogOut, KeyRound, Loader2, Smartphone, Trash2, AlertTriangle, ShieldCheck, Clock, Mail, Download, Upload, ChevronDown, Cloud, Timer, ShieldAlert } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { cn } from "../lib/utils";
 import { Button } from "../components/ui/Button";
@@ -100,7 +100,10 @@ export default function Settings() {
         changeMasterPin,
         refreshDevices,
         hasSuperAdminSetup,
-        currentDeviceId
+        currentDeviceId,
+        isSecurityBypassed,
+        securityBypassRemaining,
+        disableSecurityBypass
     } = useAuth();
     const { toast } = useToast();
 
@@ -142,6 +145,22 @@ export default function Settings() {
     const [isExporting, setIsExporting] = useState(false);
     const [isImporting, setIsImporting] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Login Activity State
+    const [loginActivity, setLoginActivity] = useState<any[]>([]);
+
+    useEffect(() => {
+        fetchLoginActivity();
+    }, []);
+
+    const fetchLoginActivity = async () => {
+        const { data } = await supabase
+            .from('login_activity')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(20);
+        if (data) setLoginActivity(data);
+    };
 
     const resetPinState = () => {
         setIsChangePinOpen(false);
@@ -535,7 +554,7 @@ export default function Settings() {
                     <div className="space-y-0">
                         <div className="flex justify-between items-center py-3 border-b border-neutral-100 dark:border-neutral-800">
                             <span className="text-sm text-neutral-500 dark:text-neutral-400 font-medium">Version</span>
-                            <span className="text-sm font-semibold text-neutral-900 dark:text-white bg-neutral-100 dark:bg-neutral-800 px-2.5 py-1 rounded-md">v5.8.3</span>
+                            <span className="text-sm font-semibold text-neutral-900 dark:text-white bg-neutral-100 dark:bg-neutral-800 px-2.5 py-1 rounded-md">v5.9.0</span>
                         </div>
 
 
@@ -554,6 +573,39 @@ export default function Settings() {
                     headerClassName="bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400"
                 >
                     <div className="space-y-5">
+                        {/* Security Bypass Status */}
+                        {isSecurityBypassed && (
+                            <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/30">
+                                <div className="flex items-start gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center shrink-0">
+                                        <Timer size={20} className="text-emerald-600 dark:text-emerald-400" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <h3 className="text-sm font-bold text-emerald-800 dark:text-emerald-300 mb-1">Security Bypass Active</h3>
+                                        <p className="text-xs text-emerald-700 dark:text-emerald-400 mb-1">
+                                            PIN and biometric authentication is temporarily disabled.
+                                        </p>
+                                        <p className="text-xs text-emerald-600 dark:text-emerald-500 mb-3">
+                                            Expires in: <span className="font-bold">{securityBypassRemaining.days} days, {securityBypassRemaining.hours} hours</span>
+                                        </p>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="border-emerald-300 dark:border-emerald-500/50 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 font-semibold h-9 px-4"
+                                            onClick={() => {
+                                                if (confirm("Are you sure you want to re-enable security? You will need to authenticate to access the app.")) {
+                                                    disableSecurityBypass();
+                                                }
+                                            }}
+                                        >
+                                            <Lock size={14} className="mr-2" />
+                                            Re-enable Security
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         <div>
                             <h3 className="text-sm font-semibold text-neutral-800 dark:text-neutral-200 mb-2">Biometrics</h3>
                             <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-3 leading-relaxed">
@@ -727,6 +779,63 @@ export default function Settings() {
                             <p className="text-sm font-medium">No authorized devices yet</p>
                         </div>
                     )}
+                </CollapsibleSection>
+
+                {/* Login Activity */}
+                <CollapsibleSection
+                    title="Login Activity"
+                    icon={ShieldAlert}
+                    headerClassName="bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400"
+                >
+                    <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-5 leading-relaxed">
+                        Recent login attempts on your account. Review for any suspicious activity.
+                    </p>
+
+                    <div className="space-y-3">
+                        {loginActivity.length > 0 ? (
+                            loginActivity.map((log) => (
+                                <div
+                                    key={log.id}
+                                    className="p-3 md:p-4 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/50"
+                                >
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="flex items-start gap-3">
+                                            <div className={cn(
+                                                "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border",
+                                                log.is_authorized_device
+                                                    ? "bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/30"
+                                                    : "bg-rose-100 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-500/30"
+                                            )}>
+                                                {log.login_method === 'biometrics' ? (
+                                                    <Fingerprint size={20} />
+                                                ) : log.login_method === 'security_bypass' ? (
+                                                    <Timer size={20} />
+                                                ) : (
+                                                    <KeyRound size={20} />
+                                                )}
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-semibold text-neutral-900 dark:text-white">
+                                                    {log.is_authorized_device ? "Authorized Login" : "Unrecognized Device"}
+                                                </p>
+                                                <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+                                                    {log.device_name} • {log.login_method.replace(/_/g, ' ')}
+                                                </p>
+                                                <div className="flex items-center gap-1.5 text-xs text-neutral-400 dark:text-neutral-500 mt-1.5">
+                                                    <Clock size={12} />
+                                                    <span>{formatRelativeTime(log.created_at)}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))
+                        ) : (
+                            <div className="text-center py-8 text-neutral-400 dark:text-neutral-500">
+                                <p className="text-sm font-medium">No recent activity</p>
+                            </div>
+                        )}
+                    </div>
                 </CollapsibleSection>
 
                 {/* Backup & Restore (Google Drive) */}

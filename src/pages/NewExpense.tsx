@@ -10,6 +10,7 @@ import { useToast } from "../components/toast-provider";
 
 import { useRealtimeTable } from "../hooks/useRealtimeSync";
 import { useDropdownClose } from "../hooks/useDropdownClose";
+import { notifyExpenseAdded } from "../lib/insightsEvents";
 
 type Preset = {
     id: string;
@@ -135,6 +136,9 @@ export default function NewExpense() {
         }
 
         toast("Expense saved", "success");
+
+        // Notify insights to refresh (auto-complete 'no expenses today' task)
+        notifyExpenseAdded();
 
         // Check presets logic...
         const matchingPreset = presets.find(p => p.label.toLowerCase() === title.toLowerCase());

@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useRealtimeTables } from './useRealtimeSync';
 import type { InsightItem, InsightSource, InsightSeverity } from '../types/insightTypes';
 import { format, subDays, subWeeks, addDays } from 'date-fns';
+import { insightsEvents, INSIGHTS_EVENTS } from '../lib/insightsEvents';
 
 interface UseInsightsGeneratorReturn {
     tasks: InsightItem[];
@@ -444,6 +445,16 @@ export function useInsightsGenerator(): UseInsightsGeneratorReturn {
         // If not, we show loading.
         const hasData = tasks.length > 0;
         refreshInsights({ silent: hasData });
+    }, [refreshInsights]);
+
+    // Listen for data change events (for auto-completing tasks)
+    useEffect(() => {
+        const unsubscribe = insightsEvents.on(INSIGHTS_EVENTS.DATA_CHANGED, () => {
+            console.log('[Insights] Data changed, refreshing tasks...');
+            refreshInsights({ silent: true });
+        });
+
+        return unsubscribe;
     }, [refreshInsights]);
 
     // Real-time updates - always silent
