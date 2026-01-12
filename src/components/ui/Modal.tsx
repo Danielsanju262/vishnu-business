@@ -43,6 +43,19 @@ export function Modal({ isOpen, onClose, children, title, className, showCloseBu
         };
     }, [isOpen, onClose]);
 
+    // Track modal state globally
+    useEffect(() => {
+        if (isOpen) {
+            window.dispatchEvent(new Event('app-modal-opened'));
+        }
+
+        return () => {
+            if (isOpen) {
+                window.dispatchEvent(new Event('app-modal-closed'));
+            }
+        };
+    }, [isOpen]);
+
     if (!isOpen) return null;
 
     // US-14: Center All Popups & US-17: Fixed positioning relative to viewport

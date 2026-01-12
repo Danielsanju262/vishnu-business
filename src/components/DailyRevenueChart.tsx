@@ -12,12 +12,20 @@ interface DailyRevenueChartProps {
 }
 
 export function DailyRevenueChart({ chartData, selectedChartDay, setSelectedChartDay, aggregation = 'day' }: DailyRevenueChartProps) {
-    const [chartMetric, setChartMetric] = useState<'revenue' | 'profit'>('revenue');
+    const [chartMetric, setChartMetric] = useState<'revenue' | 'profit' | 'margin'>('revenue');
 
-    const maxDataValue = Math.max(...chartData.map((d: any) =>
-        chartMetric === 'revenue' ? d.revenue : Math.abs(d.profit)
-    ), 1);
-    const chartMax = maxDataValue * 1.5;
+    const maxDataValue = Math.max(...chartData.map((d: any) => {
+        if (chartMetric === 'margin') {
+            return d.revenue > 0 ? (d.profit / d.revenue) * 100 : 0;
+        }
+        return chartMetric === 'revenue' ? d.revenue : Math.abs(d.profit);
+    }), 1);
+
+    // For margin, cap at 100 usually, but let it flow if super high profit? standardized to 100 is better for %, 
+    // but simplified: if metric is margin, use 100 as fixed scale or max observed? 
+    // Let's use max observed but at least 100 if it's small, to keep 0-100 scale feeling right.
+    const chartMax = chartMetric === 'margin' ? Math.max(maxDataValue, 100) : maxDataValue * 1.25; // Adjusted buffer to 1.25 for label space
+
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
     // Scroll to specific day (today) or end on mount
@@ -49,6 +57,7 @@ export function DailyRevenueChart({ chartData, selectedChartDay, setSelectedChar
     }, [chartData]);
 
     const titlePrefix = aggregation === 'week' ? 'Weekly' : aggregation === 'month' ? 'Monthly' : 'Daily';
+    const metricLabel = chartMetric === 'revenue' ? 'Revenue' : chartMetric === 'profit' ? 'Profit' : 'Margin';
 
     return (
         <div
@@ -59,7 +68,7 @@ export function DailyRevenueChart({ chartData, selectedChartDay, setSelectedChar
                 <div className="flex items-center justify-between">
                     <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
                         <BarChart3 size={16} className="text-purple-500" />
-                        {titlePrefix} {chartMetric === 'revenue' ? 'Revenue' : 'Profit'}
+                        {titlePrefix} {metricLabel}
                     </h3>
 
                     <div className="flex bg-muted/50 p-1 rounded-lg">
@@ -67,7 +76,7 @@ export function DailyRevenueChart({ chartData, selectedChartDay, setSelectedChar
                             onClick={(e) => { e.stopPropagation(); setChartMetric('revenue'); }}
                             className={cn(
                                 "px-3 py-1 text-[10px] font-bold rounded-md transition-all",
-                                chartMetric === 'revenue' ? "bg-emerald-500 text-white shadow-md" : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                                chartMetric === 'revenue' ? "bg-blue-500 text-white shadow-md" : "text-muted-foreground hover:text-foreground hover:bg-background/50"
                             )}
                         >
                             Sales
@@ -76,16 +85,30 @@ export function DailyRevenueChart({ chartData, selectedChartDay, setSelectedChar
                             onClick={(e) => { e.stopPropagation(); setChartMetric('profit'); }}
                             className={cn(
                                 "px-3 py-1 text-[10px] font-bold rounded-md transition-all",
-                                chartMetric === 'profit' ? "bg-blue-500 text-white shadow-md" : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                                chartMetric === 'profit' ? "bg-emerald-500 text-white shadow-md" : "text-muted-foreground hover:text-foreground hover:bg-background/50"
                             )}
                         >
                             Profit
+                        </button>
+                        <button
+                            onClick={(e) => { e.stopPropagation(); setChartMetric('margin'); }}
+                            className={cn(
+                                "px-3 py-1 text-[10px] font-bold rounded-md transition-all",
+                                chartMetric === 'margin' ? "bg-amber-500 text-white shadow-md" : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                            )}
+                        >
+                            Margin
                         </button>
                     </div>
                 </div>
 
                 {selectedChartDay ? (() => {
                     const selectedDayData = chartData.find((d: any) => d.date === selectedChartDay);
+                    let marginVal = 0;
+                    if (selectedDayData && selectedDayData.revenue > 0) {
+                        marginVal = (selectedDayData.profit / selectedDayData.revenue) * 100;
+                    }
+
                     return selectedDayData ? (
                         <div className="bg-muted/40 rounded-xl p-3 flex items-center justify-between animate-in slide-in-from-top-2 fade-in duration-200">
                             <div>
@@ -99,6 +122,12 @@ export function DailyRevenueChart({ chartData, selectedChartDay, setSelectedChar
                                         <span className="text-[10px] uppercase font-bold text-muted-foreground">{selectedDayData.profit >= 0 ? 'Profit' : 'Loss'}</span>
                                         <span className={cn("text-xl font-black", selectedDayData.profit >= 0 ? "text-emerald-500" : "text-rose-500")}>
                                             ₹{Math.abs(selectedDayData.profit).toLocaleString()}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-baseline gap-1">
+                                        <span className="text-[10px] uppercase font-bold text-muted-foreground">Margin</span>
+                                        <span className={cn("text-xl font-black", marginVal >= 0 ? "text-amber-500" : "text-rose-500")}>
+                                            {marginVal.toFixed(1)}%
                                         </span>
                                     </div>
                                 </div>
@@ -117,10 +146,21 @@ export function DailyRevenueChart({ chartData, selectedChartDay, setSelectedChar
             <div className="flex h-[180px] w-full gap-2">
                 {/* Y-Axis Labels (Fixed Left Column) */}
                 <div className="flex flex-col justify-between h-full w-[45px] flex-shrink-0 pb-[20px] text-[9px] font-bold text-muted-foreground pt-1">
-                    <div className="relative h-0 w-full text-right"><span className="absolute -top-2 right-0">₹{Math.round(chartMax).toLocaleString()}</span></div>
-                    <div className="relative h-0 w-full text-right"><span className="absolute -top-2 right-0">₹{Math.round(chartMax * 0.66).toLocaleString()}</span></div>
-                    <div className="relative h-0 w-full text-right"><span className="absolute -top-2 right-0">₹{Math.round(chartMax * 0.33).toLocaleString()}</span></div>
-                    <div className="relative h-0 w-full text-right"><span className="absolute -top-2 right-0">₹0</span></div>
+                    {chartMetric === 'margin' ? (
+                        <>
+                            <div className="relative h-0 w-full text-right"><span className="absolute -top-2 right-0">{Math.round(chartMax)}%</span></div>
+                            <div className="relative h-0 w-full text-right"><span className="absolute -top-2 right-0">{Math.round(chartMax * 0.66)}%</span></div>
+                            <div className="relative h-0 w-full text-right"><span className="absolute -top-2 right-0">{Math.round(chartMax * 0.33)}%</span></div>
+                            <div className="relative h-0 w-full text-right"><span className="absolute -top-2 right-0">0%</span></div>
+                        </>
+                    ) : (
+                        <>
+                            <div className="relative h-0 w-full text-right"><span className="absolute -top-2 right-0">₹{Math.round(chartMax).toLocaleString()}</span></div>
+                            <div className="relative h-0 w-full text-right"><span className="absolute -top-2 right-0">₹{Math.round(chartMax * 0.66).toLocaleString()}</span></div>
+                            <div className="relative h-0 w-full text-right"><span className="absolute -top-2 right-0">₹{Math.round(chartMax * 0.33).toLocaleString()}</span></div>
+                            <div className="relative h-0 w-full text-right"><span className="absolute -top-2 right-0">₹0</span></div>
+                        </>
+                    )}
                 </div>
 
                 {/* Chart Area (Scrollable) */}
@@ -140,23 +180,45 @@ export function DailyRevenueChart({ chartData, selectedChartDay, setSelectedChar
                     >
                         <div className="flex items-end gap-2 h-full pb-[20px] px-2 min-w-full w-max">
                             {chartData.map((day: any) => {
-                                const value = chartMetric === 'revenue' ? day.revenue : day.profit;
+                                let value;
+                                if (chartMetric === 'margin') {
+                                    value = day.revenue > 0 ? (day.profit / day.revenue) * 100 : 0;
+                                } else {
+                                    value = chartMetric === 'revenue' ? day.revenue : day.profit;
+                                }
+
                                 const displayValue = Math.abs(value);
-                                const barHeight = Math.max((displayValue / chartMax) * 100, 4);
+                                const barHeight = Math.max((displayValue / chartMax) * 100, 8); // Min height increased to 8% for visibility // Min 4% height
                                 const isSelected = selectedChartDay === day.date;
                                 // Width logic: Minimum 32px for 30 days to be touchable
                                 const barWidth = chartData.length > 20 ? '32px' : '40px';
 
                                 // Determine bar color
                                 let barGradient = "bg-muted";
-                                let selectedGradient = "from-purple-600 to-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.4)] ring-2 ring-purple-500/50";
+                                let selectedGradient = "ring-2"; // default
 
                                 if (chartMetric === 'revenue') {
+                                    if (value > 0) barGradient = "bg-gradient-to-t from-blue-600 to-blue-400";
+                                    selectedGradient = "from-blue-600 to-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.4)] ring-2 ring-blue-500/50";
+                                } else if (chartMetric === 'profit') {
                                     if (value > 0) barGradient = "bg-gradient-to-t from-emerald-600 to-emerald-400";
-                                } else {
-                                    if (value > 0) barGradient = "bg-gradient-to-t from-emerald-600 to-emerald-400";
-                                    else if (value < 0) barGradient = "bg-gradient-to-t from-rose-600 to-rose-400";
+                                    else if (value < 0) {
+                                        barGradient = "bg-gradient-to-t from-rose-600 to-rose-400";
+                                        selectedGradient = "from-rose-600 to-rose-400 shadow-[0_0_15px_rgba(244,63,94,0.4)] ring-2 ring-rose-500/50";
+                                    } else { // 0 profit
+                                        selectedGradient = "from-emerald-600 to-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.4)] ring-2 ring-emerald-500/50";
+                                    }
+                                } else if (chartMetric === 'margin') {
+                                    if (value > 0) barGradient = "bg-gradient-to-t from-amber-500 to-amber-300";
+                                    else if (value < 0) {
+                                        barGradient = "bg-gradient-to-t from-rose-600 to-rose-400";
+                                        selectedGradient = "from-rose-600 to-rose-400 shadow-[0_0_15px_rgba(244,63,94,0.4)] ring-2 ring-rose-500/50";
+                                    } else {
+                                        selectedGradient = "from-amber-500 to-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.4)] ring-2 ring-amber-500/50";
+                                    }
                                 }
+
+                                const marginHere = day.revenue > 0 ? ((day.profit / day.revenue) * 100) : 0;
 
                                 return (
                                     <div
@@ -178,8 +240,9 @@ export function DailyRevenueChart({ chartData, selectedChartDay, setSelectedChar
                                                 isSelected && "ring-2 ring-primary ring-offset-2 ring-offset-background"
                                             )}>
                                                 <p className="font-bold text-xs mb-0.5">{day.label}</p>
-                                                <p className="font-medium">Sales: <span className="text-emerald-400">₹{day.revenue.toLocaleString()}</span></p>
-                                                <p className="text-muted-foreground">Profit: <span className={cn(day.profit >= 0 ? "text-emerald-400" : "text-rose-400")}>₹{day.profit.toLocaleString()}</span></p>
+                                                <p className="font-medium">Sales: <span className="text-blue-400">₹{day.revenue.toLocaleString()}</span></p>
+                                                <p className="font-medium">Profit: <span className={cn(day.profit >= 0 ? "text-emerald-400" : "text-rose-400")}>₹{day.profit.toLocaleString()}</span></p>
+                                                <p className="font-medium">Margin: <span className={cn(marginHere >= 0 ? "text-amber-400" : "text-rose-400")}>{marginHere.toFixed(1)}%</span></p>
                                             </div>
                                             <div className="w-2.5 h-2.5 bg-zinc-900 dark:bg-zinc-800 rotate-45 -mt-1 border-r border-b border-white/10"></div>
                                         </div>
@@ -197,9 +260,9 @@ export function DailyRevenueChart({ chartData, selectedChartDay, setSelectedChar
                                             {displayValue > 0 && (
                                                 <div className="absolute -top-6 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
                                                     <span className="inline-block bg-black/80 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-sm">
-                                                        {(displayValue >= 1000) ?
-                                                            `${(displayValue / 1000).toFixed(1)}k` :
-                                                            displayValue
+                                                        {chartMetric === 'margin' ?
+                                                            `${displayValue.toFixed(0)}%` :
+                                                            ((displayValue >= 1000) ? `${(displayValue / 1000).toFixed(1)}k` : displayValue)
                                                         }
                                                     </span>
                                                 </div>

@@ -760,29 +760,30 @@ export default function BusinessInsights() {
                             )}
 
                             {/* Key Metrics */}
+                            {/* Key Metrics */}
                             <div className="grid grid-cols-2 gap-3">
-                                <div className="p-4 rounded-2xl bg-emerald-500 text-white shadow-lg relative overflow-hidden">
+                                <div className="p-4 rounded-2xl bg-blue-500 text-white shadow-lg relative overflow-hidden">
                                     <div className="relative z-10">
-                                        <p className="text-emerald-100 text-[10px] font-bold uppercase tracking-wider mb-1">Total Revenue</p>
+                                        <p className="text-blue-100 text-[10px] font-bold uppercase tracking-wider mb-1">Total Revenue</p>
                                         <p className="text-2xl font-black">₹{summaryStats.totalRevenue.toLocaleString()}</p>
                                         {summaryStats.revenueChange !== 0 && (
-                                            <div className={cn("flex items-center gap-1 mt-1 text-xs font-semibold", summaryStats.revenueChange > 0 ? "text-emerald-200" : "text-red-200")}>
+                                            <div className={cn("flex items-center gap-1 mt-1 text-xs font-semibold", summaryStats.revenueChange > 0 ? "text-blue-200" : "text-rose-200")}>
                                                 {summaryStats.revenueChange > 0 ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
                                                 {Math.abs(summaryStats.revenueChange).toFixed(1)}% vs prev period
                                             </div>
                                         )}
                                     </div>
-                                    <TrendingUp className="absolute right-[-10px] bottom-[-10px] text-emerald-600 opacity-30" size={60} />
+                                    <TrendingUp className="absolute right-[-10px] bottom-[-10px] text-blue-600 opacity-30" size={60} />
                                 </div>
 
-                                <div className={cn("p-4 rounded-2xl text-white shadow-lg relative overflow-hidden", summaryStats.netProfit >= 0 ? "bg-blue-500" : "bg-rose-500")}>
+                                <div className={cn("p-4 rounded-2xl text-white shadow-lg relative overflow-hidden", summaryStats.netProfit >= 0 ? "bg-emerald-500" : "bg-rose-500")}>
                                     <div className="relative z-10">
-                                        <p className="text-blue-100 text-[10px] font-bold uppercase tracking-wider mb-1">Net Profit</p>
+                                        <p className={cn("text-[10px] font-bold uppercase tracking-wider mb-1", summaryStats.netProfit >= 0 ? "text-emerald-100" : "text-rose-100")}>Net Profit</p>
                                         <p className="text-2xl font-black">₹{Math.abs(summaryStats.netProfit).toLocaleString()}</p>
-                                        <p className="text-xs font-semibold text-blue-200 mt-1">{summaryStats.profitMargin.toFixed(1)}% margin</p>
+                                        <p className={cn("text-xs font-semibold mt-1", summaryStats.netProfit >= 0 ? "text-emerald-200" : "text-rose-200")}>{summaryStats.profitMargin.toFixed(1)}% margin</p>
                                     </div>
                                     {summaryStats.netProfit >= 0 ? (
-                                        <TrendingUp className="absolute right-[-10px] bottom-[-10px] text-blue-600 opacity-30" size={60} />
+                                        <TrendingUp className="absolute right-[-10px] bottom-[-10px] text-emerald-600 opacity-30" size={60} />
                                     ) : (
                                         <TrendingDown className="absolute right-[-10px] bottom-[-10px] text-rose-600 opacity-30" size={60} />
                                     )}
@@ -862,29 +863,29 @@ export default function BusinessInsights() {
                             {/* Quick Stats - Readable Grid */}
                             <div className="bg-card rounded-2xl border border-border/60 p-3 shadow-sm">
                                 <div className="grid grid-cols-2 gap-2">
-                                    <div className="p-3 bg-muted/40 rounded-xl flex flex-col items-center justify-center text-center gap-1">
-                                        <span className="text-xs font-semibold text-muted-foreground">Sales</span>
-                                        <span className="text-3xl font-black text-foreground">{summaryStats.transactionCount}</span>
+                                    <div className="p-3 bg-blue-500/10 rounded-xl flex flex-col items-center justify-center text-center gap-1">
+                                        <span className="text-xs font-semibold text-blue-500">No. of Sales</span>
+                                        <span className="text-3xl font-black text-blue-600 dark:text-blue-400">{summaryStats.transactionCount}</span>
                                     </div>
-                                    <div className="p-3 bg-muted/40 rounded-xl flex flex-col items-center justify-center text-center gap-1">
-                                        <span className="text-xs font-semibold text-muted-foreground">Customers</span>
-                                        <span className="text-3xl font-black text-foreground">{summaryStats.uniqueCustomers}</span>
+                                    <div className="p-3 bg-purple-500/10 rounded-xl flex flex-col items-center justify-center text-center gap-1">
+                                        <span className="text-xs font-semibold text-purple-500">Customers</span>
+                                        <span className="text-3xl font-black text-purple-600 dark:text-purple-400">{summaryStats.uniqueCustomers}</span>
                                     </div>
-                                    <div className="p-3 bg-muted/40 rounded-xl flex flex-col items-center justify-center text-center gap-1">
-                                        <span className="text-xs font-semibold text-muted-foreground">Avg Sale/Day</span>
-                                        <span className="text-2xl font-black text-foreground">₹{summaryStats.avgDailySales.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                                    <div className="p-3 bg-amber-500/10 rounded-xl flex flex-col items-center justify-center text-center gap-1">
+                                        <span className="text-xs font-semibold text-amber-500">Avg Sale/Day</span>
+                                        <span className="text-2xl font-black text-amber-600 dark:text-amber-400">₹{summaryStats.avgDailySales.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
                                     </div>
-                                    <div className="p-3 bg-muted/40 rounded-xl flex flex-col items-center justify-center text-center gap-1">
-                                        <span className="text-xs font-semibold text-muted-foreground">Avg Profit/Day</span>
-                                        <span className={cn("text-2xl font-black", summaryStats.avgDailyProfit >= 0 ? "text-emerald-500" : "text-rose-500")}>₹{Math.abs(summaryStats.avgDailyProfit).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-                                    </div>
-                                    <div className="p-3 bg-rose-500/10 rounded-xl flex flex-col items-center justify-center text-center gap-1">
-                                        <span className="text-xs font-semibold text-rose-400">Goods Cost</span>
-                                        <span className="text-lg font-black text-rose-500">₹{summaryStats.totalGoodsCost.toLocaleString()}</span>
+                                    <div className={cn("p-3 rounded-xl flex flex-col items-center justify-center text-center gap-1", summaryStats.avgDailyProfit >= 0 ? "bg-emerald-500/10" : "bg-rose-500/10")}>
+                                        <span className={cn("text-xs font-semibold", summaryStats.avgDailyProfit >= 0 ? "text-emerald-500" : "text-rose-500")}>Avg Profit/Day</span>
+                                        <span className={cn("text-2xl font-black", summaryStats.avgDailyProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>₹{Math.abs(summaryStats.avgDailyProfit).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
                                     </div>
                                     <div className="p-3 bg-rose-500/10 rounded-xl flex flex-col items-center justify-center text-center gap-1">
-                                        <span className="text-xs font-semibold text-rose-400">Other Exp</span>
-                                        <span className="text-lg font-black text-rose-500">₹{summaryStats.otherExpenses.toLocaleString()}</span>
+                                        <span className="text-xs font-semibold text-rose-500">Goods Cost</span>
+                                        <span className="text-lg font-black text-rose-600 dark:text-rose-400">₹{summaryStats.totalGoodsCost.toLocaleString()}</span>
+                                    </div>
+                                    <div className="p-3 bg-rose-500/10 rounded-xl flex flex-col items-center justify-center text-center gap-1">
+                                        <span className="text-xs font-semibold text-rose-500">Other Exp</span>
+                                        <span className="text-lg font-black text-rose-600 dark:text-rose-400">₹{summaryStats.otherExpenses.toLocaleString()}</span>
                                     </div>
                                 </div>
                             </div>

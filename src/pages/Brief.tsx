@@ -372,7 +372,7 @@ export default function Brief() {
                 </div>
             </div>
 
-            <div className="max-w-2xl mx-auto px-4 space-y-6 mt-6">
+            <div className="max-w-2xl mx-auto px-4 space-y-16 mt-8">
 
                 {/* AI Summary Block */}
                 {aiSummary && (
@@ -387,20 +387,24 @@ export default function Brief() {
                 )}
 
                 {/* Yesterday's Stats */}
-                <section className="bg-zinc-900 border border-white/10 rounded-2xl p-4">
-                    <div className="bg-zinc-800/50 rounded-lg px-4 py-3 mb-4 inline-flex items-center gap-2 border border-white/5">
-                        <Calendar size={18} className="text-neutral-400" />
-                        <h2 className="text-sm font-bold text-neutral-300 uppercase tracking-wider">Yesterday's Performance</h2>
+                <section className="bg-zinc-900 border border-white/10 rounded-2xl p-5">
+                    <div className="flex items-center justify-between mb-5">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10">
+                                <Calendar size={20} className="text-neutral-300" />
+                            </div>
+                            <h2 className="text-base font-bold text-white uppercase tracking-wider">Yesterday's Performance</h2>
+                        </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <div className="text-xs text-neutral-400 mb-1">Total Revenue</div>
-                            <div className="text-xl font-bold text-white">₹{yesterdayStats.revenue.toLocaleString()}</div>
+                        <div className="bg-white/5 rounded-xl p-4 border border-white/5">
+                            <div className="text-xs text-neutral-400 mb-1 uppercase tracking-wider">Total Revenue</div>
+                            <div className="text-2xl font-bold text-white">₹{yesterdayStats.revenue.toLocaleString()}</div>
                         </div>
-                        <div>
-                            <div className="text-xs text-neutral-400 mb-1">Net Profit</div>
+                        <div className="bg-white/5 rounded-xl p-4 border border-white/5">
+                            <div className="text-xs text-neutral-400 mb-1 uppercase tracking-wider">Net Profit</div>
                             <div className={cn(
-                                "text-xl font-bold",
+                                "text-2xl font-bold",
                                 yesterdayStats.netProfit >= 0 ? "text-emerald-400" : "text-red-400"
                             )}>
                                 ₹{yesterdayStats.netProfit.toLocaleString()}
@@ -411,10 +415,10 @@ export default function Brief() {
 
                 {/* Tasks Section */}
                 <section>
-                    <div className="flex items-center justify-between mb-3">
-                        <div className="bg-emerald-500/10 rounded-lg px-4 py-3 inline-flex items-center gap-2 border border-emerald-500/20">
-                            <CheckCircle2 size={18} className="text-emerald-400" />
-                            <h2 className="text-sm font-bold text-emerald-300 uppercase tracking-wider">Today's Tasks ({tasks.length})</h2>
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="bg-emerald-500/10 rounded-xl px-4 py-3 inline-flex items-center gap-3 border border-emerald-500/20">
+                            <CheckCircle2 size={20} className="text-emerald-400" />
+                            <h2 className="text-base font-bold text-emerald-300 uppercase tracking-wider">Today's Tasks ({tasks.length})</h2>
                         </div>
                         <button
                             onClick={() => navigate('/insights')}
@@ -462,37 +466,41 @@ export default function Brief() {
 
                 {/* Financial Overview (Collapsible) */}
                 <section>
-                    <button
+                    <div
                         onClick={() => setIsFinancialsOpen(!isFinancialsOpen)}
-                        className="w-full flex flex-col gap-3 bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 transition-all hover:bg-blue-500/20 text-left mb-3"
+                        className="w-full bg-zinc-900 border border-white/10 rounded-2xl p-5 transition-all hover:bg-zinc-800/80 text-left mb-3 cursor-pointer"
+                        role="button"
+                        tabIndex={0}
                     >
-                        <div className="w-full flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <IndianRupee size={18} className="text-blue-400" />
-                                <h2 className="text-sm font-bold text-blue-300 uppercase tracking-wider">Financial Overview</h2>
+                        <div className="w-full flex items-center justify-between mb-5">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10">
+                                    <IndianRupee size={20} className="text-neutral-300" />
+                                </div>
+                                <h2 className="text-base font-bold text-white uppercase tracking-wider">Financial Overview</h2>
                             </div>
                             {isFinancialsOpen ? (
-                                <ChevronUp size={20} className="text-blue-300" />
+                                <ChevronUp size={20} className="text-neutral-500" />
                             ) : (
-                                <div className="flex items-center gap-1 text-blue-300 text-xs font-medium bg-blue-500/20 px-2 py-1 rounded-lg">
+                                <div className="flex items-center gap-1 text-neutral-400 text-xs font-medium bg-white/5 border border-white/5 px-3 py-1.5 rounded-lg">
                                     Tap to View <ChevronDown size={14} />
                                 </div>
                             )}
                         </div>
 
                         {!isFinancialsOpen && (
-                            <div className="w-full grid grid-cols-2 gap-4 pt-1">
-                                <div>
-                                    <span className="text-xs text-blue-200/60 block">To Pay</span>
-                                    <span className="text-sm font-bold text-white">₹{totalToPay.toLocaleString()}</span>
+                            <div className="w-full grid grid-cols-2 gap-4">
+                                <div className="bg-white/5 rounded-xl p-4 border border-white/5">
+                                    <span className="text-xs text-neutral-400 mb-1 block uppercase tracking-wider">To Pay</span>
+                                    <span className="text-2xl font-bold text-white">₹{totalToPay.toLocaleString()}</span>
                                 </div>
-                                <div>
-                                    <span className="text-xs text-blue-200/60 block">To Receive</span>
-                                    <span className="text-sm font-bold text-white">₹{totalToReceive.toLocaleString()}</span>
+                                <div className="bg-white/5 rounded-xl p-4 border border-white/5">
+                                    <span className="text-xs text-neutral-400 mb-1 block uppercase tracking-wider">To Receive</span>
+                                    <span className="text-2xl font-bold text-white">₹{totalToReceive.toLocaleString()}</span>
                                 </div>
                             </div>
                         )}
-                    </button>
+                    </div>
 
                     {isFinancialsOpen && (
                         <div className="grid md:grid-cols-2 gap-4 animate-in slide-in-from-top-2 fade-in duration-200">
@@ -627,10 +635,10 @@ export default function Brief() {
 
                 {/* Goals Section */}
                 <section>
-                    <div className="flex items-center justify-between mb-3">
-                        <div className="bg-purple-500/10 rounded-lg px-4 py-3 inline-flex items-center gap-2 border border-purple-500/20">
-                            <Target size={18} className="text-purple-400" />
-                            <h2 className="text-sm font-bold text-purple-300 uppercase tracking-wider">My Goals ({goals.length})</h2>
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="bg-purple-500/10 rounded-xl px-4 py-3 inline-flex items-center gap-3 border border-purple-500/20">
+                            <Target size={20} className="text-purple-400" />
+                            <h2 className="text-base font-bold text-purple-300 uppercase tracking-wider">My Goals ({goals.length})</h2>
                         </div>
                         <button
                             onClick={() => navigate('/insights/goals')}

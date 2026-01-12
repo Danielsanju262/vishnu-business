@@ -84,7 +84,7 @@ export default function Layout() {
     ];
 
     // List of routes where the bottom nav should be hidden
-    const hiddenNavRoutes = ["/insights/chat", "/sale/new", "/expense/new"];
+    const hiddenNavRoutes = ["/insights/chat", "/sale/new", "/expense/new", "/brief"];
     const isKeyboardOpen = useIsMobileKeyboardOpen();
     const isNavRoute = !hiddenNavRoutes.includes(location.pathname);
     const shouldShowNav = isNavRoute && !isKeyboardOpen;
@@ -97,8 +97,8 @@ export default function Layout() {
 
             {/* Premium Floating Bottom Navigation */}
             {shouldShowNav && (
-                <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-[400px]">
-                    <div className="bg-zinc-900/95 dark:bg-zinc-950/95 backdrop-blur-2xl border border-white/10 shadow-2xl shadow-black/40 rounded-full py-3 px-6 flex justify-around items-center ring-1 ring-white/5">
+                <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-[400px] pointer-events-none">
+                    <div className="bg-zinc-900/95 dark:bg-zinc-950/95 backdrop-blur-2xl border border-white/10 shadow-2xl shadow-black/40 rounded-full py-3 px-6 flex justify-around items-center ring-1 ring-white/5 pointer-events-auto">
                         {navItems.filter(item => {
                             // Check if we are on a "Core" page where we want full navigation
                             const isCorePage = ["/", "/dashboard", "/payment-reminders", "/accounts-payable", "/settings", "/insights"].includes(location.pathname);

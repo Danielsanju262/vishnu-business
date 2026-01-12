@@ -31,6 +31,7 @@ import {
     Check
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { useIsMobileKeyboardOpen } from '../../hooks/useIsMobileKeyboardOpen';
 import { enhancedChatWithAI, executePendingAction, type PendingAction } from '../../lib/enhancedAI';
 import {
     generateMorningBriefing,
@@ -97,6 +98,8 @@ export default function GlobalAIWidget() {
     // Core states
     const [isVisible, setIsVisible] = useState(getWidgetVisibility);
     const [isOpen, setIsOpen] = useState(false);
+    const [openModalCount, setOpenModalCount] = useState(0);
+    const isKeyboardOpen = useIsMobileKeyboardOpen();
 
     // DRAG STATE
     // We use direct DOM manipulation for dragging to ensure 60fps performance on mobile
@@ -164,6 +167,20 @@ export default function GlobalAIWidget() {
         };
     }, []);
 
+    // Listen for modal events to hide widget when modals are open
+    useEffect(() => {
+        const handleModalOpen = () => setOpenModalCount(prev => prev + 1);
+        const handleModalClose = () => setOpenModalCount(prev => Math.max(0, prev - 1));
+
+        window.addEventListener('app-modal-opened', handleModalOpen);
+        window.addEventListener('app-modal-closed', handleModalClose);
+
+        return () => {
+            window.removeEventListener('app-modal-opened', handleModalOpen);
+            window.removeEventListener('app-modal-closed', handleModalClose);
+        };
+    }, []);
+
     const initializeWidget = async () => {
         // Load AI config
         try {
@@ -212,6 +229,9 @@ export default function GlobalAIWidget() {
     // Handle opening widget
     const handleOpen = useCallback(() => {
         if (isDragging) return; // Guard against opening when drag ends (though click logic handles this)
+
+        // Push a history state so back button closes the modal
+        window.history.pushState({ aiChatOpen: true }, '');
         setIsOpen(true);
 
         // Show briefing on first open of the day
@@ -222,10 +242,28 @@ export default function GlobalAIWidget() {
         }
     }, [hasUnreadBriefing, briefing, isDragging]);
 
+    // Handle back button / swipe back
+    useEffect(() => {
+        const handlePopState = (event: PopStateEvent) => {
+            if (isOpen) {
+                // If the modal was open and user hit back, close it locally
+                setIsOpen(false);
+                setShowBriefing(false);
+            }
+        };
+
+        window.addEventListener('popstate', handlePopState);
+        return () => window.removeEventListener('popstate', handlePopState);
+    }, [isOpen]);
+
     // Handle closing widget
     const handleClose = () => {
-        setIsOpen(false);
-        setShowBriefing(false);
+        // Instead of setting state directly, we go back in history.
+        // This triggers the popstate listener above, which closes the modal.
+        // This ensures history stays clean.
+        if (isOpen) {
+            window.history.back();
+        }
     };
 
     // Toggle visibility (hide/show the floating button)
@@ -259,10 +297,20 @@ export default function GlobalAIWidget() {
 
     // Expand to full screen (navigate to insights chat)
     const handleExpand = () => {
-        // We only close the popover but keep the data/state
-        setIsOpen(false);
-        // Navigate to the full chat page
-        navigate('/insights/chat');
+        // We go back to remove the modal state from history, then navigate
+        if (isOpen) {
+            window.history.back();
+            // Small timeout to allow popstate to process before navigating? 
+            // Actually router navigation pushes new state, so order matters.
+            // If we don't wait, race condition might occur?
+            // Safer to just navigate immediately, but accept one dirty history entry?
+            // No, back() is async-ish.
+            setTimeout(() => {
+                navigate('/insights/chat');
+            }, 10);
+        } else {
+            navigate('/insights/chat');
+        }
     };
 
     // ===== FLUID DRAG HANDLING =====
@@ -398,7 +446,7 @@ export default function GlobalAIWidget() {
 
             // Clamp vertical position
             let yPercent = (clientY / screenHeight) * 100;
-            yPercent = Math.max(12, Math.min(88, yPercent));
+            yPercent = Math.max(12, Math.min(80, yPercent)); // 80% max to stay clear of bottom nav/remove zone
 
             // Update state for persistence
             const newPos = { side, yPercent };
@@ -601,8 +649,8 @@ export default function GlobalAIWidget() {
         setShowBriefing(false);
     };
 
-    // Don't render on hidden routes
-    if (shouldHide) return null;
+    // Don't render on hidden routes or if a modal is open
+    if (shouldHide || openModalCount > 0) return null;
 
     // Calculate badge count
     const badgeCount = hasUnreadBriefing ? (briefing?.totalPendingTasks || 1) : 0;
@@ -626,7 +674,7 @@ export default function GlobalAIWidget() {
                 <button
                     ref={buttonRef}
                     className={cn(
-                        "z-[100]",
+                        "z-[9999]",
                         "w-14 h-14 rounded-full",
                         "bg-gradient-to-br from-purple-500 to-purple-700",
                         "shadow-xl shadow-purple-500/30",
@@ -658,16 +706,19 @@ export default function GlobalAIWidget() {
             {/* Chat Popover */}
             {isOpen && (
                 <div
-                    className="fixed inset-0 z-[110] flex items-end justify-center pb-6 pointer-events-auto bg-transparent"
-                    onClick={() => setIsOpen(false)}
+                    className={cn(
+                        "fixed inset-0 z-[210] flex items-start justify-center pointer-events-auto bg-black/60 backdrop-blur-sm transition-all duration-300",
+                        isKeyboardOpen ? "pt-2" : "pt-20"
+                    )}
+                    onClick={handleClose}
                 >
                     <div
                         onClick={(e) => e.stopPropagation()}
                         className={cn(
                             "bg-zinc-900 border border-white/10 shadow-2xl shadow-black/50",
                             "flex flex-col overflow-hidden",
-                            "w-[calc(100%-32px)] max-w-[380px] h-[500px] rounded-2xl",
-                            "animate-in zoom-in-95 slide-in-from-bottom-5 duration-200",
+                            "w-[calc(100%-32px)] max-w-[380px] h-[550px] max-h-[calc(100svh-20px)] rounded-2xl",
+                            "animate-in zoom-in-95 slide-in-from-top-5 duration-200",
                             "pointer-events-auto"
                         )}
                     >
