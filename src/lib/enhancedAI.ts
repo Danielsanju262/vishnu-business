@@ -31,15 +31,14 @@ interface ToolResult {
 // Tool: Get Financial Data for Any Date Range
 async function toolGetFinancialData(startDate: string, endDate: string): Promise<string> {
     try {
-        // Sales data
+        // Sales data - fetch ALL transactions for accurate totals
         const { data: sales } = await supabase
             .from('transactions')
             .select('sell_price, buy_price, quantity, date, products(name), customers(name)')
             .gte('date', startDate)
             .lte('date', endDate)
             .is('deleted_at', null)
-            .order('date', { ascending: false })
-            .limit(50);
+            .order('date', { ascending: false });
 
         const totalRevenue = (sales || []).reduce((sum, t) => sum + (t.sell_price * t.quantity), 0);
         const totalCost = (sales || []).reduce((sum, t) => sum + (t.buy_price * t.quantity), 0);
@@ -197,18 +196,23 @@ async function toolGetGoalProgress(): Promise<string> {
         const waterfallGoals = await calculateWaterfallGoals();
 
         if (waterfallGoals.length === 0) {
-            return 'No active goals set. Would you like to set a new goal?';
+            return 'NO ACTIVE GOALS. The user has not set any goals yet.';
         }
 
-        const goalLines = waterfallGoals.map(g => {
+        const goalLines = waterfallGoals.map((g, index) => {
             const statusEmoji = g.isFullyFunded ? '✅' : g.daysLeft < 3 ? '🔥' : '📈';
-            return `${statusEmoji} ${g.goal.title}
-   - Funds Allocated: ₹${g.allocatedAmount.toLocaleString()} / Target: ₹${g.goal.target_amount.toLocaleString()}
+            const deadlineInfo = g.goal.deadline ? `Deadline: ${g.goal.deadline}` : 'No deadline set';
+            const recurringInfo = g.goal.is_recurring ? ` (Recurring: ${g.goal.recurrence_type})` : '';
+            return `${index + 1}. ${statusEmoji} "${g.goal.title}"${recurringInfo}
+   - Target Amount: ₹${g.goal.target_amount.toLocaleString()}
+   - Funds Allocated from Net Profit: ₹${g.allocatedAmount.toLocaleString()}
    - Remaining Needed: ₹${g.remainingNeeded.toLocaleString()}
+   - ${deadlineInfo} (${g.daysLeft >= 0 ? `${g.daysLeft} days left` : `${Math.abs(g.daysLeft)} days overdue`})
+   - Tracking Since: ${g.goal.start_tracking_date?.split('T')[0] || 'N/A'}
    - Status: ${g.statusMessage}`;
         });
 
-        return `ACTIVE GOALS (Waterfall Priority):\n\n${goalLines.join('\n\n')}`;
+        return `ACTIVE GOALS (${waterfallGoals.length} total, ordered by priority):\n\n${goalLines.join('\n\n')}`;
     } catch (error) {
         console.error('[AI Tool] Goals error:', error);
         return 'Error fetching goals.';
@@ -218,14 +222,24 @@ async function toolGetGoalProgress(): Promise<string> {
 // Tool: Save a Memory/Fact
 async function toolSaveMemory(content: string, bucket: 'preference' | 'fact' | 'context' = 'fact'): Promise<string> {
     try {
+        console.log('[AI Tool] Saving memory:', { bucket, content });
+
+        // Check memory count first
+        const existingMemories = await getActiveMemories();
+        if (existingMemories.length >= 35) {
+            return `❌ Cannot save memory. You've reached the maximum limit of 35 memories.\n\nPlease delete some old memories from Settings > AI Memory before adding new ones.`;
+        }
+
         const memory = await addMemory(bucket, content);
         if (memory) {
-            return `✅ Saved to memory: "${content}"`;
+            console.log('[AI Tool] Memory saved successfully:', memory);
+            return `✅ Saved ${bucket} to memory: "${content}"\n\nThis will be remembered in future conversations. You can view/edit it in Settings > AI Memory.`;
         }
-        return '❌ Failed to save memory.';
+        console.error('[AI Tool] Memory save returned null');
+        return '❌ Failed to save memory. Database operation failed.';
     } catch (error) {
         console.error('[AI Tool] Save memory error:', error);
-        return 'Error saving memory.';
+        return `❌ Error saving memory: ${error instanceof Error ? error.message : 'Unknown error'}`;
     }
 }
 
@@ -277,6 +291,8 @@ async function toolCreateGoal(
     recurrenceType?: 'monthly' | 'weekly' | 'yearly'
 ): Promise<string> {
     try {
+        console.log('[AI Tool] Creating goal:', { title, targetAmount, deadline, metricType, isRecurring, recurrenceType });
+
         const goal = await addGoal({
             title,
             target_amount: targetAmount,
@@ -289,21 +305,23 @@ async function toolCreateGoal(
 
         const recurrenceText = isRecurring ? ` (${recurrenceType})` : '';
         if (goal) {
+            console.log('[AI Tool] Goal created successfully:', goal);
             // Dispatch event to refresh dashboard
             if (typeof window !== 'undefined') {
                 window.dispatchEvent(new Event('goal-updated'));
             }
-            return `✅ Created goal: "${title}" with target ₹${targetAmount.toLocaleString()}${deadline ? ` by ${deadline}` : ''}${recurrenceText}`;
+            return `✅ Goal created successfully!\n- Title: "${title}"\n- Target: ₹${targetAmount.toLocaleString()}\n- Deadline: ${deadline || 'No deadline'}\n- Type: ${metricType}${recurrenceText}\n\nYou can view it at Insights > Goals.`;
         }
-        return '❌ Failed to create goal.';
+        console.error('[AI Tool] Goal creation returned null - check database connection and schema');
+        return '❌ Failed to create goal. The goal data was valid, but the database operation failed. Please check that the user_goals table has all required columns (is_recurring, recurrence_type).';
     } catch (error) {
         console.error('[AI Tool] Create goal error:', error);
-        return 'Error creating goal.';
+        return `❌ Error creating goal: ${error instanceof Error ? error.message : 'Unknown error'}`;
     }
 }
 
 // Tool: Update Goal Progress or Details
-async function toolUpdateGoalProgress(searchTitle: string, updates: { targetAmount?: number; deadline?: string; isRecurring?: boolean; recurrenceType?: 'monthly' | 'weekly' | 'yearly' }): Promise<string> {
+async function toolUpdateGoalProgress(searchTitle: string, updates: { targetAmount?: number; deadline?: string; isRecurring?: boolean; recurrenceType?: 'monthly' | 'weekly' | 'yearly'; currentAmount?: number; addAmount?: number }): Promise<string> {
     try {
         const goals = await getActiveGoals();
         const match = goals.find(g =>
@@ -312,17 +330,45 @@ async function toolUpdateGoalProgress(searchTitle: string, updates: { targetAmou
 
         if (match) {
             const updateData: any = {};
-            if (updates.targetAmount) updateData.target_amount = updates.targetAmount;
-            if (updates.deadline) updateData.deadline = updates.deadline;
-            if (updates.isRecurring !== undefined) updateData.is_recurring = updates.isRecurring;
-            if (updates.recurrenceType) updateData.recurrence_type = updates.recurrenceType;
+            let message = '';
 
-            await updateGoal(match.id, updateData);
-
-            if (typeof window !== 'undefined') {
-                window.dispatchEvent(new Event('goal-updated'));
+            if (updates.targetAmount) {
+                updateData.target_amount = updates.targetAmount;
+                message += ` Target: ₹${updates.targetAmount.toLocaleString()}.`;
             }
-            return `✅ Updated goal "${match.title}"`;
+            if (updates.deadline) {
+                updateData.deadline = updates.deadline;
+                message += ` Deadline: ${updates.deadline}.`;
+            }
+            if (updates.isRecurring !== undefined) {
+                updateData.is_recurring = updates.isRecurring;
+                message += ` Recurring: ${updates.isRecurring}.`;
+            }
+            if (updates.recurrenceType) {
+                updateData.recurrence_type = updates.recurrenceType;
+                message += ` Type: ${updates.recurrenceType}.`;
+            }
+
+            // Handle Progress Updates
+            if (updates.currentAmount !== undefined) {
+                updateData.current_amount = updates.currentAmount;
+                updateData.metric_type = 'manual_check'; // Switch to manual so it sticks
+                message += ` Progress set to: ₹${updates.currentAmount.toLocaleString()}. (Switched to manual tracking)`;
+            } else if (updates.addAmount !== undefined) {
+                updateData.current_amount = (match.current_amount || 0) + updates.addAmount;
+                updateData.metric_type = 'manual_check'; // Switch to manual so it sticks
+                message += ` Added ₹${updates.addAmount.toLocaleString()} to progress. New total: ₹${updateData.current_amount.toLocaleString()}. (Switched to manual tracking)`;
+            }
+
+            if (Object.keys(updateData).length > 0) {
+                await updateGoal(match.id, updateData);
+                if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new Event('goal-updated'));
+                }
+                return `✅ Updated goal "${match.title}":${message}`;
+            } else {
+                return `ℹ️ No changes needed for goal "${match.title}".`;
+            }
         }
         return `❌ No goal found matching "${searchTitle}"`;
     } catch (error) {
@@ -576,7 +622,7 @@ function detectRequiredTools(query: string): string[] {
     }
 
     // Goal update
-    if (lowerQuery.match(/update\s*(my\s*)?goal|change\s*(my\s*)?goal|modify\s*(my\s*)?goal|edit\s*(my\s*)?goal/i)) {
+    if (lowerQuery.match(/update\s*(my\s*)?goal|change\s*(my\s*)?goal|modify\s*(my\s*)?goal|edit\s*(my\s*)?goal|add\s*.*\s*to\s*goal|increase\s*goal/i)) {
         tools.push('update_goal');
     }
 
@@ -609,13 +655,55 @@ interface ChatMessage {
     content: string;
 }
 
-interface AIResponse {
+// Pending action that requires user confirmation
+export interface PendingAction {
+    id: string;
+    type: 'create_goal' | 'save_memory' | 'delete_goal' | 'delete_memory';
+    description: string;
+    data: any;
+}
+
+export interface AIResponse {
     text: string;
     usage: {
         used: number;
         limit: number;
         resetInSeconds: number | null;
     };
+    pendingAction?: PendingAction;
+}
+
+// Execute a confirmed pending action
+export async function executePendingAction(action: PendingAction): Promise<string> {
+    try {
+        switch (action.type) {
+            case 'create_goal': {
+                const { title, targetAmount, deadline, metricType, isRecurring, recurrenceType } = action.data;
+                const result = await toolCreateGoal(title, targetAmount, deadline, metricType, isRecurring, recurrenceType);
+                return result;
+            }
+            case 'save_memory': {
+                const { content, bucket } = action.data;
+                const result = await toolSaveMemory(content, bucket);
+                return result;
+            }
+            case 'delete_goal': {
+                const { searchTitle } = action.data;
+                const result = await toolDeleteGoal(searchTitle);
+                return result;
+            }
+            case 'delete_memory': {
+                const { searchText } = action.data;
+                const result = await toolDeleteMemory(searchText);
+                return result;
+            }
+            default:
+                return '❌ Unknown action type.';
+        }
+    } catch (error) {
+        console.error('[AI] Execute pending action error:', error);
+        return `❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
+    }
 }
 
 export async function enhancedChatWithAI(
@@ -634,8 +722,12 @@ export async function enhancedChatWithAI(
         // 2. Get active goals with Waterfall Context
         const waterfallGoals = await calculateWaterfallGoals();
         const goalsText = waterfallGoals.length > 0
-            ? waterfallGoals.map(g => `- ${g.goal.title}: Needs ₹${g.remainingNeeded.toLocaleString()} more. ${g.statusMessage}`).join('\n')
-            : 'No active goals.';
+            ? waterfallGoals.map((g, i) => {
+                const deadlineInfo = g.goal.deadline ? `by ${g.goal.deadline}` : 'no deadline';
+                const recurringInfo = g.goal.is_recurring ? ` (${g.goal.recurrence_type})` : '';
+                return `${i + 1}. "${g.goal.title}"${recurringInfo}: Target ₹${g.goal.target_amount.toLocaleString()}, Needs ₹${g.remainingNeeded.toLocaleString()} more, ${deadlineInfo}. ${g.statusMessage}`;
+            }).join('\n')
+            : 'NO ACTIVE GOALS currently set.';
 
         // 3. Pre-fetch Current Month Financials for Context (crucial for accurate goal tracking)
         // This ensures the AI always knows the "current state" of business without needing a specific tool call every time
@@ -688,16 +780,31 @@ export async function enhancedChatWithAI(
             });
         }
 
-        // Goal creation tool
+        // Goal creation tool - Now returns pending action for confirmation
+        let pendingAction: PendingAction | undefined;
+
         if (requiredTools.includes('create_goal')) {
             const parsed = parseGoalFromMessage(userMessage);
             if (parsed) {
-                const result = await toolCreateGoal(parsed.title, parsed.target, parsed.deadline, 'net_profit', parsed.isRecurring, parsed.recurrenceType);
+                // Create a pending action instead of executing immediately
+                pendingAction = {
+                    id: `goal-${Date.now()}`,
+                    type: 'create_goal',
+                    description: `Create goal "${parsed.title}" with target ₹${parsed.target.toLocaleString()}${parsed.deadline ? ` by ${parsed.deadline}` : ''}${parsed.isRecurring ? ` (${parsed.recurrenceType})` : ''}`,
+                    data: {
+                        title: parsed.title,
+                        targetAmount: parsed.target,
+                        deadline: parsed.deadline,
+                        metricType: 'net_profit',
+                        isRecurring: parsed.isRecurring,
+                        recurrenceType: parsed.recurrenceType
+                    }
+                };
 
-                // Dispatch event explicitly here as well, just to be safe
-                if (typeof window !== 'undefined') window.dispatchEvent(new Event('goal-updated'));
-
-                toolResults.push({ name: 'Goal Creation', result });
+                toolResults.push({
+                    name: 'Goal Creation (Pending Confirmation)',
+                    result: `I understood you want to create a goal:\n\n📌 **${parsed.title}**\n💰 Target: ₹${parsed.target.toLocaleString()}\n📅 Deadline: ${parsed.deadline || 'None'}\n🔁 Recurring: ${parsed.isRecurring ? parsed.recurrenceType : 'No'}\n\n⚠️ This action requires your confirmation.`
+                });
             } else {
                 toolResults.push({
                     name: 'Goal Creation Failed',
@@ -708,37 +815,113 @@ export async function enhancedChatWithAI(
 
         // Goal completion tool
         if (requiredTools.includes('complete_goal')) {
-            // Extract goal name from message
-            const goalMatch = userMessage.match(/(?:complete|mark|finish).*?(?:goal|target)?\s*[:\-]?\s*[\"']?([^\"']+)[\"']?/i);
-            if (goalMatch) {
-                const result = await toolCompleteGoal(goalMatch[1].trim());
+            // Extract goal name from message - improved patterns
+            let goalName = '';
+
+            // Try multiple patterns
+            const patterns = [
+                /(?:complete|mark|finish)\s+(?:my\s+)?(?:the\s+)?(.+?)\s+(?:goal|as complete)/i,
+                /(?:complete|mark|finish)\s+goal\s*[:\-]?\s*(.+?)(?:\.|$)/i,
+                /(?:complete|mark|finish)\s+(.+?)(?:\s+goal)?$/i
+            ];
+
+            for (const pattern of patterns) {
+                const match = userMessage.match(pattern);
+                if (match && match[1]) {
+                    goalName = match[1].trim();
+                    break;
+                }
+            }
+
+            if (goalName) {
+                const result = await toolCompleteGoal(goalName);
                 toolResults.push({ name: 'Goal Completion', result });
+
+                // Refresh goals list
+                if (typeof window !== 'undefined') window.dispatchEvent(new Event('goal-updated'));
             }
         }
 
         // Goal deletion tool
         if (requiredTools.includes('delete_goal')) {
-            const goalMatch = userMessage.match(/(?:delete|remove|cancel).*?goal\s*[:\-]?\s*[\"']?([^\"']+)[\"']?/i);
-            if (goalMatch) {
-                const result = await toolDeleteGoal(goalMatch[1].trim());
+            let goalName = '';
+
+            // Try multiple patterns
+            const patterns = [
+                /(?:delete|remove|cancel)\s+(?:my\s+)?(?:the\s+)?(.+?)\s+goal/i,
+                /(?:delete|remove|cancel)\s+goal\s*[:\-]?\s*(.+?)(?:\.|$)/i,
+                /(?:delete|remove|cancel)\s+(.+?)(?:\s+goal)?$/i
+            ];
+
+            for (const pattern of patterns) {
+                const match = userMessage.match(pattern);
+                if (match && match[1]) {
+                    goalName = match[1].trim();
+                    break;
+                }
+            }
+
+            if (goalName) {
+                const result = await toolDeleteGoal(goalName);
                 toolResults.push({ name: 'Goal Deletion', result });
+
+                // Refresh goals list
+                if (typeof window !== 'undefined') window.dispatchEvent(new Event('goal-updated'));
             }
         }
 
         // Goal update tool
         if (requiredTools.includes('update_goal')) {
-            const updateMatch = userMessage.match(/(?:update|change|modify|edit).*?goal\s*[:\-]?\s*[\"']?([^\"']+)[\"']?/i);
-            if (updateMatch) {
-                const updates: { targetAmount?: number; deadline?: string; isRecurring?: boolean; recurrenceType?: 'monthly' | 'weekly' | 'yearly' } = {};
+            let goalName = '';
 
-                // Parse amount update if present (simple heuristic)
+            // Try patterns for goal name
+            const patterns = [
+                /(?:update|change|modify|edit|add\s+to|increase)\s+(?:my\s+)?(?:the\s+)?(.+?)\s+goal/i,
+                /(?:goal\s+of|goal\s+for)\s+(.+?)(?:\s+target|\s+amount|\s*$)/i,
+                /(?:update|change)\s+(.+?)(?:\s+goal)?$/i
+            ];
+
+            for (const pattern of patterns) {
+                const match = userMessage.match(pattern);
+                if (match && match[1]) {
+                    goalName = match[1].trim();
+                    break;
+                }
+            }
+
+            // If still no goal name, try "Add 500 to savings" -> "savings"
+            if (!goalName) {
+                const simpleMatch = userMessage.match(/to\s+(?:my\s+)?(.+?)(?:\s+goal|\s*$)/i);
+                if (simpleMatch) goalName = simpleMatch[1].trim();
+            }
+
+            if (goalName) {
+                const updates: { targetAmount?: number; deadline?: string; isRecurring?: boolean; recurrenceType?: 'monthly' | 'weekly' | 'yearly'; currentAmount?: number; addAmount?: number } = {};
+
+                // Parse amount update if present
                 const amountMatch = userMessage.match(/(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:k|K|lakh|L)?/);
                 if (amountMatch) {
                     let amount = parseFloat(amountMatch[1].replace(/,/g, ''));
                     if (userMessage.toLowerCase().includes('k')) amount *= 1000;
                     if (userMessage.toLowerCase().includes('lakh')) amount *= 100000;
-                    // Only apply if it seems reasonable (e.g. > 100) and user likely meant new target
-                    if (amount > 100) updates.targetAmount = amount;
+
+                    const lower = userMessage.toLowerCase();
+
+                    // Determine what this amount is for
+                    if (lower.includes('target') || lower.includes('total') || lower.includes('goal amount')) {
+                        updates.targetAmount = amount;
+                    } else if (lower.includes('add') || lower.includes('increase') || lower.includes('plus') || lower.includes('saved') || lower.includes('deposit')) {
+                        // "Add 500", "Saved 500"
+                        updates.addAmount = amount;
+                    } else if (lower.includes('progress') || lower.includes('current') || lower.includes('reached') || lower.includes('set to') || lower.includes('now at')) {
+                        // "Progress is 500", "Reached 5000"
+                        updates.currentAmount = amount;
+                    } else {
+                        // Fallback: If amount is large (>100) and no other context, assume target. 
+                        // If it's small, maybe it's an addition? Hard to say. 
+                        // Let's assume target update for now to be safe, unless it says "add".
+                        if (amount > 100) updates.targetAmount = amount;
+                    }
                 }
 
                 // Check for recurrence updates
@@ -753,13 +936,13 @@ export async function enhancedChatWithAI(
                     updates.isRecurring = false;
                 }
 
-                const result = await toolUpdateGoalProgress(updateMatch[1].trim(), updates);
+                const result = await toolUpdateGoalProgress(goalName, updates);
                 toolResults.push({ name: 'Goal Update', result });
             }
         }
 
-        // Memory save tool
-        if (requiredTools.includes('save_memory')) {
+        // Memory save tool - Now returns pending action for confirmation
+        if (requiredTools.includes('save_memory') && !pendingAction) {
             // Extract what to remember
             let content = userMessage
                 .replace(/remember\s*(that)?:?\s*/i, '')
@@ -776,8 +959,18 @@ export async function enhancedChatWithAI(
             }
 
             if (content.length > 5) {
-                const result = await toolSaveMemory(content, bucket);
-                toolResults.push({ name: 'Memory Saved', result });
+                // Create pending action instead of executing immediately
+                pendingAction = {
+                    id: `memory-${Date.now()}`,
+                    type: 'save_memory',
+                    description: `Save ${bucket}: "${content}"`,
+                    data: { content, bucket }
+                };
+
+                toolResults.push({
+                    name: 'Memory Save (Pending Confirmation)',
+                    result: `I understood you want me to remember:\n\n📝 **Type:** ${bucket}\n💬 **Content:** "${content}"\n\n⚠️ This action requires your confirmation.`
+                });
             }
         }
 
@@ -816,6 +1009,9 @@ export async function enhancedChatWithAI(
         const systemPrompt = `You are ${botName}, an intelligent and caring personal business assistant.
 ${userName ? `Your owner's name is ${userName}. Address them warmly.` : ''}
 
+⚠️ **CRITICAL: DO NOT HALLUCINATE** ⚠️
+You are FORBIDDEN from making up numbers or data. Every financial figure you mention MUST come from the LIVE DATA sections below. If you don't have data, say "I don't have that information" - NEVER guess or invent numbers.
+
 YOUR PERSONALITY:
 - You are supportive, motivating, and proactive
 - You celebrate wins and encourage during challenges
@@ -823,7 +1019,7 @@ YOUR PERSONALITY:
 - Use emojis sparingly but effectively
 - Be direct and actionable, not verbose
 
-WHAT YOU KNOW ABOUT THE USER:
+WHAT YOU KNOW ABOUT THE USER (from saved memories):
 ${memoriesText}
 
 ACTIVE GOALS BEING TRACKED:
@@ -834,22 +1030,30 @@ ${currentMonthContext}
 
 ${toolContext}
 
-IMPORTANT INSTRUCTIONS:
-1. If asked about data (sales, profits, etc.), use the LIVE DATA above
-2. If no data is available for a specific time period, say so honestly
-3. For goals like EMI payments, calculate: Current Progress vs Target, Days Remaining, and give motivational advice
-4. Always confirm before assuming something new about the user
-5. When the user shares personal info (name, preferences, EMIs), acknowledge and remember it
-6. Be proactive: If you notice a concerning trend in the data, mention it
-7. Use the Indian Rupee format (₹) for all amounts
-8. When user asks to create, update, or delete goals/memories, the action has been executed - just confirm and explain
-9. Waterfall Goal Logic: YOU MUST FOLLOW THIS. The 'ACTIVE GOALS' list above shows exactly how much is needed for each goal based on priority.
-   - Use the calculated "Daily Run Rate" to motivate the user (e.g., "You need ₹2k/day for the next 3 days").
-   - If a goal is fully funded in the waterfall, celebrate it! "You have already saved enough for X, now let's focus on Y."
-   - Recurring Goals: If a recurring goal (like EMI) is fully funded and there is still money left (surplus), ASK the user: "You've finished this month's EMI! Do you want to start allocating this surplus to NEXT month's EMI now?"
-   - Persistent Tracking: UNTIL the user explicitly says "I have completed this goal" or marks it done, YOU MUST keep reminding them.
-   - Every Interaction: If there are active goals, always check their status. If the user opens the chat, ask: "How is progress on [Goal Name]? Any updates to add?"
-10. MEMORY: You do not rely on old chat logs. If the user tells you a new fact (name, specific preference, new goal context), USE the 'save_memory' tool immediately.`;
+CRITICAL RULES:
+1. **NEVER INVENT DATA**. Only use numbers from "LIVE DATA" sections. If unsure, say "I don't have that data."
+
+2. Financial queries: Quote exact figures from LIVE DATA. Example: "NET PROFIT this month: ₹X (from data above)"
+
+3. **Goal Creation**: When user wants a goal, ASK questions first:
+   • "Goal name?"
+   • "Target amount?"  
+   • "Deadline? (optional)"
+   • "Recurring? (optional)"
+   Then create with their input.
+
+4. **Goal Management**: Confirm before: updating, completing, deleting goals.
+
+5. **Memories**: 
+   • Max 30 - inform if at limit
+   • Ask "Remember this?" before saving
+   • Only mention facts from "WHAT YOU KNOW" section
+
+6. **Completed Goals**: Don't mention unless asked. Focus on active goals only.
+
+7. When asked "what are my goals" or "what do you know": Read EXACTLY from sections above.
+
+8. Use ₹ for amounts. Be motivating and supportive.`;
 
         // 6. Build messages array
         const messages = [
@@ -857,6 +1061,10 @@ IMPORTANT INSTRUCTIONS:
             ...history.map(msg => ({ role: msg.role, content: msg.content })),
             { role: 'user', content: userMessage }
         ];
+
+        // Log prompt length for debugging
+        const totalPromptLength = systemPrompt.length + history.reduce((sum, msg) => sum + msg.content.length, 0) + userMessage.length;
+        console.log(`[AI] Total prompt length: ~${totalPromptLength} characters`);
 
         // 7. Call Mistral API
         const response = await fetch(MISTRAL_API_URL, {
@@ -874,9 +1082,12 @@ IMPORTANT INSTRUCTIONS:
         });
 
         if (!response.ok) {
-            console.warn('[Mistral] API error:', response.status);
+            const errorBody = await response.text().catch(() => 'No error details');
+            console.warn('[Mistral] API error:', response.status, errorBody);
+
             if (response.status === 401) return { text: "Invalid API Key. Please check settings.", usage: { used: 0, limit: 0, resetInSeconds: null } };
             if (response.status === 429) return { text: "Rate limit exceeded. Please try again later.", usage: { used: 0, limit: 0, resetInSeconds: null } };
+            if (response.status === 503) return { text: "The AI service is temporarily unavailable or the request is too complex. Please try a shorter question or try again in a moment.", usage: { used: 0, limit: 0, resetInSeconds: null } };
             return { text: `AI Error (${response.status}). Please try again.`, usage: { used: 0, limit: 0, resetInSeconds: null } };
         }
 
@@ -884,18 +1095,14 @@ IMPORTANT INSTRUCTIONS:
         const text = data.choices?.[0]?.message?.content || "I couldn't process that.";
         const usedTokens = data.usage?.total_tokens || 0;
 
-        // 8. Check if AI wants to save memory (post-processing)
-        if (requiredTools.includes('save_memory') && text.includes('remember') && text.includes('✅')) {
-            // Memory was saved during tool execution
-        }
-
         return {
             text,
             usage: {
                 used: usedTokens,
                 limit: 1000000,
                 resetInSeconds: null
-            }
+            },
+            pendingAction
         };
 
     } catch (error) {

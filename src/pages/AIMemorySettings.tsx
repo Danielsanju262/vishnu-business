@@ -417,16 +417,18 @@ export default function AIMemorySettings() {
                                         </div>
                                         <p className="text-sm text-white">{memory.content}</p>
                                     </div>
-                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <div className="flex items-center gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                                         <button
                                             onClick={() => handleOpenEdit(memory)}
                                             className="p-2 rounded-lg hover:bg-white/10 text-neutral-400 hover:text-white transition-colors"
+                                            aria-label="Edit memory"
                                         >
                                             <Edit3 size={14} />
                                         </button>
                                         <button
                                             onClick={() => handleDeleteMemory(memory.id)}
                                             className="p-2 rounded-lg hover:bg-red-500/20 text-neutral-400 hover:text-red-400 transition-colors"
+                                            aria-label="Delete memory"
                                         >
                                             <Trash2 size={14} />
                                         </button>

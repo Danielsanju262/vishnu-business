@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../lib/supabase";
-import { Plus, Minus, TrendingUp, Users, Package, FileText, ChevronRight, Edit3, Check, LogOut, Truck, Calendar, ChevronDown } from "lucide-react";
+import { Plus, Minus, TrendingUp, Users, Package, FileText, ChevronRight, Edit3, Check, LogOut, Truck, Calendar, ChevronDown, Sparkles } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 import { Link } from "react-router-dom";
@@ -240,6 +240,30 @@ export default function Dashboard() {
 
 
             </div>
+
+            {/* Daily Brief Card */}
+            <Link
+                to="/brief"
+                className="relative overflow-hidden block mb-2 p-5 bg-gradient-to-r from-violet-600 to-indigo-600 rounded-2xl shadow-lg shadow-indigo-900/20 group active:scale-[0.98] transition-transform"
+            >
+                <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-white/10 rounded-full blur-2xl" />
+
+                <div className="flex items-center justify-between relative z-10">
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-sm border border-white/20">
+                            <Sparkles className="text-white" size={24} strokeWidth={2} />
+                        </div>
+                        <div>
+                            <h3 className="text-white font-bold text-lg tracking-tight">Daily Brief</h3>
+                            <p className="text-indigo-100 text-xs font-medium opacity-90">Overview of tasks, payments & goals</p>
+                        </div>
+                    </div>
+                    <div className="bg-white/20 p-2 rounded-full backdrop-blur-sm group-hover:bg-white/30 transition-colors">
+                        <ChevronRight className="text-white" size={20} strokeWidth={2.5} />
+                    </div>
+                </div>
+            </Link>
 
 
             {/* Date Filter and Stats Card - Grouped with tighter spacing */}

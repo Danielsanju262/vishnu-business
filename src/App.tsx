@@ -9,6 +9,7 @@ const InsightsChat = React.lazy(() => import("./pages/InsightsChat"));
 const BusinessInsights = React.lazy(() => import("./pages/BusinessInsights"));
 const GoalsDashboard = React.lazy(() => import("./pages/GoalsDashboard"));
 const AIMemorySettings = React.lazy(() => import("./pages/AIMemorySettings"));
+const Brief = React.lazy(() => import("./pages/Brief"));
 import Customers from "./pages/Customers";
 import Products from "./pages/Products";
 import Dashboard from "./pages/Dashboard";
@@ -146,6 +147,11 @@ function AppContent() {
           <Route path="settings/ai-memory" element={
             <Suspense fallback={<div className="p-10 text-center">Loading AI Settings...</div>}>
               <AIMemorySettings />
+            </Suspense>
+          } />
+          <Route path="brief" element={
+            <Suspense fallback={<div className="p-10 text-center">Loading Brief...</div>}>
+              <Brief />
             </Suspense>
           } />
           <Route path="sale/new" element={<NewSale />} />

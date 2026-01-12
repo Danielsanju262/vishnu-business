@@ -23,7 +23,6 @@ import {
     BarChart3,
     ShoppingCart,
     FileText,
-    ChevronRight,
     Trophy,
     Flame
 } from 'lucide-react';
@@ -66,6 +65,9 @@ export default function GoalsDashboard() {
     const [showAddModal, setShowAddModal] = useState(false);
     const [editingGoal, setEditingGoal] = useState<UserGoal | null>(null);
     const [confirmComplete, setConfirmComplete] = useState<string | null>(null);
+    const [showProgressModal, setShowProgressModal] = useState(false);
+    const [updatingGoal, setUpdatingGoal] = useState<UserGoal | null>(null);
+    const [newProgressAmount, setNewProgressAmount] = useState('');
 
     // Form state
     const [formTitle, setFormTitle] = useState('');
@@ -166,7 +168,14 @@ export default function GoalsDashboard() {
                 toast('Goal updated! 🎯', 'success');
             } else {
                 // Create new
-                await addGoal({
+                console.log('[Goals] Creating goal:', {
+                    title: formTitle.trim(),
+                    target_amount: parseFloat(formTargetAmount),
+                    metric_type: formMetricType,
+                    is_recurring: formIsRecurring
+                });
+
+                const newGoal = await addGoal({
                     title: formTitle.trim(),
                     description: formDescription.trim() || undefined,
                     target_amount: parseFloat(formTargetAmount),
@@ -176,6 +185,14 @@ export default function GoalsDashboard() {
                     is_recurring: formIsRecurring,
                     recurrence_type: formIsRecurring ? formRecurrenceType : undefined
                 });
+
+                if (!newGoal) {
+                    console.error('[Goals] Goal creation returned null - database insert failed');
+                    toast('Failed to create goal. Please check database connection.', 'error');
+                    return;
+                }
+
+                console.log('[Goals] Goal created successfully:', newGoal);
                 toast('Goal created! Let\'s do this! 🚀', 'success');
             }
 
@@ -184,7 +201,41 @@ export default function GoalsDashboard() {
             loadGoals();
         } catch (error) {
             console.error('Error saving goal:', error);
-            toast('Failed to save goal', 'error');
+            toast(`Failed to save goal: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+        }
+    };
+
+    const handleOpenUpdateProgress = (goal: UserGoal) => {
+        setUpdatingGoal(goal);
+        setNewProgressAmount(goal.current_amount.toString());
+        setShowProgressModal(true);
+    };
+
+    const handleSaveProgress = async () => {
+        if (!updatingGoal) return;
+
+        const amount = parseFloat(newProgressAmount);
+        if (isNaN(amount)) return;
+
+        try {
+            await updateGoal(updatingGoal.id, {
+                current_amount: amount,
+                // Force switch to manual tracking so auto-sync doesn't overwrite it
+                metric_type: 'manual_check'
+            });
+            toast('Progress updated successfully. Goal switched to Manual tracking.', 'success');
+
+            // Wait a small moment before reloading to ensure DB transaction clears
+            setTimeout(() => {
+                loadGoals();
+            }, 500);
+
+            setShowProgressModal(false);
+            setUpdatingGoal(null);
+            setNewProgressAmount('');
+        } catch (error) {
+            console.error('Error updating progress:', error);
+            toast('Failed to update progress', 'error');
         }
     };
 
@@ -214,6 +265,11 @@ export default function GoalsDashboard() {
     // Separate goals by status
     const activeGoals = goals.filter(g => g.status === 'active');
     const completedGoals = goals.filter(g => g.status === 'completed');
+
+    // Debug logging
+    console.log('[GoalsDashboard] Total goals in state:', goals.length);
+    console.log('[GoalsDashboard] Active goals:', activeGoals.length);
+    console.log('[GoalsDashboard] All goals:', goals.map(g => ({ id: g.id, title: g.title, status: g.status })));
 
     return (
         <div className="min-h-screen bg-background p-3 md:p-4 pb-6 animate-in fade-in w-full md:max-w-2xl md:mx-auto">
@@ -392,16 +448,30 @@ export default function GoalsDashboard() {
                                             )}
                                         </div>
 
-                                        {progress >= 100 || goal.metric_type === 'manual_check' ? (
+                                        <div className="flex items-center gap-2">
+                                            {/* Update Progress Button */}
                                             <Button
                                                 size="sm"
-                                                onClick={() => setConfirmComplete(goal.id)}
-                                                className="bg-emerald-600 hover:bg-emerald-500 h-8 px-3 text-xs"
+                                                variant="outline"
+                                                onClick={() => handleOpenUpdateProgress(goal)}
+                                                className="bg-zinc-800 border-white/10 hover:bg-zinc-700 h-8 px-3 text-xs text-white"
                                             >
-                                                <CheckCircle2 size={14} className="mr-1" />
-                                                Mark Complete
+                                                <Edit3 size={12} className="mr-1" />
+                                                Update
                                             </Button>
-                                        ) : null}
+
+                                            {/* Mark Complete Button */}
+                                            {progress >= 100 || goal.metric_type === 'manual_check' ? (
+                                                <Button
+                                                    size="sm"
+                                                    onClick={() => setConfirmComplete(goal.id)}
+                                                    className="bg-emerald-600 hover:bg-emerald-500 h-8 px-3 text-xs"
+                                                >
+                                                    <CheckCircle2 size={14} className="mr-1" />
+                                                    Mark Complete
+                                                </Button>
+                                            ) : null}
+                                        </div>
                                     </div>
 
                                     {/* Motivation Message */}
@@ -458,7 +528,13 @@ export default function GoalsDashboard() {
                                         </p>
                                     </div>
                                 </div>
-                                <ChevronRight size={16} className="text-neutral-600" />
+                                <button
+                                    onClick={() => handleDeleteGoal(goal.id)}
+                                    className="p-2 rounded-lg hover:bg-red-500/20 text-neutral-500 hover:text-red-400 transition-colors"
+                                    aria-label="Delete completed goal"
+                                >
+                                    <Trash2 size={14} />
+                                </button>
                             </div>
                         ))}
                     </div>
@@ -632,6 +708,50 @@ export default function GoalsDashboard() {
                             className="flex-1 bg-emerald-600 hover:bg-emerald-500"
                         >
                             Yes, I Did It! 🎉
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
+
+            {/* Update Progress Modal */}
+            <Modal
+                isOpen={showProgressModal}
+                onClose={() => setShowProgressModal(false)}
+                title="Update Progress"
+            >
+                <div className="space-y-4">
+                    <div>
+                        <label className="text-xs text-neutral-400 mb-1.5 block">Current Progress Amount (₹)</label>
+                        <Input
+                            type="number"
+                            value={newProgressAmount}
+                            onChange={(e) => setNewProgressAmount(e.target.value)}
+                            placeholder="e.g. 5000"
+                            className="bg-zinc-800 border-white/10"
+                        />
+                        <p className="text-[10px] text-neutral-500 mt-1.5">
+                            Enter the total amount accumulated so far.
+                            {updatingGoal?.metric_type === 'net_profit' && (
+                                <span className="text-amber-500 block mt-1">
+                                    Note: This goal tracks Net Profit automatically. Updating this manually may be overwritten by the next auto-sync unless you change the metric type.
+                                </span>
+                            )}
+                        </p>
+                    </div>
+
+                    <div className="flex gap-3 pt-2">
+                        <Button
+                            variant="outline"
+                            onClick={() => setShowProgressModal(false)}
+                            className="flex-1 border-white/20 hover:bg-white/10"
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={handleSaveProgress}
+                            className="flex-1 bg-purple-600 hover:bg-purple-500"
+                        >
+                            Update
                         </Button>
                     </div>
                 </div>

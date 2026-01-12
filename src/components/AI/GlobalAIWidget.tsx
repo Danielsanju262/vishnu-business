@@ -27,10 +27,11 @@ import {
     AlertCircle,
     CheckCircle2,
     Loader2,
-    EyeOff
+    EyeOff,
+    Check
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { enhancedChatWithAI } from '../../lib/enhancedAI';
+import { enhancedChatWithAI, executePendingAction, type PendingAction } from '../../lib/enhancedAI';
 import {
     generateMorningBriefing,
     hasReadTodaysBriefing,
@@ -130,6 +131,9 @@ export default function GlobalAIWidget() {
     const [hasUnreadBriefing, setHasUnreadBriefing] = useState(false);
     const [briefing, setBriefing] = useState<MorningBriefing | null>(null);
     const [showBriefing, setShowBriefing] = useState(false);
+
+    // Pending action awaiting user confirmation
+    const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
 
     // Refs
     const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -524,6 +528,11 @@ export default function GlobalAIWidget() {
             if (sessionId) {
                 await addChatMessage(sessionId, 'assistant', response.text);
             }
+
+            // If there's a pending action, store it for user confirmation
+            if (response.pendingAction) {
+                setPendingAction(response.pendingAction);
+            }
         } catch (error) {
             const errorMsg: ChatMessage = {
                 id: `error-${Date.now()}`,
@@ -535,6 +544,52 @@ export default function GlobalAIWidget() {
         } finally {
             setIsLoading(false);
         }
+    };
+
+    // Handle confirming a pending action
+    const handleConfirmAction = async () => {
+        if (!pendingAction) return;
+
+        setIsLoading(true);
+        try {
+            const result = await executePendingAction(pendingAction);
+
+            const confirmMsg: ChatMessage = {
+                id: `confirm-${Date.now()}`,
+                role: 'assistant',
+                content: result,
+                timestamp: new Date()
+            };
+            setMessages(prev => [...prev, confirmMsg]);
+
+            // Save to database
+            if (sessionId) {
+                await addChatMessage(sessionId, 'assistant', result);
+            }
+        } catch (error) {
+            const errorMsg: ChatMessage = {
+                id: `error-${Date.now()}`,
+                role: 'assistant',
+                content: `❌ Failed to execute action: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                timestamp: new Date()
+            };
+            setMessages(prev => [...prev, errorMsg]);
+        } finally {
+            setPendingAction(null);
+            setIsLoading(false);
+        }
+    };
+
+    // Handle declining a pending action
+    const handleDeclineAction = () => {
+        const declineMsg: ChatMessage = {
+            id: `decline-${Date.now()}`,
+            role: 'assistant',
+            content: '✋ Got it! I won\'t make that change. Let me know if you need anything else.',
+            timestamp: new Date()
+        };
+        setMessages(prev => [...prev, declineMsg]);
+        setPendingAction(null);
     };
 
     // Clear chat
@@ -867,6 +922,35 @@ export default function GlobalAIWidget() {
                                         <div className="flex items-center gap-1.5">
                                             <Loader2 size={14} className="animate-spin text-purple-400" />
                                             <span className="text-xs text-white/50">Thinking...</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Pending Action Confirmation */}
+                            {pendingAction && !isLoading && (
+                                <div className="flex justify-start">
+                                    <div className="p-3 bg-gradient-to-br from-purple-500/10 to-blue-500/10 border border-purple-500/30 rounded-2xl rounded-bl-md max-w-[95%]">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <AlertCircle size={14} className="text-purple-400" />
+                                            <span className="text-xs font-semibold text-purple-300">Confirm Action</span>
+                                        </div>
+                                        <p className="text-sm text-white mb-3">{pendingAction.description}</p>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={handleConfirmAction}
+                                                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-purple-600 hover:bg-purple-500 rounded-lg text-white text-xs font-medium transition-colors"
+                                            >
+                                                <Check size={14} />
+                                                Confirm
+                                            </button>
+                                            <button
+                                                onClick={handleDeclineAction}
+                                                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 rounded-lg text-white text-xs font-medium transition-colors"
+                                            >
+                                                <X size={14} />
+                                                Decline
+                                            </button>
                                         </div>
                                     </div>
                                 </div>

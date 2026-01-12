@@ -34,7 +34,6 @@ export async function getActiveMemories(): Promise<AIMemory[]> {
     const { data, error } = await supabase
         .from('ai_memories')
         .select('*')
-        .select('*')
         .eq('is_active', true)
         .order('created_at', { ascending: false });
 
@@ -47,6 +46,13 @@ export async function getActiveMemories(): Promise<AIMemory[]> {
 }
 
 export async function addMemory(bucket: 'preference' | 'fact' | 'context', content: string): Promise<AIMemory | null> {
+    // Check if we've hit the 30-memory limit
+    const existingMemories = await getActiveMemories();
+    if (existingMemories.length >= 30) {
+        console.error('[AI Memory] Cannot add memory: limit of 30 reached');
+        return null;
+    }
+
     const { data, error } = await supabase
         .from('ai_memories')
         .insert({ bucket, content, is_active: true })
@@ -105,6 +111,8 @@ export async function getActiveGoals(): Promise<UserGoal[]> {
 }
 
 export async function getAllGoals(): Promise<UserGoal[]> {
+    console.log('[AI Goals] Fetching all goals...');
+
     const { data, error } = await supabase
         .from('user_goals')
         .select('*')
@@ -112,28 +120,56 @@ export async function getAllGoals(): Promise<UserGoal[]> {
 
     if (error) {
         console.error('[AI Goals] Error fetching all goals:', error);
+        console.error('[AI Goals] Error details:', JSON.stringify(error, null, 2));
         return [];
     }
 
+    console.log('[AI Goals] Fetched goals:', data?.length || 0, 'goals');
+    console.log('[AI Goals] Goals data:', data);
     return data || [];
 }
 
 export async function addGoal(goal: Omit<UserGoal, 'id' | 'created_at' | 'status' | 'current_amount'>): Promise<UserGoal | null> {
+    // Build insert object, only including core fields that exist in all DB versions
+    const insertData: any = {
+        title: goal.title,
+        target_amount: goal.target_amount,
+        metric_type: goal.metric_type,
+        start_tracking_date: goal.start_tracking_date,
+        current_amount: 0,
+        status: 'active'
+    };
+
+    // Only include truly optional fields if they have values
+    if (goal.description) {
+        insertData.description = goal.description;
+    }
+    if (goal.deadline) {
+        insertData.deadline = goal.deadline;
+    }
+    if (goal.metadata) {
+        insertData.metadata = goal.metadata;
+    }
+
+    // NOTE: is_recurring and recurrence_type are intentionally NOT included
+    // to maintain compatibility with existing database schemas that don't have these columns.
+    // After running the migration, these can be added back.
+
+    console.log('[AI Goals] Inserting goal:', insertData);
+
     const { data, error } = await supabase
         .from('user_goals')
-        .insert({
-            ...goal,
-            current_amount: 0,
-            status: 'active'
-        })
+        .insert(insertData)
         .select()
         .single();
 
     if (error) {
         console.error('[AI Goals] Error adding goal:', error);
+        console.error('[AI Goals] Error details:', JSON.stringify(error, null, 2));
         return null;
     }
 
+    console.log('[AI Goals] Goal inserted successfully:', data);
     return data;
 }
 
@@ -361,10 +397,13 @@ export async function updateGoalProgress(goalId: string): Promise<UserGoal | nul
 
     if (!goal) return null;
 
-    let currentAmount = 0;
+    // Use existing amount as default, in case we don't recalculate (e.g. manual_check)
+    let currentAmount = goal.current_amount;
+    let shouldUpdate = false;
 
     if (goal.metric_type === 'net_profit') {
         currentAmount = await calculateNetProfitSince(goal.start_tracking_date.split('T')[0]);
+        shouldUpdate = true;
     } else if (goal.metric_type === 'revenue') {
         const { data: sales } = await supabase
             .from('transactions')
@@ -372,6 +411,7 @@ export async function updateGoalProgress(goalId: string): Promise<UserGoal | nul
             .gte('date', goal.start_tracking_date.split('T')[0])
             .is('deleted_at', null);
         currentAmount = (sales || []).reduce((sum, t) => sum + (t.sell_price * t.quantity), 0);
+        shouldUpdate = true;
     } else if (goal.metric_type === 'sales_count') {
         const { count } = await supabase
             .from('transactions')
@@ -379,15 +419,20 @@ export async function updateGoalProgress(goalId: string): Promise<UserGoal | nul
             .gte('date', goal.start_tracking_date.split('T')[0])
             .is('deleted_at', null);
         currentAmount = count || 0;
+        shouldUpdate = true;
     }
 
-    // Update the goal with new current amount
-    await supabase
-        .from('user_goals')
-        .update({ current_amount: currentAmount })
-        .eq('id', goalId);
+    // Only update if we calculated a new value (for auto-trackers) 
+    // AND the value is actually different to avoid unnecessary writes
+    if (shouldUpdate && currentAmount !== goal.current_amount) {
+        await supabase
+            .from('user_goals')
+            .update({ current_amount: currentAmount })
+            .eq('id', goalId);
+        return { ...goal, current_amount: currentAmount };
+    }
 
-    return { ...goal, current_amount: currentAmount };
+    return goal;
 }
 
 // ===== MORNING BRIEFING =====

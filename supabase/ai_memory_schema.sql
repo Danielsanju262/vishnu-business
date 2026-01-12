@@ -26,6 +26,9 @@ create table if not exists user_goals (
   status text default 'active' check (status in ('active', 'completed', 'archived')),
   start_tracking_date timestamptz default now(), -- To calculate "Profit SINCE X"
   metadata jsonb default '{}', -- For extra rules like "recurring: monthly"
+  is_recurring boolean default false, -- Whether this goal repeats
+  recurrence_type text check (recurrence_type is null or recurrence_type in ('monthly', 'weekly', 'yearly')),
+  rollover_preference text check (rollover_preference is null or rollover_preference in ('ask', 'immediate', 'first_of_month')),
   created_at timestamptz default now()
 );
 
