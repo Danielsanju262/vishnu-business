@@ -698,6 +698,11 @@ export async function enhancedChatWithAI(
                 if (typeof window !== 'undefined') window.dispatchEvent(new Event('goal-updated'));
 
                 toolResults.push({ name: 'Goal Creation', result });
+            } else {
+                toolResults.push({
+                    name: 'Goal Creation Failed',
+                    result: "I tried to create a goal but couldn't find a clear Target Amount (e.g. '50k', '10000') or Title. Please ask the user to specify the amount."
+                });
             }
         }
 
