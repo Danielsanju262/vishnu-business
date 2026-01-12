@@ -107,11 +107,6 @@ async function getBusinessContext(): Promise<BusinessData> {
 }
 
 // AI chat using Mistral API
-interface ChatMessage {
-    role: 'user' | 'assistant';
-    content: string;
-}
-
 interface AIResponse {
     text: string;
     usage: {
@@ -121,22 +116,21 @@ interface AIResponse {
     };
 }
 
-export async function chatWithAI(userMessage: string, history: ChatMessage[] = []): Promise<AIResponse> {
+// Core AI logic for Business Insights
+export async function chatWithAI(userMessage: string, history: any[], botName: string = "Via AI"): Promise<AIResponse> {
     try {
-        // First, get business context
+        // 1. Get real-time business context
         const context = await getBusinessContext();
 
-        // System prompt with DETAILED data
+        // 2. Construct System Prompt with Context
         const systemPrompt = `
-You are an intelligent business analyst for Vishnu.
-You have access to the raw business data below. Use it to answer specific questions.
-
-📊 BUSINESS DATA LOGS:
+You are ${botName}, a smart business assistant for this shop owner.
+Your goal is to provide concise, data-driven answers based on the logs below.
 
 [RECENT SALES LOG (Last 20)]
 ${context.recentTransactions}
 
-[PENDING PAYMENTS (People owe us)]
+[PENDING PAYMENTS (Who owes money)]
 ${context.pendingPaymentsList}
 
 [RECENT EXPENSES (Last 10)]
@@ -220,7 +214,7 @@ INSTRUCTIONS:
 
 // Handle pre-built queries by just passing them to the AI
 // This ensures they also benefit from the enriched context
-export async function handleQuickQuery(queryType: string): Promise<AIResponse> {
+export async function handleQuickQuery(queryType: string, botName: string = "Via AI"): Promise<AIResponse> {
     const prompts: Record<string, string> = {
         'unpaid_this_week': "Who hasn't paid me this week? List them out.",
         'weekly_comparison': "How are my sales this week compared to last week?",
@@ -230,7 +224,7 @@ export async function handleQuickQuery(queryType: string): Promise<AIResponse> {
     };
 
     const userPrompt = prompts[queryType] || "Tell me about my business status.";
-    return chatWithAI(userPrompt, []);
+    return chatWithAI(userPrompt, [], botName);
 }
 
 

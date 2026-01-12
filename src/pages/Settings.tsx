@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import Papa from "papaparse";
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
-import { ArrowLeft, Database, Shield, Lock, Check, Fingerprint, LogOut, KeyRound, Loader2, Smartphone, Trash2, AlertTriangle, ShieldCheck, Clock, Mail, Download, Upload, ChevronDown, Cloud, Timer, ShieldAlert } from "lucide-react";
+import { ArrowLeft, Database, Shield, Lock, Check, Fingerprint, LogOut, KeyRound, Loader2, Smartphone, Trash2, AlertTriangle, ShieldCheck, Clock, Mail, Download, Upload, ChevronDown, Cloud, Timer, Sparkles, ChevronRight } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { cn } from "../lib/utils";
 import { Button } from "../components/ui/Button";
@@ -146,21 +146,16 @@ export default function Settings() {
     const [isImporting, setIsImporting] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Login Activity State
-    const [loginActivity, setLoginActivity] = useState<any[]>([]);
+    // AI Widget Visibility State - for instant UI updates
+    const [isAIWidgetVisible, setIsAIWidgetVisible] = useState(() =>
+        localStorage.getItem('ai_widget_visible') !== 'false'
+    );
 
-    useEffect(() => {
-        fetchLoginActivity();
-    }, []);
+    // useEffect(() => {
+    //     fetchLoginActivity();
+    // }, []);
 
-    const fetchLoginActivity = async () => {
-        const { data } = await supabase
-            .from('login_activity')
-            .select('*')
-            .order('created_at', { ascending: false })
-            .limit(20);
-        if (data) setLoginActivity(data);
-    };
+
 
     const resetPinState = () => {
         setIsChangePinOpen(false);
@@ -554,7 +549,7 @@ export default function Settings() {
                     <div className="space-y-0">
                         <div className="flex justify-between items-center py-3 border-b border-neutral-100 dark:border-neutral-800">
                             <span className="text-sm text-neutral-500 dark:text-neutral-400 font-medium">Version</span>
-                            <span className="text-sm font-semibold text-neutral-900 dark:text-white bg-neutral-100 dark:bg-neutral-800 px-2.5 py-1 rounded-md">v5.9.0</span>
+                            <span className="text-sm font-semibold text-neutral-900 dark:text-white bg-neutral-100 dark:bg-neutral-800 px-2.5 py-1 rounded-md">v7.0.0</span>
                         </div>
 
 
@@ -562,6 +557,78 @@ export default function Settings() {
                             <span className="text-sm text-neutral-500 dark:text-neutral-400 font-medium">Build</span>
                             <span className="text-sm font-semibold text-neutral-900 dark:text-white bg-neutral-100 dark:bg-neutral-800 px-2.5 py-1 rounded-md">Production</span>
                         </div>
+                    </div>
+                </div>
+
+                {/* AI Assistant Settings Card */}
+                <div className="bg-gradient-to-br from-purple-500/10 to-violet-500/10 border border-purple-500/20 rounded-2xl p-4 md:p-5 shadow-sm">
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center shadow-lg shadow-purple-500/30">
+                            <Sparkles size={20} className="text-white" />
+                        </div>
+                        <div>
+                            <h2 className="font-bold text-neutral-900 dark:text-white text-base">AI Assistant</h2>
+                            <p className="text-sm text-neutral-500 dark:text-neutral-400">Your personal business helper</p>
+                        </div>
+                    </div>
+
+                    {/* Show/Hide Widget Toggle */}
+                    <div className="space-y-3">
+                        <div
+                            onClick={() => {
+                                const newValue = !isAIWidgetVisible;
+                                setIsAIWidgetVisible(newValue); // Instant UI update
+                                localStorage.setItem('ai_widget_visible', newValue ? 'true' : 'false');
+                                window.dispatchEvent(new Event('ai-widget-visibility-changed'));
+                            }}
+                            className={cn(
+                                "flex items-center justify-between p-3 rounded-xl cursor-pointer active:scale-[0.98] transition-all border",
+                                isAIWidgetVisible
+                                    ? "bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800"
+                                    : "bg-neutral-50 dark:bg-neutral-800/50 border-neutral-100 dark:border-neutral-800"
+                            )}
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className={cn(
+                                    "p-2 rounded-lg",
+                                    isAIWidgetVisible
+                                        ? "bg-purple-100 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400"
+                                        : "bg-neutral-200 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-400"
+                                )}>
+                                    <Sparkles size={18} />
+                                </div>
+                                <div>
+                                    <p className="text-sm font-semibold text-neutral-900 dark:text-white">Show floating bubble</p>
+                                    <p className="text-[10px] text-neutral-500 dark:text-neutral-400">
+                                        {isAIWidgetVisible
+                                            ? "AI chat bubble is visible"
+                                            : "Enable to show AI bubble on screen"
+                                        }
+                                    </p>
+                                </div>
+                            </div>
+                            <div
+                                className={cn(
+                                    "w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all",
+                                    isAIWidgetVisible
+                                        ? "border-purple-500 bg-purple-500"
+                                        : "border-neutral-300 dark:border-neutral-600 bg-transparent"
+                                )}
+                            >
+                                {isAIWidgetVisible && <div className="w-2.5 h-2.5 rounded-full bg-white animate-in zoom-in-50" />}
+                            </div>
+                        </div>
+
+                        <Link
+                            to="/settings/ai-memory"
+                            className="flex items-center justify-between p-3 bg-white/5 dark:bg-white/5 hover:bg-white/10 dark:hover:bg-white/10 rounded-xl transition-colors group"
+                        >
+                            <div>
+                                <span className="text-sm font-medium text-neutral-900 dark:text-white">Memory & Personalization</span>
+                                <p className="text-xs text-neutral-500 dark:text-neutral-400">Manage what AI knows about you</p>
+                            </div>
+                            <ChevronRight size={18} className="text-purple-400 group-hover:translate-x-1 transition-transform" />
+                        </Link>
                     </div>
                 </div>
 
@@ -757,7 +824,8 @@ export default function Settings() {
                                                 </p>
                                             </div>
                                         </div>
-                                        {device.fingerprint_enabled && hasSuperAdminSetup && (
+                                        {/* Only show delete button for OTHER devices, not current device */}
+                                        {device.fingerprint_enabled && hasSuperAdminSetup && device.device_id !== currentDeviceId && (
                                             <Button
                                                 variant="outline"
                                                 size="sm"
@@ -779,63 +847,6 @@ export default function Settings() {
                             <p className="text-sm font-medium">No authorized devices yet</p>
                         </div>
                     )}
-                </CollapsibleSection>
-
-                {/* Login Activity */}
-                <CollapsibleSection
-                    title="Login Activity"
-                    icon={ShieldAlert}
-                    headerClassName="bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400"
-                >
-                    <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-5 leading-relaxed">
-                        Recent login attempts on your account. Review for any suspicious activity.
-                    </p>
-
-                    <div className="space-y-3">
-                        {loginActivity.length > 0 ? (
-                            loginActivity.map((log) => (
-                                <div
-                                    key={log.id}
-                                    className="p-3 md:p-4 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/50"
-                                >
-                                    <div className="flex items-start justify-between gap-3">
-                                        <div className="flex items-start gap-3">
-                                            <div className={cn(
-                                                "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border",
-                                                log.is_authorized_device
-                                                    ? "bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/30"
-                                                    : "bg-rose-100 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-500/30"
-                                            )}>
-                                                {log.login_method === 'biometrics' ? (
-                                                    <Fingerprint size={20} />
-                                                ) : log.login_method === 'security_bypass' ? (
-                                                    <Timer size={20} />
-                                                ) : (
-                                                    <KeyRound size={20} />
-                                                )}
-                                            </div>
-                                            <div>
-                                                <p className="text-sm font-semibold text-neutral-900 dark:text-white">
-                                                    {log.is_authorized_device ? "Authorized Login" : "Unrecognized Device"}
-                                                </p>
-                                                <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
-                                                    {log.device_name} • {log.login_method.replace(/_/g, ' ')}
-                                                </p>
-                                                <div className="flex items-center gap-1.5 text-xs text-neutral-400 dark:text-neutral-500 mt-1.5">
-                                                    <Clock size={12} />
-                                                    <span>{formatRelativeTime(log.created_at)}</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))
-                        ) : (
-                            <div className="text-center py-8 text-neutral-400 dark:text-neutral-500">
-                                <p className="text-sm font-medium">No recent activity</p>
-                            </div>
-                        )}
-                    </div>
                 </CollapsibleSection>
 
                 {/* Backup & Restore (Google Drive) */}
@@ -887,66 +898,7 @@ export default function Settings() {
                         />
                     </div>
                 </CollapsibleSection>
-
-                {/* Device Deauthorize - Enhanced with improved styling */}
-                <div className="bg-white dark:bg-neutral-900/80 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-4 md:p-5 shadow-sm">
-                    <h2 className="font-bold text-neutral-900 dark:text-white mb-3 flex items-center gap-2.5 text-base">
-                        <div className="w-8 h-8 rounded-lg bg-rose-100 dark:bg-rose-500/20 flex items-center justify-center">
-                            <LogOut size={16} className="text-rose-600 dark:text-rose-400" />
-                        </div>
-                        Device
-                    </h2>
-                    <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-5 leading-relaxed">
-                        Remove this device's authorization. You'll need your Master PIN again.
-                    </p>
-                    <Button
-                        variant="outline"
-                        className="w-full h-11 md:h-12 border-neutral-300 dark:border-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 font-medium transition-all duration-200"
-                        onClick={() => setShowDeauthConfirm(true)}
-                    >
-                        <LogOut size={16} className="mr-2" />
-                        Deauthorize Device
-                    </Button>
-                </div>
             </div>
-
-            {/* Deauthorize Confirmation Modal */}
-            <Modal
-                isOpen={showDeauthConfirm}
-                onClose={() => setShowDeauthConfirm(false)}
-            >
-                <div className="text-center space-y-2 mb-6">
-                    <div className="w-14 h-14 rounded-2xl bg-amber-500/10 flex items-center justify-center mx-auto text-amber-500">
-                        <AlertTriangle size={28} />
-                    </div>
-                    <h2 className="text-xl font-bold">Deauthorize This Device?</h2>
-                    <p className="text-sm text-muted-foreground">
-                        You'll need to enter your Master PIN again to access the app on this device.
-                    </p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                    <Button
-                        variant="outline"
-                        className="h-12"
-                        onClick={() => setShowDeauthConfirm(false)}
-                    >
-                        Cancel
-                    </Button>
-                    <Button
-                        className="h-12 bg-amber-500 hover:bg-amber-600 text-white font-bold"
-                        onClick={() => {
-                            localStorage.removeItem('device_authorized');
-                            localStorage.removeItem('bio_credential_id');
-                            localStorage.removeItem('app_locked');
-                            localStorage.removeItem('verified_pin_version');
-                            window.location.reload();
-                        }}
-                    >
-                        Deauthorize
-                    </Button>
-                </div>
-            </Modal>
 
             {/* Export Modal */}
             {/* Export Modal */}

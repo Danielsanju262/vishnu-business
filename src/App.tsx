@@ -7,6 +7,8 @@ import Layout from "./components/Layout";
 const Insights = React.lazy(() => import("./pages/Insights"));
 const InsightsChat = React.lazy(() => import("./pages/InsightsChat"));
 const BusinessInsights = React.lazy(() => import("./pages/BusinessInsights"));
+const GoalsDashboard = React.lazy(() => import("./pages/GoalsDashboard"));
+const AIMemorySettings = React.lazy(() => import("./pages/AIMemorySettings"));
 import Customers from "./pages/Customers";
 import Products from "./pages/Products";
 import Dashboard from "./pages/Dashboard";
@@ -22,6 +24,7 @@ import Suppliers from "./pages/Suppliers";
 import SupplierPaymentDetail from "./pages/SupplierPaymentDetail";
 
 import ScrollToTop from "./components/ScrollToTop";
+import GlobalAIWidget from "./components/AI/GlobalAIWidget";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import LockScreen from "./components/LockScreen";
 import { useMorningNotifications } from "./hooks/useMorningNotifications";
@@ -104,6 +107,8 @@ function AppContent() {
       <DeepLinkBackHandler />
       <ScrollToTop />
       {isLocked && <LockScreen />}
+      {/* Global AI Widget - appears on all pages */}
+      <GlobalAIWidget />
       <Routes>
         <Route path="/" element={<Layout />}>
           <Route index element={<Dashboard />} />
@@ -122,6 +127,11 @@ function AppContent() {
               <BusinessInsights />
             </Suspense>
           } />
+          <Route path="insights/goals" element={
+            <Suspense fallback={<div className="p-10 text-center">Loading Goals...</div>}>
+              <GoalsDashboard />
+            </Suspense>
+          } />
           {/* Dashboard is now home, but keep this route for legacy links if any */}
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="customers" element={<Customers />} />
@@ -133,6 +143,11 @@ function AppContent() {
           <Route path="accounts-payable/:supplierId" element={<SupplierPaymentDetail />} />
           <Route path="suppliers" element={<Suppliers />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="settings/ai-memory" element={
+            <Suspense fallback={<div className="p-10 text-center">Loading AI Settings...</div>}>
+              <AIMemorySettings />
+            </Suspense>
+          } />
           <Route path="sale/new" element={<NewSale />} />
           <Route path="expense/new" element={<NewExpense />} />
         </Route>

@@ -1,7 +1,7 @@
-import { useState, useMemo, useRef, useCallback } from "react";
+import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import { ArrowLeft, Calendar, ChevronDown, ChevronRight, TrendingUp, TrendingDown, Users, Wallet, ShoppingBag, Clock, BarChart3, ArrowUpRight, ArrowDownRight, RefreshCw } from "lucide-react";
-import { format, subDays, startOfWeek, startOfMonth, endOfWeek, endOfMonth } from "date-fns";
+import { format, subDays, startOfWeek, startOfMonth, endOfWeek, endOfMonth, startOfYear, endOfYear, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, subMonths } from "date-fns";
 import { Link } from "react-router-dom";
 import { Modal } from "../components/ui/Modal";
 import { cn } from "../lib/utils";
@@ -10,7 +10,8 @@ import { useDropdownClose } from "../hooks/useDropdownClose";
 import { useHistorySyncedState } from "../hooks/useHistorySyncedState";
 import { DailyRevenueChart } from "../components/DailyRevenueChart";
 
-type DateRangeType = "today" | "yesterday" | "week" | "month" | "custom";
+type DateRangeType = "today" | "yesterday" | "week" | "month" | "year" | "custom";
+type ChartAggregationType = "day" | "week" | "month";
 type TabType = "summary" | "sales" | "customers" | "cashflow";
 
 interface InsightData {
@@ -20,7 +21,7 @@ interface InsightData {
     paymentReminders: any[];
     accountsPayable: any[];
     previousPeriodTransactions: any[];
-    allTimeTransactions: any[];
+
 }
 
 export default function BusinessInsights() {
@@ -29,6 +30,7 @@ export default function BusinessInsights() {
     const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
     const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
     const [selectedChartDay, setSelectedChartDay] = useState<string | null>(null);
+    const [chartAggregation, setChartAggregation] = useState<ChartAggregationType>('day');
     const chartRef = useRef<HTMLDivElement>(null);
     useDropdownClose(selectedChartDay !== null, () => setSelectedChartDay(null), chartRef);
     const [showFilters, setShowFilters] = useHistorySyncedState(false, 'businessInsightsFilter');
@@ -50,9 +52,13 @@ export default function BusinessInsights() {
         paymentReminders: [],
         accountsPayable: [],
         previousPeriodTransactions: [],
-        allTimeTransactions: [],
     });
+    const [historicalData, setHistoricalData] = useState<{
+        transactions: any[];
+        expenses: any[];
+    }>({ transactions: [], expenses: [] });
     const [isLoading, setIsLoading] = useState(true);
+    const [isHistoricalLoading, setIsHistoricalLoading] = useState(false);
 
     const getDateFilter = useCallback(() => {
         const today = new Date();
@@ -65,6 +71,7 @@ export default function BusinessInsights() {
         }
         if (rangeType === 'week') return { start: format(startOfWeek(today, { weekStartsOn: 1 }), 'yyyy-MM-dd'), end: format(endOfWeek(today, { weekStartsOn: 1 }), 'yyyy-MM-dd') };
         if (rangeType === 'month') return { start: format(startOfMonth(today), 'yyyy-MM-dd'), end: format(endOfMonth(today), 'yyyy-MM-dd') };
+        if (rangeType === 'year') return { start: format(startOfYear(today), 'yyyy-MM-dd'), end: format(endOfYear(today), 'yyyy-MM-dd') };
         return { start: startDate, end: endDate };
     }, [rangeType, startDate, endDate]);
 
@@ -92,18 +99,17 @@ export default function BusinessInsights() {
         const prevPeriod = getPreviousPeriodDates();
 
         try {
-            const [transactionsRes, expensesRes, customersRes, remindersRes, payablesRes, prevTransactionsRes, allTimeTransactionsRes] = await Promise.all([
+            const [transactionsRes, expensesRes, customersRes, remindersRes, payablesRes, prevTransactionsRes] = await Promise.all([
                 supabase.from('transactions').select('*, customers(name, id), products(name, unit, category)').is('deleted_at', null).gte('date', start).lte('date', end).order('date', { ascending: false }),
                 supabase.from('expenses').select('*').is('deleted_at', null).gte('date', start).lte('date', end),
-                supabase.from('customers').select('*').is('deleted_at', null),
+                supabase.from('customers').select('*'),
                 supabase.from('payment_reminders').select('*, customers(name)').eq('status', 'pending'),
                 supabase.from('accounts_payable').select('*, suppliers(name)').eq('status', 'pending'),
                 supabase.from('transactions').select('*, customers(name, id), products(name, unit, category)').is('deleted_at', null).gte('date', prevPeriod.start).lte('date', prevPeriod.end),
-                supabase.from('transactions').select('customer_id, quantity, sell_price, customers(name)').is('deleted_at', null),
             ]);
 
             // Check for errors in results
-            const errors = [transactionsRes, expensesRes, customersRes, remindersRes, payablesRes, prevTransactionsRes, allTimeTransactionsRes].filter(r => r.error);
+            const errors = [transactionsRes, expensesRes, customersRes, remindersRes, payablesRes, prevTransactionsRes].filter(r => r.error);
             if (errors.length > 0) throw errors[0].error;
 
             setData({
@@ -113,17 +119,48 @@ export default function BusinessInsights() {
                 paymentReminders: remindersRes.data || [],
                 accountsPayable: payablesRes.data || [],
                 previousPeriodTransactions: prevTransactionsRes.data || [],
-                allTimeTransactions: allTimeTransactionsRes.data || [],
             });
         } catch (error) {
             console.error('[BusinessInsights] Error fetching data:', error);
-            setError("Failed to load data");
+            setError((error as any)?.message || "Failed to load data");
         } finally {
             setIsLoading(false);
         }
     }, [getDateFilter, getPreviousPeriodDates]);
 
     useRealtimeTables(['transactions', 'expenses', 'payment_reminders', 'accounts_payable'], fetchData, [rangeType, startDate, endDate]);
+
+    // Fetch Historical Data when Week/Month view is selected
+    useEffect(() => {
+        if ((chartAggregation === 'week' || chartAggregation === 'month') && historicalData.transactions.length === 0 && !isHistoricalLoading) {
+            const fetchHistorical = async () => {
+                setIsHistoricalLoading(true);
+                try {
+                    // Fetch last 12 months of data (covers both 31 weeks and 12 months requirements)
+                    const end = format(new Date(), 'yyyy-MM-dd');
+                    const start = format(subMonths(new Date(), 12), 'yyyy-MM-dd');
+
+                    const [transactionsRes, expensesRes] = await Promise.all([
+                        supabase.from('transactions').select('date, quantity, sell_price, buy_price, products(name)').is('deleted_at', null).gte('date', start).lte('date', end),
+                        supabase.from('expenses').select('date, amount, is_ghee_ingredient').is('deleted_at', null).gte('date', start).lte('date', end)
+                    ]);
+
+                    if (transactionsRes.error) throw transactionsRes.error;
+                    if (expensesRes.error) throw expensesRes.error;
+
+                    setHistoricalData({
+                        transactions: transactionsRes.data || [],
+                        expenses: expensesRes.data || []
+                    });
+                } catch (err) {
+                    console.error("Failed to fetch historical data", err);
+                } finally {
+                    setIsHistoricalLoading(false);
+                }
+            };
+            fetchHistorical();
+        }
+    }, [chartAggregation, historicalData.transactions.length, isHistoricalLoading]);
 
     // === CALCULATIONS ===
 
@@ -146,7 +183,7 @@ export default function BusinessInsights() {
         const { start, end } = getDateFilter();
         const startDt = new Date(start);
         const endDt = new Date(end);
-        const daysInPeriod = Math.max(Math.ceil((endDt.getTime() - startDt.getTime()) / (1000 * 60 * 60 * 24)) + 1, 1);
+
 
         // Calculate effective days for averages (sales/profit per day)
         // If the selected period includes future dates (e.g. "This Month"), cap the divisor at today
@@ -199,27 +236,6 @@ export default function BusinessInsights() {
             profit: bestDayEntry[1].revenue - bestDayEntry[1].cost
         } : null;
 
-        // Daily data for chart (max 30 days)
-        // Reusing daysInPeriod and dates from above
-        const daysDiff = daysInPeriod;
-
-        const dailyData: { date: string; revenue: number; profit: number; label: string }[] = [];
-        if (daysDiff <= 32) {
-            // Generate all days in range
-            for (let i = 0; i < daysDiff; i++) {
-                const dt = new Date(startDt);
-                dt.setDate(startDt.getDate() + i);
-                const dateStr = format(dt, 'yyyy-MM-dd');
-                const dayData = salesByDay[dateStr];
-                dailyData.push({
-                    date: dateStr,
-                    label: format(dt, 'd MMM'),
-                    revenue: dayData ? dayData.revenue : 0,
-                    profit: dayData ? (dayData.revenue - dayData.cost) : 0
-                });
-            }
-        }
-
         return {
             totalRevenue,
             totalGoodsCost,
@@ -234,10 +250,157 @@ export default function BusinessInsights() {
             revenueChange,
             prevRevenue,
             bestDay,
-            dailyData,
-            canShowChart: daysDiff <= 32,
         };
     }, [data, getDateFilter]);
+
+    // Chart Series Data
+    const chartSeries = useMemo(() => {
+        const chartData: { date: string; revenue: number; profit: number; label: string; axisLabel?: string }[] = [];
+        let canShowChart = false;
+
+        // Determine source data and range based on aggregation
+        // Daily: Uses filtered data (user selected range)
+        // Weekly/Monthly: Uses historical data (last ~12 months fixed)
+        let sourceTransactions = data.transactions;
+        let sourceExpenses = data.expenses;
+        let start: Date;
+        let end: Date;
+
+        if (chartAggregation === 'day') {
+            const filter = getDateFilter();
+            start = new Date(filter.start);
+            end = new Date(filter.end);
+        } else {
+            // For Weekly/Monthly, we generally want the last X periods ending today
+            // But we should use historicalData preferably if available, otherwise fallback to data (if it covers it, which implies large range selected)
+            // However, request says "other than that [daily], it should show me the data for last 31 weeks and 12 months" so we force this range.
+            sourceTransactions = historicalData.transactions.length > 0 ? historicalData.transactions : data.transactions;
+            sourceExpenses = historicalData.expenses.length > 0 ? historicalData.expenses : data.expenses;
+            end = new Date();
+            start = subMonths(end, 12); // Ensuring we have coverage for the requested logic
+        }
+
+        if (chartAggregation === 'day') {
+            const daysDiff = Math.max(Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1, 1);
+            if (daysDiff <= 32) {
+                // Generate all days
+                const days = eachDayOfInterval({ start, end });
+
+                // Pre-process sales for performance
+                const salesByDay: Record<string, { revenue: number; cost: number }> = {};
+                sourceTransactions.forEach((t: any) => {
+                    const d = t.date;
+                    if (!salesByDay[d]) salesByDay[d] = { revenue: 0, cost: 0 };
+                    salesByDay[d].revenue += (t.quantity * t.sell_price);
+                    salesByDay[d].cost += (t.quantity * t.buy_price);
+                });
+                sourceExpenses.filter((e: any) => e.is_ghee_ingredient).forEach((e: any) => {
+                    const d = e.date;
+                    if (salesByDay[d]) salesByDay[d].cost += e.amount;
+                });
+
+                days.forEach(day => {
+                    const dateStr = format(day, 'yyyy-MM-dd');
+                    const dayData = salesByDay[dateStr];
+                    chartData.push({
+                        date: dateStr,
+                        label: format(day, 'd MMM'),
+                        revenue: dayData ? dayData.revenue : 0,
+                        profit: dayData ? (dayData.revenue - dayData.cost) : 0
+                    });
+                });
+                canShowChart = true;
+            }
+        } else if (chartAggregation === 'week') {
+            // Last 31 weeks
+            // Start from 31 weeks ago to now
+            // We'll iterate BACKWARDS from end week to ensure we capture the "last 31 weeks" correctly relative to today?
+            // Or just interval. Let's do interval for simplicity, but construct start date carefully.
+            // 31 weeks approx 7 months, so our 12 month historical fetch covers it.
+            // Let's explicitly set start to 31 weeks ago.
+            const weekStartPoint = subDays(end, 31 * 7);
+            const validStart = weekStartPoint; // simplified
+
+            const weeks = eachWeekOfInterval({ start: validStart, end }, { weekStartsOn: 1 });
+            // Take only last 31 if somehow we got more
+            const weeksToShow = weeks.slice(-31);
+
+            weeksToShow.forEach(weekStart => {
+                const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
+                const weekKey = format(weekStart, 'yyyy-MM-dd');
+
+                // Filter source for this week
+                const weekRevenue = sourceTransactions
+                    .filter((t: any) => {
+                        const d = new Date(t.date);
+                        return d >= weekStart && d <= weekEnd;
+                    })
+                    .reduce((acc: number, t: any) => acc + (t.quantity * t.sell_price), 0);
+
+                const weekCost = sourceTransactions
+                    .filter((t: any) => {
+                        const d = new Date(t.date);
+                        return d >= weekStart && d <= weekEnd;
+                    })
+                    .reduce((acc: number, t: any) => acc + (t.quantity * t.buy_price), 0)
+                    + sourceExpenses
+                        .filter((e: any) => {
+                            const d = new Date(e.date);
+                            return e.is_ghee_ingredient && d >= weekStart && d <= weekEnd;
+                        })
+                        .reduce((acc: number, e: any) => acc + e.amount, 0);
+
+                chartData.push({
+                    date: weekKey,
+                    label: `Week of ${format(weekStart, 'd MMM')}`,
+                    axisLabel: format(weekStart, 'd MMM'),
+                    revenue: weekRevenue,
+                    profit: weekRevenue - weekCost
+                });
+            });
+            canShowChart = true;
+        } else if (chartAggregation === 'month') {
+            // Last 12 months
+            const validStart = subMonths(end, 11); // 11 months back + current month = 12 months
+            const months = eachMonthOfInterval({ start: validStart, end });
+
+            months.forEach(monthStart => {
+                const monthEnd = endOfMonth(monthStart);
+                const monthKey = format(monthStart, 'yyyy-MM-dd');
+
+                const monthRevenue = sourceTransactions
+                    .filter((t: any) => {
+                        const d = new Date(t.date);
+                        return d >= monthStart && d <= monthEnd;
+                    })
+                    .reduce((acc: number, t: any) => acc + (t.quantity * t.sell_price), 0);
+
+                const monthCost = sourceTransactions
+                    .filter((t: any) => {
+                        const d = new Date(t.date);
+                        return d >= monthStart && d <= monthEnd;
+                    })
+                    .reduce((acc: number, t: any) => acc + (t.quantity * t.buy_price), 0)
+                    + sourceExpenses
+                        .filter((e: any) => {
+                            const d = new Date(e.date);
+                            return e.is_ghee_ingredient && d >= monthStart && d <= monthEnd;
+                        })
+                        .reduce((acc: number, e: any) => acc + e.amount, 0);
+
+                chartData.push({
+                    date: monthKey,
+                    label: format(monthStart, 'MMMM yyyy'),
+                    axisLabel: format(monthStart, 'MMM'), // Jan, Feb...
+                    revenue: monthRevenue,
+                    profit: monthRevenue - monthCost
+                });
+            });
+            canShowChart = true;
+        }
+
+        return { data: chartData, canShowChart };
+    }, [data, historicalData, chartAggregation, getDateFilter]);
 
     // Sales Insights
     const salesInsights = useMemo(() => {
@@ -391,6 +554,7 @@ export default function BusinessInsights() {
         { key: 'yesterday', label: 'Yesterday' },
         { key: 'week', label: 'This Week' },
         { key: 'month', label: 'This Month' },
+        { key: 'year', label: 'This Year' },
         { key: 'custom', label: 'Custom Range' },
     ];
 
@@ -629,14 +793,68 @@ export default function BusinessInsights() {
 
 
 
-                            {/* Daily Revenue Chart */}
-                            {summaryStats.canShowChart && summaryStats.dailyData.length > 1 && (
-                                <div ref={chartRef}>
+                            {/* Chart Controls & Visibility */}
+                            <div className="flex bg-muted/30 p-1 rounded-xl w-max mx-auto mb-2 border border-border/50">
+                                <button
+                                    onClick={() => setChartAggregation('day')}
+                                    className={cn(
+                                        "px-3 py-1.5 text-xs font-bold rounded-lg transition-all",
+                                        chartAggregation === 'day' ? "bg-white dark:bg-zinc-800 text-foreground shadow-sm border border-border/50" : "text-muted-foreground hover:text-foreground"
+                                    )}
+                                >
+                                    Daily
+                                </button>
+                                <button
+                                    onClick={() => setChartAggregation('week')}
+                                    className={cn(
+                                        "px-3 py-1.5 text-xs font-bold rounded-lg transition-all",
+                                        chartAggregation === 'week' ? "bg-white dark:bg-zinc-800 text-foreground shadow-sm border border-border/50" : "text-muted-foreground hover:text-foreground"
+                                    )}
+                                >
+                                    Weekly
+                                </button>
+                                <button
+                                    onClick={() => setChartAggregation('month')}
+                                    className={cn(
+                                        "px-3 py-1.5 text-xs font-bold rounded-lg transition-all",
+                                        chartAggregation === 'month' ? "bg-white dark:bg-zinc-800 text-foreground shadow-sm border border-border/50" : "text-muted-foreground hover:text-foreground"
+                                    )}
+                                >
+                                    Monthly
+                                </button>
+                            </div>
+
+                            {/* Revenue Chart */}
+                            {chartSeries.canShowChart && chartSeries.data.length > 0 && (
+                                <div ref={chartRef} className="animate-in fade-in slide-in-from-bottom-2 duration-500">
                                     <DailyRevenueChart
-                                        summaryStats={summaryStats}
+                                        chartData={chartSeries.data}
                                         selectedChartDay={selectedChartDay}
                                         setSelectedChartDay={setSelectedChartDay}
                                     />
+                                </div>
+                            )}
+
+                            {!chartSeries.canShowChart && (
+                                <div className="p-6 text-center border border-dashed border-border rounded-2xl bg-muted/20">
+                                    <BarChart3 className="mx-auto h-8 w-8 text-muted-foreground/50 mb-2" />
+                                    <p className="text-sm font-semibold text-muted-foreground">Chart not available for this range</p>
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        {chartAggregation === 'day' && "For daily view, select a range of 31 days or less."}
+                                        {chartAggregation === 'week' && "For weekly view, select a range of 31 weeks or less."}
+                                        {chartAggregation === 'month' && "For monthly view, select a range of 12 months or less."}
+                                    </p>
+                                    <div className="mt-3">
+                                        <button
+                                            onClick={() => {
+                                                if (chartAggregation === 'day') setChartAggregation('week');
+                                                else if (chartAggregation === 'week') setChartAggregation('month');
+                                            }}
+                                            className="text-xs font-bold text-primary hover:underline"
+                                        >
+                                            Switch to {chartAggregation === 'day' ? 'Weekly' : 'Monthly'} view
+                                        </button>
+                                    </div>
                                 </div>
                             )}
 

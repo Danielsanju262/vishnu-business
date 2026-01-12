@@ -5,15 +5,15 @@ import { cn } from "../lib/utils";
 import { BarChart3, X } from "lucide-react";
 
 interface DailyRevenueChartProps {
-    summaryStats: any;
+    chartData: any[]; // Decoupled from summaryStats
     selectedChartDay: string | null;
     setSelectedChartDay: (date: string | null) => void;
 }
 
-export function DailyRevenueChart({ summaryStats, selectedChartDay, setSelectedChartDay }: DailyRevenueChartProps) {
+export function DailyRevenueChart({ chartData, selectedChartDay, setSelectedChartDay }: DailyRevenueChartProps) {
     const [chartMetric, setChartMetric] = useState<'revenue' | 'profit'>('revenue');
 
-    const maxDataValue = Math.max(...summaryStats.dailyData.map((d: any) =>
+    const maxDataValue = Math.max(...chartData.map((d: any) =>
         chartMetric === 'revenue' ? d.revenue : Math.abs(d.profit)
     ), 1);
     const chartMax = maxDataValue * 1.5;
@@ -23,11 +23,11 @@ export function DailyRevenueChart({ summaryStats, selectedChartDay, setSelectedC
     useEffect(() => {
         if (scrollContainerRef.current) {
             const todayStr = format(new Date(), 'yyyy-MM-dd');
-            const todayIndex = summaryStats.dailyData.findIndex((d: any) => d.date === todayStr);
+            const todayIndex = chartData.findIndex((d: any) => d.date === todayStr);
 
             if (todayIndex !== -1) {
                 // Determine bar width based on data length (matching render logic)
-                const barWidth = summaryStats.dailyData.length > 20 ? 32 : 40;
+                const barWidth = chartData.length > 20 ? 32 : 40;
                 const gap = 8; // gap-2
                 const paddingLeft = 8; // px-2
 
@@ -45,7 +45,7 @@ export function DailyRevenueChart({ summaryStats, selectedChartDay, setSelectedC
                 scrollContainerRef.current.scrollLeft = scrollContainerRef.current.scrollWidth;
             }
         }
-    }, [summaryStats.dailyData]);
+    }, [chartData]);
 
     return (
         <div
@@ -82,7 +82,7 @@ export function DailyRevenueChart({ summaryStats, selectedChartDay, setSelectedC
                 </div>
 
                 {selectedChartDay ? (() => {
-                    const selectedDayData = summaryStats.dailyData.find((d: any) => d.date === selectedChartDay);
+                    const selectedDayData = chartData.find((d: any) => d.date === selectedChartDay);
                     return selectedDayData ? (
                         <div className="bg-muted/40 rounded-xl p-3 flex items-center justify-between animate-in slide-in-from-top-2 fade-in duration-200">
                             <div>
@@ -136,13 +136,13 @@ export function DailyRevenueChart({ summaryStats, selectedChartDay, setSelectedC
                         className="absolute inset-0 overflow-x-auto no-scrollbar z-10"
                     >
                         <div className="flex items-end gap-2 h-full pb-[20px] px-2 min-w-full w-max">
-                            {summaryStats.dailyData.map((day: any) => {
+                            {chartData.map((day: any) => {
                                 const value = chartMetric === 'revenue' ? day.revenue : day.profit;
                                 const displayValue = Math.abs(value);
                                 const barHeight = Math.max((displayValue / chartMax) * 100, 4);
                                 const isSelected = selectedChartDay === day.date;
                                 // Width logic: Minimum 32px for 30 days to be touchable
-                                const barWidth = summaryStats.dailyData.length > 20 ? '32px' : '40px';
+                                const barWidth = chartData.length > 20 ? '32px' : '40px';
 
                                 // Determine bar color
                                 let barGradient = "bg-muted";
@@ -209,7 +209,7 @@ export function DailyRevenueChart({ summaryStats, selectedChartDay, setSelectedC
                                                 "text-[9px] truncate transition-colors font-medium",
                                                 isSelected ? "text-primary font-bold" : "text-muted-foreground"
                                             )}>
-                                                {summaryStats.dailyData.length <= 7 ? format(new Date(day.date), 'EEE') : format(new Date(day.date), 'dd')}
+                                                {day.axisLabel || (chartData.length <= 7 ? format(new Date(day.date), 'EEE') : format(new Date(day.date), 'dd'))}
                                             </p>
                                         </div>
                                     </div>

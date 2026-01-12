@@ -212,7 +212,6 @@ export function GoogleDriveBackup() {
     const [isLoading, setIsLoading] = useState(false);
     const [backups, setBackups] = useState<any[]>([]);
     const [showBackups, setShowBackups] = useState(false);
-    const [isAutoBackupEnabled, setIsAutoBackupEnabled] = useState(false);
     const [tokenExpiringSoon, setTokenExpiringSoon] = useState(false);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [isPersistentConnection, setIsPersistentConnection] = useState(hasRefreshToken());
@@ -242,20 +241,8 @@ export function GoogleDriveBackup() {
         fileData: null
     });
 
-    // Load Auto Backup Config and Server Backup Config
+    // Load server backup config
     useEffect(() => {
-        // Local config
-        const configStr = localStorage.getItem('vishnu_backup_config');
-        if (configStr) {
-            try {
-                const config = JSON.parse(configStr);
-                setIsAutoBackupEnabled(config.enabled || false);
-            } catch (e) {
-                console.error("Failed to parse backup config", e);
-            }
-        }
-
-        // Server config
         const loadServerConfig = async () => {
             setIsLoadingServerConfig(true);
             try {
@@ -283,17 +270,6 @@ export function GoogleDriveBackup() {
         }
     }, []);
 
-    const toggleAutoBackup = () => {
-        const newState = !isAutoBackupEnabled;
-        setIsAutoBackupEnabled(newState);
-        localStorage.setItem('vishnu_backup_config', JSON.stringify({ enabled: newState }));
-
-        if (newState) {
-            localStorage.setItem('vishnu_last_auto_backup', new Date().toDateString());
-        }
-
-        toast(newState ? "Daily auto-backup enabled" : "Auto-backup disabled", "success");
-    };
 
     const toggleServerBackup = async () => {
         const newState = !isServerBackupEnabled;
@@ -779,33 +755,7 @@ export function GoogleDriveBackup() {
                     </div>
                 )}
 
-                {/* Regular Backup Toggle */}
-                <div
-                    onClick={toggleAutoBackup}
-                    className="flex items-center justify-between p-3 bg-neutral-50 dark:bg-neutral-800/50 rounded-xl mb-4 border border-neutral-100 dark:border-neutral-800 cursor-pointer active:scale-[0.98] transition-all"
-                >
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-blue-100 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 rounded-lg">
-                            <RefreshCw size={18} />
-                        </div>
-                        <div>
-                            <p className="text-sm font-semibold text-neutral-900 dark:text-white">Regular Daily Backup</p>
-                            <p className="text-[10px] text-neutral-500 dark:text-neutral-400">
-                                Automatically back up when you open the app
-                            </p>
-                        </div>
-                    </div>
-                    <div
-                        className={cn(
-                            "w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all",
-                            isAutoBackupEnabled
-                                ? "border-primary bg-primary"
-                                : "border-neutral-300 dark:border-neutral-600 bg-transparent"
-                        )}
-                    >
-                        {isAutoBackupEnabled && <div className="w-2.5 h-2.5 rounded-full bg-white animate-in zoom-in-50" />}
-                    </div>
-                </div>
+
 
                 <div className="flex flex-col sm:flex-row gap-3">
                     <Button

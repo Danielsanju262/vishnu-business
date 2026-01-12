@@ -12,7 +12,14 @@ import {
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { QUICK_QUESTIONS } from "../types/insightTypes";
-import { handleQuickQuery, chatWithAI } from "../lib/insightsAI";
+import { enhancedChatWithAI } from "../lib/enhancedAI";
+import {
+    getAIConfig,
+    getOrCreateActiveSession,
+    getChatMessages,
+    addChatMessage,
+    clearChatSession
+} from "../lib/aiMemory";
 
 interface ChatMessage {
     id: string;
@@ -26,6 +33,9 @@ export default function InsightsChat() {
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
     const [chatInput, setChatInput] = useState("");
     const [isChatLoading, setIsChatLoading] = useState(false);
+    const [botName, setBotName] = useState("Via AI");
+    const [userName, setUserName] = useState("");
+    const [sessionId, setSessionId] = useState<string | null>(null);
 
     // Initialize tokens - Persist until API reset time
     const [totalTokensUsed, setTotalTokensUsed] = useState(() => {
@@ -58,6 +68,34 @@ export default function InsightsChat() {
 
     const chatContainerRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+
+    // Load AI Config and existing session on mount
+    useEffect(() => {
+        const loadData = async () => {
+            try {
+                // Load config
+                const config = await getAIConfig();
+                if (config.bot_name) setBotName(config.bot_name);
+                if (config.user_name) setUserName(config.user_name);
+
+                // Load existing session (shared with widget)
+                const session = await getOrCreateActiveSession();
+                if (session) {
+                    setSessionId(session.id);
+                    const history = await getChatMessages(session.id);
+                    setChatMessages(history.map(m => ({
+                        id: m.id,
+                        role: m.role as 'user' | 'assistant',
+                        content: m.content,
+                        timestamp: new Date(m.created_at)
+                    })));
+                }
+            } catch (error) {
+                console.error("Failed to load AI data", error);
+            }
+        };
+        loadData();
+    }, []);
 
     // Persist token usage
     useEffect(() => {
@@ -114,8 +152,14 @@ export default function InsightsChat() {
         };
         setChatMessages(prev => [...prev, userMsg]);
 
+        // Save user message to database
+        if (sessionId) {
+            await addChatMessage(sessionId, 'user', question);
+        }
+
         try {
-            const response = await handleQuickQuery(queryType);
+            const history = chatMessages.map(m => ({ role: m.role, content: m.content }));
+            const response = await enhancedChatWithAI(question, history, botName, userName);
             setTotalTokensUsed(prev => prev + response.usage.used);
             processAIResponse(response);
 
@@ -126,6 +170,11 @@ export default function InsightsChat() {
                 timestamp: new Date(),
             };
             setChatMessages(prev => [...prev, aiMsg]);
+
+            // Save AI response to database
+            if (sessionId) {
+                await addChatMessage(sessionId, 'assistant', response.text);
+            }
         } catch {
             const errorMsg: ChatMessage = {
                 id: `error-${Date.now()}`,
@@ -156,10 +205,15 @@ export default function InsightsChat() {
         };
         setChatMessages(prev => [...prev, userMsg]);
 
+        // Save user message to database
+        if (sessionId) {
+            await addChatMessage(sessionId, 'user', message);
+        }
+
         try {
-            // Pass the current history (excluding the new user message we just added visually) to the AI
+            // Pass the current history to the AI
             const history = chatMessages.map(m => ({ role: m.role, content: m.content }));
-            const response = await chatWithAI(message, history);
+            const response = await enhancedChatWithAI(message, history, botName, userName);
             setTotalTokensUsed(prev => prev + response.usage.used);
             processAIResponse(response);
 
@@ -170,6 +224,11 @@ export default function InsightsChat() {
                 timestamp: new Date(),
             };
             setChatMessages(prev => [...prev, aiMsg]);
+
+            // Save AI response to database
+            if (sessionId) {
+                await addChatMessage(sessionId, 'assistant', response.text);
+            }
         } catch {
             const errorMsg: ChatMessage = {
                 id: `error-${Date.now()}`,
@@ -183,7 +242,10 @@ export default function InsightsChat() {
         }
     };
 
-    const clearChat = () => {
+    const clearChat = async () => {
+        if (sessionId) {
+            await clearChatSession(sessionId);
+        }
         setChatMessages([]);
     };
 
@@ -211,7 +273,7 @@ export default function InsightsChat() {
                                 <Sparkles size={18} className="text-purple-400" />
                             </div>
                             <div>
-                                <h1 className="font-semibold text-foreground leading-none mb-1">Via AI</h1>
+                                <h1 className="font-semibold text-foreground leading-none mb-1">{botName}</h1>
                                 <div className="flex items-center gap-2">
                                     <span className="text-[10px] text-muted-foreground bg-white/5 px-1.5 py-0.5 rounded">Mistral Large</span>
                                     <span className="text-[10px] text-muted-foreground flex items-center gap-1">
@@ -245,7 +307,7 @@ export default function InsightsChat() {
                             <MessageCircle size={32} className="text-purple-400" />
                         </div>
                         <h2 className="text-lg font-semibold text-foreground mb-1">
-                            Hey! I'm your business assistant 👋
+                            Hey! I'm {botName} 👋
                         </h2>
                         <p className="text-sm text-muted-foreground mb-6 max-w-xs">
                             Ask me anything about your sales, expenses, payments, or customers. I know everything about your business!

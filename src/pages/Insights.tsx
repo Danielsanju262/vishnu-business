@@ -11,7 +11,7 @@ import {
     ChevronDown,
     ChevronRight,
     MessageCircle,
-
+    Target,
     Check,
 } from "lucide-react";
 import { cn } from "../lib/utils";
@@ -210,6 +210,25 @@ export default function Insights() {
                                 </div>
                             </div>
                             <ChevronRight size={24} className="text-amber-400 group-hover:translate-x-1 transition-transform" />
+                        </div>
+                    </button>
+
+                    {/* My Goals - Track Progress */}
+                    <button
+                        onClick={() => navigate('/insights/goals')}
+                        className="w-full p-4 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 hover:from-emerald-500/30 hover:to-teal-500/30 active:from-emerald-500/40 active:to-teal-500/40 rounded-2xl border border-emerald-500/20 transition-all group"
+                    >
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+                                    <Target size={24} className="text-emerald-400" />
+                                </div>
+                                <div className="text-left">
+                                    <h2 className="text-lg font-semibold text-foreground">My Goals</h2>
+                                    <p className="text-sm text-muted-foreground">Track your targets & EMIs</p>
+                                </div>
+                            </div>
+                            <ChevronRight size={24} className="text-emerald-400 group-hover:translate-x-1 transition-transform" />
                         </div>
                     </button>
 

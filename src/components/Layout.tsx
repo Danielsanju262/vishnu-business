@@ -4,6 +4,7 @@ import { cn } from "../lib/utils";
 import { usePaymentNotifications } from "../hooks/usePaymentNotifications";
 import { useAutoBackup } from "../hooks/useAutoBackup";
 import { useNavBadgeCounts } from "../hooks/usePendingTaskCount";
+import { useIsMobileKeyboardOpen } from "../hooks/useIsMobileKeyboardOpen";
 
 export default function Layout() {
     const location = useLocation();
@@ -84,10 +85,12 @@ export default function Layout() {
 
     // List of routes where the bottom nav should be hidden
     const hiddenNavRoutes = ["/insights/chat", "/sale/new", "/expense/new"];
-    const shouldShowNav = !hiddenNavRoutes.includes(location.pathname);
+    const isKeyboardOpen = useIsMobileKeyboardOpen();
+    const isNavRoute = !hiddenNavRoutes.includes(location.pathname);
+    const shouldShowNav = isNavRoute && !isKeyboardOpen;
 
     return (
-        <div className={cn("min-h-screen relative bg-background selection:bg-primary/20", shouldShowNav && "pb-28 md:pb-32")}>
+        <div className={cn("min-h-screen relative bg-background selection:bg-primary/20", isNavRoute && "pb-28 md:pb-32")}>
             <main className="h-full">
                 <Outlet />
             </main>
