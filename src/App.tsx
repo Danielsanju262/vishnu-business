@@ -28,8 +28,9 @@ import ScrollToTop from "./components/ScrollToTop";
 import GlobalAIWidget from "./components/AI/GlobalAIWidget";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import LockScreen from "./components/LockScreen";
-import { useMorningNotifications } from "./hooks/useMorningNotifications";
-import { useNativeNotifications } from "./hooks/useNativeNotifications";
+// Notifications disabled per user request
+// import { useMorningNotifications } from "./hooks/useMorningNotifications";
+// import { useNativeNotifications } from "./hooks/useNativeNotifications";
 
 import { useDeepLinkBackHandler } from "./hooks/useDeepLinkBackHandler";
 import { useAutoBackup } from "./hooks/useAutoBackup";
@@ -45,10 +46,10 @@ function AppContent() {
   const [isDeviceAuthorized, setIsDeviceAuthorized] = useState<boolean | null>(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
 
-  // Initialize morning notifications (web fallback)
-  useMorningNotifications();
-  // Initialize native notifications (for background delivery on mobile)
-  useNativeNotifications();
+  // Notifications disabled per user request
+  // useMorningNotifications();
+  // useNativeNotifications();
+
   // Initialize auto backup
   useAutoBackup();
 
