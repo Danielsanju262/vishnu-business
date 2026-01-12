@@ -13,7 +13,10 @@ import {
     Sparkles,
     Trophy,
     ChevronRight,
-    Receipt
+    Receipt,
+    ChevronDown,
+    ChevronUp,
+    MessageSquareQuote
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from '../components/ui/Button';
@@ -58,10 +61,23 @@ export default function Brief() {
     // State
     const [loading, setLoading] = useState(true);
     const [goals, setGoals] = useState<UserGoal[]>([]);
-    const [paymentReminders, setPaymentReminders] = useState<PaymentReminder[]>([]);
-    const [accountsPayable, setAccountsPayable] = useState<AccountPayable[]>([]);
+
+    // We will store just the overdue/today items for display
+    const [todayReminders, setTodayReminders] = useState<PaymentReminder[]>([]);
+    const [overdueReminders, setOverdueReminders] = useState<PaymentReminder[]>([]);
+
+    const [todayPayables, setTodayPayables] = useState<AccountPayable[]>([]);
+    const [overduePayables, setOverduePayables] = useState<AccountPayable[]>([]);
+
     const [customers, setCustomers] = useState<Customer[]>([]);
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+
+    // UI State
+    const [isFinancialsOpen, setIsFinancialsOpen] = useState(false);
+    const [aiSummary, setAiSummary] = useState('');
+
+    // Yesterday's Stats
+    const [yesterdayStats, setYesterdayStats] = useState({ revenue: 0, netProfit: 0 });
 
     // Goal completion modal
     const [completingGoal, setCompletingGoal] = useState<UserGoal | null>(null);
@@ -71,7 +87,77 @@ export default function Brief() {
     // Load all data
     useEffect(() => {
         loadAllData();
+
+        // Subscribe to real-time changes
+        const channel = supabase
+            .channel('brief-goals-changes')
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'user_goals'
+                },
+                () => {
+                    loadAllData();
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, []);
+
+    const generateDailySummary = (
+        yStats: { revenue: number, netProfit: number },
+        tPay: AccountPayable[],
+        oPay: AccountPayable[],
+        tRec: PaymentReminder[],
+        oRec: PaymentReminder[],
+        pendingTasks: any[]
+    ) => {
+        const hour = new Date().getHours();
+        const timeGreeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+
+        // Revenue sentiment
+        let revenueText = '';
+        if (yStats.revenue > 0) {
+            revenueText = `Yesterday was productive with ₹${yStats.revenue.toLocaleString()} in sales`;
+            if (yStats.netProfit > 0) revenueText += ` and a healthy profit of ₹${yStats.netProfit.toLocaleString()}.`;
+            else revenueText += `.`;
+        } else {
+            revenueText = "Yesterday was quiet on the sales front.";
+        }
+
+        // Financial obligations
+        const totalDueCount = tPay.length + oPay.length;
+        const totalRecCount = tRec.length + oRec.length;
+
+        let financeText = '';
+        if (totalDueCount > 0 || totalRecCount > 0) {
+            financeText = " Financially, ";
+            if (totalDueCount > 0 && totalRecCount > 0) {
+                financeText += `you have some payments to settle and collections to make today.`;
+            } else if (totalDueCount > 0) {
+                financeText += `you have payments to clear today.`;
+            } else {
+                financeText += `you have reliable collections coming in today.`;
+            }
+        } else {
+            financeText = " No major payments or collections are due today.";
+        }
+
+        // Tasks
+        let taskText = '';
+        if (pendingTasks.length > 0) {
+            taskText = ` You have ${pendingTasks.length} pending action items to look into.`;
+        } else {
+            taskText = ` You're all caught up on tasks!`;
+        }
+
+        return `${timeGreeting}! ${revenueText}${financeText}${taskText} Let's make today count.`;
+    };
 
     const loadAllData = async () => {
         setLoading(true);
@@ -81,21 +167,71 @@ export default function Brief() {
             const activeGoals = goalsData.filter(g => g.status === 'active');
             setGoals(activeGoals);
 
-            // Load payment reminders (to be received)
+            // Fetch yesterday's stats
+            const yesterdayDate = new Date();
+            yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+            const yStr = yesterdayDate.toISOString().split('T')[0];
+
+            // Yesterday Revenue
+            const { data: ySales } = await supabase
+                .from('transactions')
+                .select('sell_price, buy_price, quantity')
+                .eq('date', yStr)
+                .is('deleted_at', null);
+
+            const yRevenue = (ySales || []).reduce((sum, t) => sum + (t.sell_price * t.quantity), 0);
+            const yCost = (ySales || []).reduce((sum, t) => sum + (t.buy_price * t.quantity), 0);
+
+            // Yesterday Expenses
+            const { data: yExpenses } = await supabase
+                .from('expenses')
+                .select('amount')
+                .eq('date', yStr)
+                .is('deleted_at', null);
+
+            const yExpenseTotal = (yExpenses || []).reduce((sum, e) => sum + Number(e.amount), 0);
+
+            const stats = {
+                revenue: yRevenue,
+                netProfit: yRevenue - yCost - yExpenseTotal
+            };
+            setYesterdayStats(stats);
+
+            const todayStr = new Date().toISOString().split('T')[0];
+            let tReminders: PaymentReminder[] = [];
+            let oReminders: PaymentReminder[] = [];
+            let tPayables: AccountPayable[] = [];
+            let oPayables: AccountPayable[] = [];
+
+            // Load payment reminders (To Receive)
             const { data: remindersData } = await supabase
                 .from('payment_reminders')
                 .select('*')
                 .eq('status', 'pending')
+                .lte('due_date', todayStr) // Only today or older
                 .order('due_date', { ascending: true });
-            if (remindersData) setPaymentReminders(remindersData);
 
-            // Load accounts payable (to be paid)
+            if (remindersData) {
+                tReminders = remindersData.filter(r => r.due_date === todayStr);
+                oReminders = remindersData.filter(r => r.due_date < todayStr);
+                setTodayReminders(tReminders);
+                setOverdueReminders(oReminders);
+            }
+
+            // Load accounts payable (To Pay)
             const { data: payablesData } = await supabase
                 .from('accounts_payable')
                 .select('*')
                 .eq('status', 'pending')
+                .lte('due_date', todayStr) // Only today or older
                 .order('due_date', { ascending: true });
-            if (payablesData) setAccountsPayable(payablesData);
+
+            if (payablesData) {
+                tPayables = payablesData.filter(p => p.due_date === todayStr);
+                oPayables = payablesData.filter(p => p.due_date < todayStr);
+                setTodayPayables(tPayables);
+                setOverduePayables(oPayables);
+            }
 
             // Load customers
             const { data: customersData } = await supabase
@@ -110,6 +246,9 @@ export default function Brief() {
                 .select('id, name')
                 .eq('is_active', true);
             if (suppliersData) setSuppliers(suppliersData);
+
+            // Generate Summary using filtered lists
+            setAiSummary(generateDailySummary(stats, tPayables, oPayables, tReminders, oReminders, tasks));
 
         } catch (error) {
             console.error('Error loading brief data:', error);
@@ -195,10 +334,6 @@ export default function Brief() {
         }
     };
 
-    // Calculate totals
-    const totalToReceive = paymentReminders.reduce((sum, r) => sum + Number(r.amount), 0);
-    const totalToPay = accountsPayable.reduce((sum, a) => sum + Number(a.amount), 0);
-
     if (loading) {
         return (
             <div className="min-h-screen bg-background flex items-center justify-center">
@@ -207,23 +342,30 @@ export default function Brief() {
         );
     }
 
+    // Totals for summary
+    const totalToPay = todayPayables.reduce((sum, p) => sum + p.amount, 0) + overduePayables.reduce((sum, p) => sum + p.amount, 0);
+    const totalToReceive = todayReminders.reduce((sum, r) => sum + r.amount, 0) + overdueReminders.reduce((sum, r) => sum + r.amount, 0);
+
     return (
         <div className="min-h-screen bg-background pb-24 animate-in fade-in">
             {/* Header */}
-            <div className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-white/10 px-4 py-4">
+            <div
+                className="sticky top-0 z-50 border-b border-neutral-200 dark:border-white/10 px-4 py-4 shadow-sm"
+                style={{ backgroundColor: 'hsl(var(--background))' }}
+            >
                 <div className="flex items-center gap-3 max-w-2xl mx-auto">
                     <button
                         onClick={() => window.history.back()}
-                        className="p-3 rounded-xl bg-white/5 hover:bg-white/10 text-neutral-400 hover:text-white transition-all"
+                        className="p-3 -ml-2 text-neutral-400 hover:text-white transition-all"
                     >
                         <ArrowLeft size={20} strokeWidth={2.5} />
                     </button>
                     <div className="flex-1">
                         <div className="flex items-center gap-2 text-xs text-neutral-500 mb-0.5">
                             <Sparkles size={14} />
-                            <span className="font-semibold">Your Daily Brief</span>
+                            <span className="font-semibold">Your Brief</span>
                         </div>
-                        <h1 className="text-xl font-bold text-white tracking-tight">
+                        <h1 className="text-xl font-bold text-foreground tracking-tight">
                             {format(new Date(), 'EEEE, MMM d')}
                         </h1>
                     </div>
@@ -231,13 +373,49 @@ export default function Brief() {
             </div>
 
             <div className="max-w-2xl mx-auto px-4 space-y-6 mt-6">
+
+                {/* AI Summary Block */}
+                {aiSummary && (
+                    <div className="bg-gradient-to-br from-purple-500/10 to-blue-500/5 border border-purple-500/20 rounded-2xl p-4 flex gap-3 shadow-sm">
+                        <MessageSquareQuote className="w-6 h-6 text-purple-400 shrink-0 mt-1" />
+                        <div>
+                            <p className="text-sm font-medium text-purple-100 leading-relaxed">
+                                {aiSummary}
+                            </p>
+                        </div>
+                    </div>
+                )}
+
+                {/* Yesterday's Stats */}
+                <section className="bg-zinc-900 border border-white/10 rounded-2xl p-4">
+                    <div className="bg-zinc-800/50 rounded-lg px-4 py-3 mb-4 inline-flex items-center gap-2 border border-white/5">
+                        <Calendar size={18} className="text-neutral-400" />
+                        <h2 className="text-sm font-bold text-neutral-300 uppercase tracking-wider">Yesterday's Performance</h2>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <div className="text-xs text-neutral-400 mb-1">Total Revenue</div>
+                            <div className="text-xl font-bold text-white">₹{yesterdayStats.revenue.toLocaleString()}</div>
+                        </div>
+                        <div>
+                            <div className="text-xs text-neutral-400 mb-1">Net Profit</div>
+                            <div className={cn(
+                                "text-xl font-bold",
+                                yesterdayStats.netProfit >= 0 ? "text-emerald-400" : "text-red-400"
+                            )}>
+                                ₹{yesterdayStats.netProfit.toLocaleString()}
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
                 {/* Tasks Section */}
                 <section>
                     <div className="flex items-center justify-between mb-3">
-                        <h2 className="text-sm font-bold text-neutral-400 uppercase tracking-wider flex items-center gap-2">
-                            <CheckCircle2 size={16} className="text-emerald-500" />
-                            Today's Tasks ({tasks.length})
-                        </h2>
+                        <div className="bg-emerald-500/10 rounded-lg px-4 py-3 inline-flex items-center gap-2 border border-emerald-500/20">
+                            <CheckCircle2 size={18} className="text-emerald-400" />
+                            <h2 className="text-sm font-bold text-emerald-300 uppercase tracking-wider">Today's Tasks ({tasks.length})</h2>
+                        </div>
                         <button
                             onClick={() => navigate('/insights')}
                             className="text-xs text-purple-400 hover:text-purple-300 font-medium flex items-center gap-1"
@@ -282,113 +460,167 @@ export default function Brief() {
                     )}
                 </section>
 
-                {/* Payments Section */}
+                {/* Financial Overview (Collapsible) */}
                 <section>
-                    <h2 className="text-sm font-bold text-neutral-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-                        <IndianRupee size={16} className="text-blue-500" />
-                        Payments
-                    </h2>
-                    <div className="grid grid-cols-2 gap-3">
-                        {/* To Receive */}
-                        <button
-                            onClick={() => navigate('/payment-reminders')}
-                            className="bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 border border-emerald-500/30 rounded-xl p-4 text-left hover:from-emerald-500/30 hover:to-emerald-600/20 transition-all group"
-                        >
-                            <div className="flex items-center gap-2 mb-2">
-                                <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
-                                    <TrendingUp size={16} className="text-emerald-400" />
-                                </div>
-                                <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">
-                                    To Receive
-                                </span>
+                    <button
+                        onClick={() => setIsFinancialsOpen(!isFinancialsOpen)}
+                        className="w-full flex flex-col gap-3 bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 transition-all hover:bg-blue-500/20 text-left mb-3"
+                    >
+                        <div className="w-full flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <IndianRupee size={18} className="text-blue-400" />
+                                <h2 className="text-sm font-bold text-blue-300 uppercase tracking-wider">Financial Overview</h2>
                             </div>
-                            <p className="text-2xl font-black text-white mb-1">
-                                ₹{totalToReceive.toLocaleString()}
-                            </p>
-                            <p className="text-xs text-emerald-400">
-                                {paymentReminders.length} customer{paymentReminders.length !== 1 ? 's' : ''}
-                            </p>
-                        </button>
-
-                        {/* To Pay */}
-                        <button
-                            onClick={() => navigate('/accounts-payable')}
-                            className="bg-gradient-to-br from-red-500/20 to-red-600/10 border border-red-500/30 rounded-xl p-4 text-left hover:from-red-500/30 hover:to-red-600/20 transition-all group"
-                        >
-                            <div className="flex items-center gap-2 mb-2">
-                                <div className="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center">
-                                    <Receipt size={16} className="text-red-400" />
+                            {isFinancialsOpen ? (
+                                <ChevronUp size={20} className="text-blue-300" />
+                            ) : (
+                                <div className="flex items-center gap-1 text-blue-300 text-xs font-medium bg-blue-500/20 px-2 py-1 rounded-lg">
+                                    Tap to View <ChevronDown size={14} />
                                 </div>
-                                <span className="text-xs font-bold text-red-400 uppercase tracking-wider">
-                                    To Pay
-                                </span>
-                            </div>
-                            <p className="text-2xl font-black text-white mb-1">
-                                ₹{totalToPay.toLocaleString()}
-                            </p>
-                            <p className="text-xs text-red-400">
-                                {accountsPayable.length} supplier{accountsPayable.length !== 1 ? 's' : ''}
-                            </p>
-                        </button>
-                    </div>
+                            )}
+                        </div>
 
-                    {/* Recent Payment Items */}
-                    {(paymentReminders.length > 0 || accountsPayable.length > 0) && (
-                        <div className="mt-3 space-y-2">
-                            {paymentReminders.slice(0, 2).map((reminder) => {
-                                const status = getDueStatus(reminder.due_date);
-                                return (
-                                    <div
-                                        key={reminder.id}
-                                        onClick={() => navigate('/payment-reminders')}
-                                        className="bg-zinc-900/50 border border-white/5 rounded-lg p-3 flex items-center justify-between cursor-pointer hover:bg-zinc-900/70 transition-all"
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
-                                                <TrendingUp size={14} className="text-emerald-400" />
-                                            </div>
-                                            <div>
-                                                <p className="text-sm font-medium text-white">
-                                                    {getCustomerName(reminder.customer_id)}
-                                                </p>
-                                                <p className={cn("text-xs font-medium", status.color)}>
-                                                    {status.text}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <p className="text-sm font-bold text-emerald-400">
-                                            ₹{Number(reminder.amount).toLocaleString()}
-                                        </p>
+                        {!isFinancialsOpen && (
+                            <div className="w-full grid grid-cols-2 gap-4 pt-1">
+                                <div>
+                                    <span className="text-xs text-blue-200/60 block">To Pay</span>
+                                    <span className="text-sm font-bold text-white">₹{totalToPay.toLocaleString()}</span>
+                                </div>
+                                <div>
+                                    <span className="text-xs text-blue-200/60 block">To Receive</span>
+                                    <span className="text-sm font-bold text-white">₹{totalToReceive.toLocaleString()}</span>
+                                </div>
+                            </div>
+                        )}
+                    </button>
+
+                    {isFinancialsOpen && (
+                        <div className="grid md:grid-cols-2 gap-4 animate-in slide-in-from-top-2 fade-in duration-200">
+                            {/* To Pay Today */}
+                            <div className="bg-zinc-900 border border-white/5 rounded-2xl p-4">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center">
+                                        <Receipt size={20} className="text-orange-400" />
                                     </div>
-                                );
-                            })}
-                            {accountsPayable.slice(0, 2).map((payable) => {
-                                const status = getDueStatus(payable.due_date);
-                                return (
-                                    <div
-                                        key={payable.id}
-                                        onClick={() => navigate('/accounts-payable')}
-                                        className="bg-zinc-900/50 border border-white/5 rounded-lg p-3 flex items-center justify-between cursor-pointer hover:bg-zinc-900/70 transition-all"
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center">
-                                                <Receipt size={14} className="text-red-400" />
-                                            </div>
-                                            <div>
-                                                <p className="text-sm font-medium text-white">
-                                                    {getSupplierName(payable.supplier_id)}
-                                                </p>
-                                                <p className={cn("text-xs font-medium", status.color)}>
-                                                    {status.text}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <p className="text-sm font-bold text-red-400">
-                                            ₹{Number(payable.amount).toLocaleString()}
-                                        </p>
+                                    <div>
+                                        <h3 className="font-bold text-white">To Pay Today</h3>
+                                        <p className="text-xs text-neutral-400">Bills & Suppliers</p>
                                     </div>
-                                );
-                            })}
+                                    <div className="ml-auto text-right">
+                                        <div className="text-lg font-bold text-white">
+                                            ₹{totalToPay.toLocaleString()}
+                                        </div>
+                                        <div className="text-[10px] text-orange-400 font-medium">Total Due</div>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    {/* Overdue Items */}
+                                    {overduePayables.length > 0 && (
+                                        <div className="space-y-1">
+                                            <p className="text-[10px] font-bold text-red-400 uppercase tracking-wider px-1">Overdue</p>
+                                            {overduePayables.map((item) => {
+                                                const supplier = suppliers.find(s => s.id === item.supplier_id);
+                                                const daysOverdue = differenceInDays(new Date(), new Date(item.due_date));
+                                                return (
+                                                    <div key={item.id} className="flex items-center justify-between p-2.5 rounded-lg bg-red-500/10 border border-red-500/20">
+                                                        <div>
+                                                            <div className="text-sm font-medium text-red-200">{supplier?.name || 'Unknown Supplier'}</div>
+                                                            <div className="text-[10px] text-red-400">Due {daysOverdue} days ago</div>
+                                                        </div>
+                                                        <div className="font-bold text-red-200">₹{item.amount.toLocaleString()}</div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+
+                                    {/* Due Today Items */}
+                                    {todayPayables.length > 0 && (
+                                        <div className="space-y-1 mt-2">
+                                            <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider px-1">Due Today</p>
+                                            {todayPayables.map((item) => {
+                                                const supplier = suppliers.find(s => s.id === item.supplier_id);
+                                                return (
+                                                    <div key={item.id} className="flex items-center justify-between p-2.5 rounded-lg bg-white/5 border border-white/5">
+                                                        <div className="text-sm font-medium text-white">{supplier?.name || 'Unknown Supplier'}</div>
+                                                        <div className="font-bold text-white">₹{item.amount.toLocaleString()}</div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+
+                                    {overduePayables.length === 0 && todayPayables.length === 0 && (
+                                        <div className="text-center py-4 text-xs text-neutral-500">
+                                            No payments due today.
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* To Receive Today */}
+                            <div className="bg-zinc-900 border border-white/5 rounded-2xl p-4">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+                                        <IndianRupee size={20} className="text-emerald-400" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-white">To Receive Today</h3>
+                                        <p className="text-xs text-neutral-400">Customer Payments</p>
+                                    </div>
+                                    <div className="ml-auto text-right">
+                                        <div className="text-lg font-bold text-white">
+                                            ₹{totalToReceive.toLocaleString()}
+                                        </div>
+                                        <div className="text-[10px] text-emerald-400 font-medium">Total Collectible</div>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    {/* Overdue Items */}
+                                    {overdueReminders.length > 0 && (
+                                        <div className="space-y-1">
+                                            <p className="text-[10px] font-bold text-red-400 uppercase tracking-wider px-1">Overdue</p>
+                                            {overdueReminders.map((item) => {
+                                                const customer = customers.find(c => c.id === item.customer_id);
+                                                const daysOverdue = differenceInDays(new Date(), new Date(item.due_date));
+                                                return (
+                                                    <div key={item.id} className="flex items-center justify-between p-2.5 rounded-lg bg-red-500/10 border border-red-500/20">
+                                                        <div>
+                                                            <div className="text-sm font-medium text-red-200">{customer?.name || 'Unknown Customer'}</div>
+                                                            <div className="text-[10px] text-red-400">Due {daysOverdue} days ago</div>
+                                                        </div>
+                                                        <div className="font-bold text-red-200">₹{item.amount.toLocaleString()}</div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+
+                                    {/* Due Today Items */}
+                                    {todayReminders.length > 0 && (
+                                        <div className="space-y-1 mt-2">
+                                            <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider px-1">Due Today</p>
+                                            {todayReminders.map((item) => {
+                                                const customer = customers.find(c => c.id === item.customer_id);
+                                                return (
+                                                    <div key={item.id} className="flex items-center justify-between p-2.5 rounded-lg bg-white/5 border border-white/5">
+                                                        <div className="text-sm font-medium text-white">{customer?.name || 'Unknown Customer'}</div>
+                                                        <div className="font-bold text-white">₹{item.amount.toLocaleString()}</div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+
+                                    {overdueReminders.length === 0 && todayReminders.length === 0 && (
+                                        <div className="text-center py-4 text-xs text-neutral-500">
+                                            No payments expected today.
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                         </div>
                     )}
                 </section>
@@ -396,10 +628,10 @@ export default function Brief() {
                 {/* Goals Section */}
                 <section>
                     <div className="flex items-center justify-between mb-3">
-                        <h2 className="text-sm font-bold text-neutral-400 uppercase tracking-wider flex items-center gap-2">
-                            <Target size={16} className="text-purple-500" />
-                            My Goals ({goals.length})
-                        </h2>
+                        <div className="bg-purple-500/10 rounded-lg px-4 py-3 inline-flex items-center gap-2 border border-purple-500/20">
+                            <Target size={18} className="text-purple-400" />
+                            <h2 className="text-sm font-bold text-purple-300 uppercase tracking-wider">My Goals ({goals.length})</h2>
+                        </div>
                         <button
                             onClick={() => navigate('/insights/goals')}
                             className="text-xs text-purple-400 hover:text-purple-300 font-medium flex items-center gap-1"

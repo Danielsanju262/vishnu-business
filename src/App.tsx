@@ -109,7 +109,7 @@ function AppContent() {
       <ScrollToTop />
       {isLocked && <LockScreen />}
       {/* Global AI Widget - appears on all pages */}
-      <GlobalAIWidget />
+      {!isLocked && <GlobalAIWidget />}
       <Routes>
         <Route path="/" element={<Layout />}>
           <Route index element={<Dashboard />} />

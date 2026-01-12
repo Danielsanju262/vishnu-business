@@ -590,6 +590,7 @@ export default function LockScreen() {
                                 <button
                                     type="button"
                                     onClick={() => setShowBypassMode(true)}
+                                    tabIndex={-1}
                                     className="text-sm text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 font-medium hover:underline active:underline py-2 transition-colors flex items-center justify-center gap-1.5"
                                 >
                                     <Timer size={14} />
@@ -626,6 +627,7 @@ export default function LockScreen() {
                             <button
                                 type="button"
                                 onClick={() => setShowBypassMode(true)}
+                                tabIndex={-1}
                                 className="w-full text-sm text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 font-medium hover:underline active:underline py-3 transition-colors flex items-center justify-center gap-1.5"
                             >
                                 <Timer size={14} />

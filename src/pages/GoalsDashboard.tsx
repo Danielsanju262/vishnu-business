@@ -40,6 +40,7 @@ import {
     updateGoalProgress,
     type UserGoal
 } from '../lib/aiMemory';
+import { supabase } from '../lib/supabase';
 
 // Goal type icons
 const goalTypeIcons: Record<string, React.ReactNode> = {
@@ -82,13 +83,34 @@ export default function GoalsDashboard() {
     useEffect(() => {
         loadGoals();
 
-        // Listen for updates from AI
+        // Subscribe to real-time changes
+        const channel = supabase
+            .channel('goals-dashboard-changes')
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'user_goals'
+                },
+                (payload) => {
+                    console.log('Real-time goal update received:', payload);
+                    loadGoals();
+                }
+            )
+            .subscribe();
+
+        // Listen for internal app updates
         const handleGoalUpdate = () => {
             loadGoals();
         };
 
         window.addEventListener('goal-updated', handleGoalUpdate);
-        return () => window.removeEventListener('goal-updated', handleGoalUpdate);
+
+        return () => {
+            supabase.removeChannel(channel);
+            window.removeEventListener('goal-updated', handleGoalUpdate);
+        };
     }, []);
 
     const loadGoals = async () => {
@@ -211,21 +233,31 @@ export default function GoalsDashboard() {
         setShowProgressModal(true);
     };
 
-    const handleSaveProgress = async () => {
+    const handleSaveAdjustment = async (type: 'add' | 'subtract') => {
         if (!updatingGoal) return;
 
-        const amount = parseFloat(newProgressAmount);
-        if (isNaN(amount)) return;
+        const adjAmount = parseFloat(newProgressAmount);
+        if (isNaN(adjAmount) || adjAmount < 0) {
+            toast('Please enter a valid amount', 'error');
+            return;
+        }
+
+        const currentTotal = updatingGoal.current_amount;
+        let newTotal = 0;
+
+        if (type === 'add') {
+            newTotal = currentTotal + adjAmount;
+        } else {
+            newTotal = Math.max(0, currentTotal - adjAmount);
+        }
 
         try {
             await updateGoal(updatingGoal.id, {
-                current_amount: amount,
-                // Force switch to manual tracking so auto-sync doesn't overwrite it
+                current_amount: newTotal,
                 metric_type: 'manual_check'
             });
-            toast('Progress updated successfully. Goal switched to Manual tracking.', 'success');
+            toast(type === 'add' ? 'Amount added successfully!' : 'Amount reduced successfully!', 'success');
 
-            // Wait a small moment before reloading to ensure DB transaction clears
             setTimeout(() => {
                 loadGoals();
             }, 500);
@@ -238,6 +270,8 @@ export default function GoalsDashboard() {
             toast('Failed to update progress', 'error');
         }
     };
+
+
 
     const handleCompleteGoal = async (goalId: string) => {
         try {
@@ -721,23 +755,43 @@ export default function GoalsDashboard() {
             >
                 <div className="space-y-4">
                     <div>
-                        <label className="text-xs text-neutral-400 mb-1.5 block">Current Progress Amount (₹)</label>
+                        <label className="text-xs text-neutral-400 mb-1.5 block">
+                            Amount to Adjust (₹)
+                        </label>
                         <Input
                             type="number"
                             value={newProgressAmount}
                             onChange={(e) => setNewProgressAmount(e.target.value)}
-                            placeholder="e.g. 5000"
+                            placeholder="e.g. 500"
                             className="bg-zinc-800 border-white/10"
+                            autoFocus
                         />
                         <p className="text-[10px] text-neutral-500 mt-1.5">
-                            Enter the total amount accumulated so far.
+                            Enter an amount to add or subtract from your current collected total.
                             {updatingGoal?.metric_type === 'net_profit' && (
                                 <span className="text-amber-500 block mt-1">
-                                    Note: This goal tracks Net Profit automatically. Updating this manually may be overwritten by the next auto-sync unless you change the metric type.
+                                    Note: Manually updating this Net Profit goal will switch it to 'Manual Check' mode to prevent auto-sync overwrites.
                                 </span>
                             )}
                         </p>
                     </div>
+
+                    {updatingGoal && (
+                        <div className="bg-white/5 rounded-lg p-3 border border-white/5">
+                            <div className="flex justify-between text-xs mb-1">
+                                <span className="text-neutral-400">Current Total:</span>
+                                <span className="text-white font-mono">₹{updatingGoal.current_amount.toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between text-xs">
+                                <span className="text-neutral-400">New Total will be:</span>
+                                <span className="text-purple-400 font-bold font-mono">
+                                    ₹{(updatingGoal.current_amount + (parseFloat(newProgressAmount) || 0)).toLocaleString()}
+                                    <span className="text-neutral-500 font-normal mx-1">or</span>
+                                    ₹{Math.max(0, updatingGoal.current_amount - (parseFloat(newProgressAmount) || 0)).toLocaleString()}
+                                </span>
+                            </div>
+                        </div>
+                    )}
 
                     <div className="flex gap-3 pt-2">
                         <Button
@@ -747,11 +801,18 @@ export default function GoalsDashboard() {
                         >
                             Cancel
                         </Button>
+
                         <Button
-                            onClick={handleSaveProgress}
-                            className="flex-1 bg-purple-600 hover:bg-purple-500"
+                            onClick={() => handleSaveAdjustment('subtract')}
+                            className="flex-1 bg-red-600/80 hover:bg-red-500"
                         >
-                            Update
+                            - Subtract
+                        </Button>
+                        <Button
+                            onClick={() => handleSaveAdjustment('add')}
+                            className="flex-1 bg-emerald-600/80 hover:bg-emerald-500"
+                        >
+                            + Add
                         </Button>
                     </div>
                 </div>
