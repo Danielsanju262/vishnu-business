@@ -86,10 +86,17 @@ export default function Products() {
 
     const fetchProducts = useCallback(async () => {
         setLoading(true);
-        const { data } = await supabase.from("products").select("*").eq('is_active', true).order("name");
-        if (data) setProducts(data);
-        setLoading(false);
-    }, []);
+        try {
+            const { data, error } = await supabase.from("products").select("*").eq('is_active', true).order("name");
+            if (error) throw error;
+            if (data) setProducts(data);
+        } catch (error) {
+            console.error("Error loading products:", error);
+            toast("Failed to load products. Please refresh.", "error");
+        } finally {
+            setLoading(false);
+        }
+    }, [toast]);
 
     // Real-time sync for products - auto-refreshes when data changes on any device
     useRealtimeTable('products', fetchProducts, []);
@@ -357,6 +364,7 @@ export default function Products() {
                                 </div>
                                 <p className="font-medium">No products found</p>
                                 <p className="text-xs opacity-70 mt-1">Add items to your inventory</p>
+                                <Button variant="outline" size="sm" onClick={fetchProducts} className="mt-4">Refresh Data</Button>
                             </div>
                         )}
 

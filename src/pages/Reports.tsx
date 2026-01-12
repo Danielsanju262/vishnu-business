@@ -38,6 +38,7 @@ export default function Reports() {
     // Data State
     const [data, setData] = useState<{ transactions: any[], expenses: any[] }>({ transactions: [], expenses: [] });
     const [combinedExpenses, setCombinedExpenses] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
 
     // Detail Modal State - synced with browser history
     const [selectedDetail, setSelectedDetail] = useState<'sales' | 'goods' | 'expenses' | null>(null);
@@ -143,54 +144,66 @@ export default function Reports() {
     };
 
     const fetchData = useCallback(async () => {
+        setLoading(true);
         const { start, end } = getDateFilter();
 
-        const { data: transactions } = await supabase
-            .from('transactions')
-            .select('*, customers(name), products(name, unit)')
-            .is('deleted_at', null)
-            .gte('date', start)
-            .lte('date', end)
-            .order('created_at', { ascending: false });
+        try {
+            const { data: transactions, error: tError } = await supabase
+                .from('transactions')
+                .select('*, customers(name), products(name, unit)')
+                .is('deleted_at', null)
+                .gte('date', start)
+                .lte('date', end)
+                .order('created_at', { ascending: false });
 
-        const { data: expenses } = await supabase
-            .from('expenses')
-            .select('*')
-            .is('deleted_at', null)
-            .gte('date', start)
-            .lte('date', end)
-            .order('created_at', { ascending: false });
+            if (tError) throw tError;
 
-        if (transactions && expenses) {
-            setData({ transactions, expenses });
+            const { data: expenses, error: eError } = await supabase
+                .from('expenses')
+                .select('*')
+                .is('deleted_at', null)
+                .gte('date', start)
+                .lte('date', end)
+                .order('created_at', { ascending: false });
 
-            // Combine for "Expenses View"
-            // 1. Manual Expenses (Other Expense)
-            const manual = expenses.map(e => ({
-                id: e.id,
-                type: 'manual',
-                title: e.title,
-                amount: e.amount,
-                date: e.date,
-                isGhee: e.is_ghee_ingredient,
-                raw: e
-            }));
+            if (eError) throw eError;
 
-            // 2. COGS from Transactions (Goods Cost)
-            const cogs = transactions.filter(t => t.buy_price > 0).map(t => ({
-                id: `cogs-${t.id}`,
-                type: 'cogs',
-                title: `Goods Cost - ${t.products?.name}`,
-                amount: t.buy_price * t.quantity,
-                date: t.date,
-                isGhee: false,
-                raw: t
-            }));
+            if (transactions && expenses) {
+                setData({ transactions, expenses });
 
-            const all = [...manual, ...cogs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-            setCombinedExpenses(all);
+                // Combine for "Expenses View"
+                // 1. Manual Expenses (Other Expense)
+                const manual = expenses.map(e => ({
+                    id: e.id,
+                    type: 'manual',
+                    title: e.title,
+                    amount: e.amount,
+                    date: e.date,
+                    isGhee: e.is_ghee_ingredient,
+                    raw: e
+                }));
+
+                // 2. COGS from Transactions (Goods Cost)
+                const cogs = transactions.filter(t => t.buy_price > 0).map(t => ({
+                    id: `cogs-${t.id}`,
+                    type: 'cogs',
+                    title: `Goods Cost - ${t.products?.name}`,
+                    amount: t.buy_price * t.quantity,
+                    date: t.date,
+                    isGhee: false,
+                    raw: t
+                }));
+
+                const all = [...manual, ...cogs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                setCombinedExpenses(all);
+            }
+        } catch (error) {
+            console.error("Error fetching reports:", error);
+            toast("Failed to load data. Please refresh.", "error");
+        } finally {
+            setLoading(false);
         }
-    }, [rangeType, startDate, endDate]);
+    }, [rangeType, startDate, endDate, toast]);
 
     // Real-time sync for transactions and expenses - auto-refreshes when data changes on any device
     useRealtimeTables(['transactions', 'expenses'], fetchData, [rangeType, startDate, endDate]);
@@ -1013,10 +1026,15 @@ export default function Reports() {
                             </div>
 
                             <div className="space-y-3">
-                                {data.transactions.length === 0 && (
+                                {loading ? (
+                                    <div className="space-y-4">
+                                        {[1, 2, 3].map(i => <div key={i} className="h-20 bg-accent/30 rounded-xl animate-pulse" />)}
+                                    </div>
+                                ) : data.transactions.length === 0 && (
                                     <div className="text-center py-12 text-muted-foreground bg-accent/20 rounded-2xl border-2 border-dashed border-border/60">
                                         <ShoppingBag size={32} className="mx-auto mb-2 opacity-30" />
                                         <p className="font-medium">No sales recorded today.</p>
+                                        <Button variant="outline" size="sm" onClick={fetchData} className="mt-4">Refresh Data</Button>
                                     </div>
                                 )}
 

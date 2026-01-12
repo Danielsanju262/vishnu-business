@@ -481,47 +481,55 @@ export default function CustomerPaymentDetail() {
 
         setLoading(true);
 
-        // Load customer
-        const { data: customerData } = await supabase
-            .from("customers")
-            .select("id, name")
-            .eq("id", customerId)
-            .single();
+        try {
+            // Load customer
+            const { data: customerData, error: custError } = await supabase
+                .from("customers")
+                .select("id, name")
+                .eq("id", customerId)
+                .single();
 
-        if (customerData) setCustomer(customerData);
+            if (custError) throw custError;
+            if (customerData) setCustomer(customerData);
 
-        // Load ALL payment reminders for this customer
-        const { data: remindersData } = await supabase
-            .from("payment_reminders")
-            .select("*")
-            .eq("customer_id", customerId)
-            .eq("status", "pending")
-            .order("due_date", { ascending: true });
+            // Load ALL payment reminders for this customer
+            const { data: remindersData, error: remError } = await supabase
+                .from("payment_reminders")
+                .select("*")
+                .eq("customer_id", customerId)
+                .eq("status", "pending")
+                .order("due_date", { ascending: true });
 
-        if (remindersData && remindersData.length > 0) {
-            setReminders(remindersData);
+            if (remError) throw remError;
 
-            // Calculate total balance from all reminders
-            const total = remindersData.reduce((sum, r) => {
-                const val = typeof r.amount === 'string' ? parseFloat(r.amount) : r.amount;
-                return sum + (isNaN(val) ? 0 : val);
-            }, 0);
-            setTotalBalance(total);
+            if (remindersData && remindersData.length > 0) {
+                setReminders(remindersData);
 
-            // Get earliest due date
-            setEarliestDueDate(remindersData[0].due_date);
+                // Calculate total balance from all reminders
+                const total = remindersData.reduce((sum, r) => {
+                    const val = typeof r.amount === 'string' ? parseFloat(r.amount) : r.amount;
+                    return sum + (isNaN(val) ? 0 : val);
+                }, 0);
+                setTotalBalance(total);
 
-            // Combine and parse transactions from all reminders
-            const allNotes = remindersData.map(r => r.note || "").join("\n");
-            parseTransactions(allNotes);
-        } else {
-            setReminders([]);
-            setTotalBalance(0);
-            setEarliestDueDate(null);
-            setTransactions([]);
+                // Get earliest due date
+                setEarliestDueDate(remindersData[0].due_date);
+
+                // Combine and parse transactions from all reminders
+                const allNotes = remindersData.map(r => r.note || "").join("\n");
+                parseTransactions(allNotes);
+            } else {
+                setReminders([]);
+                setTotalBalance(0);
+                setEarliestDueDate(null);
+                setTransactions([]);
+            }
+        } catch (error) {
+            console.error("Error loading payment details:", error);
+            toast("Failed to load details. Please refresh.", "error");
+        } finally {
+            setLoading(false);
         }
-
-        setLoading(false);
     };
 
     const parseTransactions = (note: string) => {

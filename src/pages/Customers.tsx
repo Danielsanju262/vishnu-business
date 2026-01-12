@@ -83,10 +83,17 @@ export default function Customers() {
 
     const fetchCustomers = useCallback(async () => {
         setLoading(true);
-        const { data } = await supabase.from("customers").select("*").eq('is_active', true).order("name");
-        if (data) setCustomers(data);
-        setLoading(false);
-    }, []);
+        try {
+            const { data, error } = await supabase.from("customers").select("*").eq('is_active', true).order("name");
+            if (error) throw error;
+            if (data) setCustomers(data);
+        } catch (error) {
+            console.error("Error loading customers:", error);
+            toast("Failed to load customers. Please refresh.", "error");
+        } finally {
+            setLoading(false);
+        }
+    }, [toast]);
 
     // Real-time sync for customers - auto-refreshes when data changes on any device
     useRealtimeTable('customers', fetchCustomers, []);
@@ -306,6 +313,7 @@ export default function Customers() {
                                     </div>
                                     <p className="font-medium">No customers found</p>
                                     <p className="text-xs opacity-70 mt-1">Add a new customer to get started</p>
+                                    <Button variant="outline" size="sm" onClick={fetchCustomers} className="mt-4">Refresh Data</Button>
                                 </div>
                             )}
 

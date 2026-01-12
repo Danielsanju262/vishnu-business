@@ -332,51 +332,59 @@ export default function SupplierPaymentDetail() {
 
         setLoading(true);
 
-        // Load supplier
-        const { data: supplierData } = await supabase
-            .from("suppliers")
-            .select("id, name")
-            .eq("id", supplierId)
-            .single();
+        try {
+            // Load supplier
+            const { data: supplierData, error: supError } = await supabase
+                .from("suppliers")
+                .select("id, name")
+                .eq("id", supplierId)
+                .single();
 
-        if (supplierData) setSupplier(supplierData);
+            if (supError) throw supError;
+            if (supplierData) setSupplier(supplierData);
 
-        // Load ALL accounts payable for this supplier
-        const { data: payablesData } = await supabase
-            .from("accounts_payable")
-            .select("*")
-            .eq("supplier_id", supplierId)
-            .eq("status", "pending")
-            .order("due_date", { ascending: true });
+            // Load ALL accounts payable for this supplier
+            const { data: payablesData, error: payError } = await supabase
+                .from("accounts_payable")
+                .select("*")
+                .eq("supplier_id", supplierId)
+                .eq("status", "pending")
+                .order("due_date", { ascending: true });
 
-        if (payablesData && payablesData.length > 0) {
-            setPayables(payablesData);
+            if (payError) throw payError;
 
-            // Calculate total balance from all payables
-            const total = payablesData.reduce((sum, r) => {
-                const val = typeof r.amount === 'string' ? parseFloat(r.amount) : r.amount;
-                return sum + (isNaN(val) ? 0 : val);
-            }, 0);
-            setTotalBalance(total);
+            if (payablesData && payablesData.length > 0) {
+                setPayables(payablesData);
 
-            // Get earliest due date
-            setEarliestDueDate(payablesData[0].due_date);
+                // Calculate total balance from all payables
+                const total = payablesData.reduce((sum, r) => {
+                    const val = typeof r.amount === 'string' ? parseFloat(r.amount) : r.amount;
+                    return sum + (isNaN(val) ? 0 : val);
+                }, 0);
+                setTotalBalance(total);
 
-            // Combine and parse transactions from all payables
-            // Sort by recorded_at to ensure history is chronological regardless of due date
-            const historyPayables = [...payablesData].sort((a, b) =>
-                new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime()
-            );
-            const allNotes = historyPayables.map(r => r.note || "").join("\n");
-            parseTransactions(allNotes);
-        } else {
-            setPayables([]);
-            setTotalBalance(0);
-            setEarliestDueDate(null);
-            setTransactions([]);
+                // Get earliest due date
+                setEarliestDueDate(payablesData[0].due_date);
+
+                // Combine and parse transactions from all payables
+                // Sort by recorded_at to ensure history is chronological regardless of due date
+                const historyPayables = [...payablesData].sort((a, b) =>
+                    new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime()
+                );
+                const allNotes = historyPayables.map(r => r.note || "").join("\n");
+                parseTransactions(allNotes);
+            } else {
+                setPayables([]);
+                setTotalBalance(0);
+                setEarliestDueDate(null);
+                setTransactions([]);
+            }
+        } catch (error) {
+            console.error("Error loading details:", error);
+            toast("Failed to load details. Please refresh.", "error");
+        } finally {
+            setLoading(false);
         }
-
-        setLoading(false);
     };
 
     const parseTransactions = (note: string) => {

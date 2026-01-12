@@ -30,6 +30,7 @@ export default function NewSale() {
     // Data State
     const [customers, setCustomers] = useState<Customer[]>([]);
     const [products, setProducts] = useState<Product[]>([]);
+    const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
 
     // Supplier Payment State (Linked Payable)
@@ -158,15 +159,28 @@ export default function NewSale() {
     const productSearchInputRef = useRef<HTMLInputElement>(null);
 
     const fetchData = useCallback(async () => {
-        const [custRes, prodRes, supRes] = await Promise.all([
-            supabase.from("customers").select("*").eq('is_active', true).order("name"),
-            supabase.from("products").select("*").eq('is_active', true).order("name"),
-            supabase.from("suppliers").select("id, name").eq('is_active', true).order("name")
-        ]);
-        if (custRes.data) setCustomers(custRes.data);
-        if (prodRes.data) setProducts(prodRes.data);
-        if (supRes.data) setSuppliers(supRes.data);
-    }, []);
+        setLoading(true);
+        try {
+            const [custRes, prodRes, supRes] = await Promise.all([
+                supabase.from("customers").select("*").eq('is_active', true).order("name"),
+                supabase.from("products").select("*").eq('is_active', true).order("name"),
+                supabase.from("suppliers").select("id, name").eq('is_active', true).order("name")
+            ]);
+
+            if (custRes.error) throw custRes.error;
+            if (prodRes.error) throw prodRes.error;
+            if (supRes.error) throw supRes.error;
+
+            if (custRes.data) setCustomers(custRes.data);
+            if (prodRes.data) setProducts(prodRes.data);
+            if (supRes.data) setSuppliers(supRes.data);
+        } catch (error) {
+            console.error("Error loading data:", error);
+            toast("Failed to load data. Please refresh.", "error");
+        } finally {
+            setLoading(false);
+        }
+    }, [toast]);
 
     // Real-time sync for customers and products - auto-refreshes when data changes on any device
     useRealtimeTables(['customers', 'products', 'suppliers'], fetchData, []);
@@ -833,36 +847,51 @@ export default function NewSale() {
                         )}
 
                         <div className="flex-1 space-y-2.5">
-                            {customers.filter(c => c.name.toLowerCase().includes(search.toLowerCase())).map(c => (
-                                <button
-                                    key={c.id}
-                                    onClick={() => { setSelectedCust(c); setSearch(""); setStep("cart"); }}
-                                    onKeyDown={(e) => {
-                                        if (e.key === "Enter" || e.key === " ") {
-                                            e.preventDefault();
-                                            setSelectedCust(c);
-                                            setSearch("");
-                                            setStep("cart");
-                                        }
-                                    }}
-                                    tabIndex={0}
-                                    className="w-full bg-card p-3 rounded-xl border border-border/30 flex items-center justify-between shadow-sm hover:shadow-md hover:border-primary/30 hover:bg-accent/30 transition-all interactive group text-left focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
-                                    aria-label={`Select ${c.name}`}
-                                >
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center font-bold text-sm shadow-md shadow-blue-500/20 group-hover:scale-110 transition-transform">
-                                            {c.name.charAt(0).toUpperCase()}
+                            {loading ? (
+                                <div className="space-y-3">
+                                    {[1, 2, 3].map(i => <div key={i} className="h-16 bg-accent/30 rounded-xl animate-pulse" />)}
+                                </div>
+                            ) : (
+                                <>
+                                    {customers.filter(c => c.name.toLowerCase().includes(search.toLowerCase())).length === 0 && (
+                                        <div className="text-center py-8 text-muted-foreground bg-accent/20 rounded-2xl border-2 border-dashed border-border/60">
+                                            <p className="font-medium">No customers found</p>
+                                            <p className="text-xs mb-3">Add a new customer to continue</p>
+                                            <Button variant="outline" size="sm" onClick={fetchData}>Refresh List</Button>
                                         </div>
-                                        <div>
-                                            <span className="font-bold text-foreground text-base block">{c.name}</span>
-                                            <span className="text-xs text-muted-foreground font-medium">Customer</span>
-                                        </div>
-                                    </div>
-                                    <div className="p-2 bg-accent rounded-full text-muted-foreground group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                                        <ChevronRight size={16} />
-                                    </div>
-                                </button>
-                            ))}
+                                    )}
+                                    {customers.filter(c => c.name.toLowerCase().includes(search.toLowerCase())).map(c => (
+                                        <button
+                                            key={c.id}
+                                            onClick={() => { setSelectedCust(c); setSearch(""); setStep("cart"); }}
+                                            onKeyDown={(e) => {
+                                                if (e.key === "Enter" || e.key === " ") {
+                                                    e.preventDefault();
+                                                    setSelectedCust(c);
+                                                    setSearch("");
+                                                    setStep("cart");
+                                                }
+                                            }}
+                                            tabIndex={0}
+                                            className="w-full bg-card p-3 rounded-xl border border-border/30 flex items-center justify-between shadow-sm hover:shadow-md hover:border-primary/30 hover:bg-accent/30 transition-all interactive group text-left focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
+                                            aria-label={`Select ${c.name}`}
+                                        >
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center font-bold text-sm shadow-md shadow-blue-500/20 group-hover:scale-110 transition-transform">
+                                                    {c.name.charAt(0).toUpperCase()}
+                                                </div>
+                                                <div>
+                                                    <span className="font-bold text-foreground text-base block">{c.name}</span>
+                                                    <span className="text-xs text-muted-foreground font-medium">Customer</span>
+                                                </div>
+                                            </div>
+                                            <div className="p-2 bg-accent rounded-full text-muted-foreground group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                                                <ChevronRight size={16} />
+                                            </div>
+                                        </button>
+                                    ))}
+                                </>
+                            )}
                         </div>
                     </div>
                 )}
@@ -1383,27 +1412,41 @@ export default function NewSale() {
                                 </button>
                             )}
 
-                            <div className="grid grid-cols-2 gap-4 overflow-y-auto pb-4 pt-3">
-                                {products.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).map(p => (
-                                    <button
-                                        key={p.id}
-                                        onClick={() => { setTempProd(p); setStep("details"); }}
-                                        className="bg-card p-5 rounded-3xl border border-border/60 text-left hover:border-primary/50 hover:bg-accent/40 hover:shadow-lg transition-all shadow-sm h-40 flex flex-col justify-between interactive group relative overflow-hidden"
-                                    >
-                                        <div className={cn(
-                                            "w-12 h-12 rounded-2xl flex items-center justify-center mb-2 transition-transform duration-300 group-hover:scale-110",
-                                            p.category === 'ghee' ? "bg-amber-100 dark:bg-amber-900/30 text-amber-600" : "bg-primary/10 text-primary"
-                                        )}>
-                                            <Package size={24} />
-                                        </div>
-                                        <div className="relative z-10">
-                                            <p className="font-bold text-foreground leading-tight line-clamp-2 text-lg">{p.name}</p>
-                                            <span className="inline-block mt-2 px-2 py-0.5 bg-muted rounded-md text-[10px] font-bold uppercase tracking-wide text-muted-foreground group-hover:bg-background transition-colors">{p.unit}</span>
-                                        </div>
-                                        {/* Decorative gradient blob */}
-                                        <div className="absolute -bottom-8 -right-8 w-24 h-24 bg-gradient-to-br from-primary/10 to-transparent rounded-full blur-2xl group-hover:from-primary/20 transition-all opacity-0 group-hover:opacity-100" />
-                                    </button>
-                                ))}
+                            <div className="overflow-y-auto pb-4 pt-3 min-h-[200px]">
+                                {loading ? (
+                                    <div className="grid grid-cols-2 gap-4">
+                                        {[1, 2, 3, 4].map(i => <div key={i} className="h-40 bg-accent/30 rounded-3xl animate-pulse" />)}
+                                    </div>
+                                ) : products.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).length === 0 ? (
+                                    <div className="text-center py-12 text-muted-foreground bg-accent/20 rounded-3xl border-2 border-dashed border-border/60">
+                                        <Package size={32} className="mx-auto mb-2 opacity-30" />
+                                        <p className="font-medium">No products found</p>
+                                        <Button variant="outline" size="sm" onClick={fetchData} className="mt-4">Refresh Data</Button>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-2 gap-4">
+                                        {products.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).map(p => (
+                                            <button
+                                                key={p.id}
+                                                onClick={() => { setTempProd(p); setStep("details"); }}
+                                                className="bg-card p-5 rounded-3xl border border-border/60 text-left hover:border-primary/50 hover:bg-accent/40 hover:shadow-lg transition-all shadow-sm h-40 flex flex-col justify-between interactive group relative overflow-hidden"
+                                            >
+                                                <div className={cn(
+                                                    "w-12 h-12 rounded-2xl flex items-center justify-center mb-2 transition-transform duration-300 group-hover:scale-110",
+                                                    p.category === 'ghee' ? "bg-amber-100 dark:bg-amber-900/30 text-amber-600" : "bg-primary/10 text-primary"
+                                                )}>
+                                                    <Package size={24} />
+                                                </div>
+                                                <div className="relative z-10">
+                                                    <p className="font-bold text-foreground leading-tight line-clamp-2 text-lg">{p.name}</p>
+                                                    <span className="inline-block mt-2 px-2 py-0.5 bg-muted rounded-md text-[10px] font-bold uppercase tracking-wide text-muted-foreground group-hover:bg-background transition-colors">{p.unit}</span>
+                                                </div>
+                                                {/* Decorative gradient blob */}
+                                                <div className="absolute -bottom-8 -right-8 w-24 h-24 bg-gradient-to-br from-primary/10 to-transparent rounded-full blur-2xl group-hover:from-primary/20 transition-all opacity-0 group-hover:opacity-100" />
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )

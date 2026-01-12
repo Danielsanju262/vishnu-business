@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useCallback } from "react";
 import { supabase } from "../lib/supabase";
-import { ArrowLeft, Calendar, ChevronDown, ChevronRight, TrendingUp, TrendingDown, Users, Wallet, ShoppingBag, Clock, BarChart3, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { ArrowLeft, Calendar, ChevronDown, ChevronRight, TrendingUp, TrendingDown, Users, Wallet, ShoppingBag, Clock, BarChart3, ArrowUpRight, ArrowDownRight, RefreshCw } from "lucide-react";
 import { format, subDays, startOfWeek, startOfMonth, endOfWeek, endOfMonth } from "date-fns";
 import { Link } from "react-router-dom";
 import { Modal } from "../components/ui/Modal";
@@ -83,8 +83,11 @@ export default function BusinessInsights() {
         };
     }, [getDateFilter]);
 
+    const [error, setError] = useState<string | null>(null);
+
     const fetchData = useCallback(async () => {
         setIsLoading(true);
+        setError(null);
         const { start, end } = getDateFilter();
         const prevPeriod = getPreviousPeriodDates();
 
@@ -99,6 +102,10 @@ export default function BusinessInsights() {
                 supabase.from('transactions').select('customer_id, quantity, sell_price, customers(name)').is('deleted_at', null),
             ]);
 
+            // Check for errors in results
+            const errors = [transactionsRes, expensesRes, customersRes, remindersRes, payablesRes, prevTransactionsRes, allTimeTransactionsRes].filter(r => r.error);
+            if (errors.length > 0) throw errors[0].error;
+
             setData({
                 transactions: transactionsRes.data || [],
                 expenses: expensesRes.data || [],
@@ -110,6 +117,7 @@ export default function BusinessInsights() {
             });
         } catch (error) {
             console.error('[BusinessInsights] Error fetching data:', error);
+            setError("Failed to load data");
         } finally {
             setIsLoading(false);
         }
@@ -416,6 +424,13 @@ export default function BusinessInsights() {
                             </div>
 
                             <div className="flex items-center gap-1.5">
+                                <button
+                                    onClick={fetchData}
+                                    className="p-2.5 rounded-full bg-accent hover:bg-zinc-200 dark:hover:bg-zinc-700 transition active:scale-95 text-foreground"
+                                    aria-label="Refresh data"
+                                >
+                                    <RefreshCw size={16} className={cn(isLoading && "animate-spin")} />
+                                </button>
                                 {/* Filter Trigger */}
                                 <button
                                     ref={filterButtonRef}
@@ -539,6 +554,14 @@ export default function BusinessInsights() {
             </div>
 
             <div className="h-36 md:h-40" /> {/* Spacer for fixed header */}
+
+            {error && (
+                <div className="mb-4 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-xl p-3 flex items-center gap-3 animate-in slide-in-from-top-2">
+                    <div className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                    <p className="text-xs font-semibold text-red-600 dark:text-red-400 flex-1">{error}</p>
+                    <button onClick={fetchData} className="text-xs font-bold text-red-600 underline hover:text-red-700">Retry</button>
+                </div>
+            )}
 
             {isLoading ? (
                 <div className="space-y-3 animate-pulse">
