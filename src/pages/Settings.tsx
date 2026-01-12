@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import Papa from "papaparse";
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
-import { ArrowLeft, Database, Shield, Lock, Check, Fingerprint, KeyRound, Loader2, Smartphone, Trash2, AlertTriangle, ShieldCheck, Clock, Mail, Download, Upload, ChevronDown, Cloud, Timer, Sparkles } from "lucide-react";
+import { ArrowLeft, Database, Shield, Lock, Check, Fingerprint, KeyRound, Loader2, Smartphone, Trash2, AlertTriangle, ShieldCheck, Clock, Mail, Download, Upload, ChevronDown, Cloud, Timer, Sparkles, Bell } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { cn } from "../lib/utils";
 import { Button } from "../components/ui/Button";
@@ -766,6 +766,43 @@ export default function Settings() {
                                     Please configure Super Admin first
                                 </p>
                             )}
+                        </div>
+                    </div>
+                </CollapsibleSection>
+
+                {/* Notifications Section */}
+                <CollapsibleSection
+                    title="Notifications"
+                    icon={Bell}
+                    headerClassName="bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400"
+                >
+                    <div className="space-y-4">
+                        <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed">
+                            Control how you receive alerts for tasks, payments, and business updates.
+                        </p>
+
+                        <div className="p-4 rounded-xl bg-neutral-50 dark:bg-neutral-800/50 border border-neutral-200 dark:border-neutral-700">
+                            <h3 className="text-sm font-semibold text-neutral-900 dark:text-white mb-2">Test Notifications</h3>
+                            <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-4">
+                                Tap the button below, then <b>close the app immediately</b>. You should receive a notification after 10 seconds.
+                            </p>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                className="w-full"
+                                onClick={async () => {
+                                    const { showImmediateNotification } = await import('../lib/nativeNotifications');
+                                    await showImmediateNotification(
+                                        "🔔 Test Notification",
+                                        "This is a test notification! Your background alerts are working perfectly.",
+                                        "/settings"
+                                    );
+                                    toast("Notification scheduled in 10 seconds. Close app now!", "info");
+                                }}
+                            >
+                                <Bell className="w-4 h-4 mr-2" />
+                                Test Background Notification (10s Delay)
+                            </Button>
                         </div>
                     </div>
                 </CollapsibleSection>

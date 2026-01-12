@@ -244,7 +244,7 @@ export default function GlobalAIWidget() {
 
     // Handle back button / swipe back
     useEffect(() => {
-        const handlePopState = (event: PopStateEvent) => {
+        const handlePopState = () => {
             if (isOpen) {
                 // If the modal was open and user hit back, close it locally
                 setIsOpen(false);

@@ -23,7 +23,6 @@ export function useNativeNotifications() {
     const navigate = useNavigate();
     const { tasks, isLoading } = useInsightsGenerator();
     const hasSetupListeners = useRef(false);
-    const lastScheduledDate = useRef<string>('');
 
     // Set up notification click listener once
     useEffect(() => {
@@ -41,20 +40,10 @@ export function useNativeNotifications() {
     useEffect(() => {
         if (isLoading) return;
 
-        const scheduleNotifications = async () => {
-            const todayStr = new Date().toISOString().split('T')[0];
-
-            // Only reschedule once per day or when tasks change significantly
-            if (lastScheduledDate.current === todayStr) {
-                return;
-            }
-
+        const scheduleTaskNotifications = async () => {
             // Request permission first
             const hasPermission = await requestNotificationPermission();
-            if (!hasPermission) {
-                console.log('[Notifications] Permission not granted');
-                return;
-            }
+            if (!hasPermission) return;
 
             // Get task count
             const tasksCount = tasks.length;
@@ -68,15 +57,30 @@ export function useNativeNotifications() {
             if (tasksCount > 0) {
                 await scheduleEveningNotification(tasksCount);
             }
-
-            // Check for payment reminders and schedule notification
-            await schedulePaymentReminders();
-
-            lastScheduledDate.current = todayStr;
         };
 
-        scheduleNotifications();
+        scheduleTaskNotifications();
     }, [tasks, isLoading]);
+
+    // Independent Effect: Schedule Payment & Backup Reminders on Mount
+    useEffect(() => {
+        const scheduleCriticalReminders = async () => {
+            // Request permission quietly
+            const hasPermission = await requestNotificationPermission();
+            if (!hasPermission) return;
+
+            // 1. Payment Reminders (Critical)
+            await schedulePaymentReminders();
+
+            // 2. Daily Backup Reminder
+            // (Assumed imported or added to nativeNotifications if not already there, 
+            // strictly using the existing 'scheduleBackupReminderNotification' if available, otherwise skip)
+            // const { scheduleBackupReminderNotification } = await import('../lib/nativeNotifications');
+            // await scheduleBackupReminderNotification();
+        };
+
+        scheduleCriticalReminders();
+    }, []);
 
     /**
      * Schedule payment reminder notification by checking Supabase

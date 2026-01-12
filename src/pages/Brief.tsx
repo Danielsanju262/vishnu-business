@@ -8,7 +8,6 @@ import {
     AlertTriangle,
     Target,
     IndianRupee,
-    TrendingUp,
     Calendar,
     Sparkles,
     Trophy,
@@ -259,27 +258,7 @@ export default function Brief() {
     };
 
     // Helper functions
-    const getCustomerName = (id: string) => {
-        return customers.find(c => c.id === id)?.name || 'Unknown';
-    };
 
-    const getSupplierName = (id: string) => {
-        return suppliers.find(s => s.id === id)?.name || 'Unknown';
-    };
-
-    const getDueStatus = (dateStr: string) => {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const due = new Date(dateStr);
-        due.setHours(0, 0, 0, 0);
-
-        const diffDays = Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-
-        if (diffDays < 0) return { text: `Overdue by ${Math.abs(diffDays)} days`, color: 'text-red-500', bg: 'bg-red-500/10' };
-        if (diffDays === 0) return { text: 'Due Today', color: 'text-orange-500', bg: 'bg-orange-500/10' };
-        if (diffDays === 1) return { text: 'Due Tomorrow', color: 'text-amber-500', bg: 'bg-amber-500/10' };
-        return { text: `Due in ${diffDays} days`, color: 'text-zinc-400', bg: 'bg-zinc-500/10' };
-    };
 
     // Handle goal completion with surplus
     const handleGoalClick = (goal: UserGoal) => {
