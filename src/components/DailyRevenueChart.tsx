@@ -8,9 +8,10 @@ interface DailyRevenueChartProps {
     chartData: any[]; // Decoupled from summaryStats
     selectedChartDay: string | null;
     setSelectedChartDay: (date: string | null) => void;
+    aggregation?: 'day' | 'week' | 'month';
 }
 
-export function DailyRevenueChart({ chartData, selectedChartDay, setSelectedChartDay }: DailyRevenueChartProps) {
+export function DailyRevenueChart({ chartData, selectedChartDay, setSelectedChartDay, aggregation = 'day' }: DailyRevenueChartProps) {
     const [chartMetric, setChartMetric] = useState<'revenue' | 'profit'>('revenue');
 
     const maxDataValue = Math.max(...chartData.map((d: any) =>
@@ -47,6 +48,8 @@ export function DailyRevenueChart({ chartData, selectedChartDay, setSelectedChar
         }
     }, [chartData]);
 
+    const titlePrefix = aggregation === 'week' ? 'Weekly' : aggregation === 'month' ? 'Monthly' : 'Daily';
+
     return (
         <div
             className="bg-card rounded-2xl border border-border/60 p-4 shadow-sm"
@@ -56,7 +59,7 @@ export function DailyRevenueChart({ chartData, selectedChartDay, setSelectedChar
                 <div className="flex items-center justify-between">
                     <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
                         <BarChart3 size={16} className="text-purple-500" />
-                        Daily {chartMetric === 'revenue' ? 'Revenue' : 'Profit'}
+                        {titlePrefix} {chartMetric === 'revenue' ? 'Revenue' : 'Profit'}
                     </h3>
 
                     <div className="flex bg-muted/50 p-1 rounded-lg">

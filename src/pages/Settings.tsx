@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import Papa from "papaparse";
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
-import { ArrowLeft, Database, Shield, Lock, Check, Fingerprint, LogOut, KeyRound, Loader2, Smartphone, Trash2, AlertTriangle, ShieldCheck, Clock, Mail, Download, Upload, ChevronDown, Cloud, Timer, Sparkles, ChevronRight } from "lucide-react";
+import { ArrowLeft, Database, Shield, Lock, Check, Fingerprint, KeyRound, Loader2, Smartphone, Trash2, AlertTriangle, ShieldCheck, Clock, Mail, Download, Upload, ChevronDown, Cloud, Timer, Sparkles } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { cn } from "../lib/utils";
 import { Button } from "../components/ui/Button";
@@ -115,7 +115,7 @@ export default function Settings() {
     const [isSetupSuperAdminOpen, setIsSetupSuperAdminOpen] = useHistorySyncedState(false, 'settingsSuperAdmin');
     const [isChangePinOpen, setIsChangePinOpen] = useHistorySyncedState(false, 'settingsChangePin');
     const [isRevokeModalOpen, setIsRevokeModalOpen] = useHistorySyncedState(false, 'settingsRevoke');
-    const [showDeauthConfirm, setShowDeauthConfirm] = useHistorySyncedState(false, 'settingsDeauth');
+    // const [showDeauthConfirm, setShowDeauthConfirm] = useHistorySyncedState(false, 'settingsDeauth');
     const [isExportModalOpen, setIsExportModalOpen] = useHistorySyncedState(false, 'settingsExport');
     const [showMigrationHelp, setShowMigrationHelp] = useHistorySyncedState(false, 'settingsMigration');
 
@@ -549,7 +549,7 @@ export default function Settings() {
                     <div className="space-y-0">
                         <div className="flex justify-between items-center py-3 border-b border-neutral-100 dark:border-neutral-800">
                             <span className="text-sm text-neutral-500 dark:text-neutral-400 font-medium">Version</span>
-                            <span className="text-sm font-semibold text-neutral-900 dark:text-white bg-neutral-100 dark:bg-neutral-800 px-2.5 py-1 rounded-md">v7.0.0</span>
+                            <span className="text-sm font-semibold text-neutral-900 dark:text-white bg-neutral-100 dark:bg-neutral-800 px-2.5 py-1 rounded-md">v7.5.0</span>
                         </div>
 
 
@@ -627,7 +627,7 @@ export default function Settings() {
                                 <span className="text-sm font-medium text-neutral-900 dark:text-white">Memory & Personalization</span>
                                 <p className="text-xs text-neutral-500 dark:text-neutral-400">Manage what AI knows about you</p>
                             </div>
-                            <ChevronRight size={18} className="text-purple-400 group-hover:translate-x-1 transition-transform" />
+                            <ArrowLeft size={18} className="text-purple-400 group-hover:translate-x-1 transition-transform rotate-180" />
                         </Link>
                     </div>
                 </div>

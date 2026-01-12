@@ -15,9 +15,7 @@ import {
     updateGoal,
     deleteGoal,
     completeGoal,
-    updateGoalProgress,
-    calculateWaterfallGoals,
-    type WaterfallGoalStatus
+    calculateWaterfallGoals
 } from './aiMemory';
 
 // Mistral AI Configuration

@@ -552,20 +552,7 @@ export default function GlobalAIWidget() {
     // Calculate badge count
     const badgeCount = hasUnreadBriefing ? (briefing?.totalPendingTasks || 1) : 0;
 
-    // Get chat popover position based on button position
-    const getChatStyle = (): React.CSSProperties => {
-        // Center the chat window regardless of button position
-        return {
-            position: 'fixed',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            bottom: '24px', // Slightly higher anchor
-            width: 'calc(100% - 32px)',
-            maxWidth: '380px',
-            maxHeight: '80vh',
-            zIndex: 110
-        };
-    };
+
 
     return createPortal(
         <>

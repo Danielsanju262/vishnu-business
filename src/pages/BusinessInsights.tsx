@@ -831,6 +831,7 @@ export default function BusinessInsights() {
                                         chartData={chartSeries.data}
                                         selectedChartDay={selectedChartDay}
                                         setSelectedChartDay={setSelectedChartDay}
+                                        aggregation={chartAggregation}
                                     />
                                 </div>
                             )}
