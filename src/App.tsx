@@ -100,7 +100,7 @@ function AppContent() {
   }
 
   return (
-    <Router>
+    <React.Fragment>
       <DeepLinkBackHandler />
       <ScrollToTop />
       {isLocked && <LockScreen />}
@@ -137,15 +137,17 @@ function AppContent() {
           <Route path="expense/new" element={<NewExpense />} />
         </Route>
       </Routes>
-    </Router>
+    </React.Fragment>
   );
 }
 
 function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <Router>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </Router>
   );
 }
 
