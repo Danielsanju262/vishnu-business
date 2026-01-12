@@ -1316,6 +1316,7 @@ export default function CustomerPaymentDetail() {
                                         }}
                                         onTouchStart={() => handleTouchStart(actualIndex)}
                                         onTouchEnd={handleTouchEnd}
+                                        onTouchCancel={handleTouchEnd}
                                         onTouchMove={handleTouchMove}
                                         onContextMenu={() => {
                                             // Optional: prevent default menu on long press contexts if needed

@@ -1082,6 +1082,7 @@ export default function Reports() {
                                                     onTouchStart={(e) => !isSelectionMode && handleTransactionTouchStart(e, t.id, selectedTransactionIds.has(t.id))}
                                                     onTouchEnd={handleTouchEnd}
                                                     onTouchMove={handleTouchMove}
+                                                    onTouchCancel={handleTouchEnd}
                                                     onMouseDown={(e) => !isSelectionMode && handleTransactionTouchStart(e, t.id, selectedTransactionIds.has(t.id))}
                                                     onMouseUp={handleTouchEnd}
                                                     onMouseLeave={handleTouchEnd}
@@ -1235,6 +1236,7 @@ export default function Reports() {
                                                     onTouchStart={(evt) => !isSelectionMode && e.type === 'manual' && handleExpenseTouchStart(evt, e.id, selectedExpenseIds.has(e.id))}
                                                     onTouchEnd={handleTouchEnd}
                                                     onTouchMove={handleTouchMove}
+                                                    onTouchCancel={handleTouchEnd}
                                                     onMouseDown={(evt) => !isSelectionMode && e.type === 'manual' && handleExpenseTouchStart(evt, e.id, selectedExpenseIds.has(e.id))}
                                                     onMouseUp={handleTouchEnd}
                                                     onMouseLeave={handleTouchEnd}

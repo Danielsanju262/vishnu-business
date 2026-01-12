@@ -1062,6 +1062,7 @@ export default function SupplierPaymentDetail() {
                                         }}
                                         onTouchStart={() => handleTouchStart(actualIndex)}
                                         onTouchEnd={handleTouchEnd}
+                                        onTouchCancel={handleTouchEnd}
                                         onTouchMove={handleTouchMove}
                                         onContextMenu={() => {
                                             // Prevent default context menu on long press

@@ -957,6 +957,7 @@ export default function NewSale() {
                                                     onContextMenu={(e) => e.preventDefault()}
                                                     onTouchStart={() => handleTouchStart(idx)}
                                                     onTouchEnd={handleTouchEnd}
+                                                    onTouchCancel={handleTouchEnd}
                                                     onTouchMove={handleTouchMove}
                                                     onMouseDown={() => handleTouchStart(idx)}
                                                     onMouseUp={handleTouchEnd}

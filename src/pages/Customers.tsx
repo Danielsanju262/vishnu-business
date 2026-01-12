@@ -336,6 +336,7 @@ export default function Customers() {
                                             className="flex justify-between items-center"
                                             onTouchStart={() => handleTouchStart(c.id, selectedIds.has(c.id))}
                                             onTouchEnd={handleTouchEnd}
+                                            onTouchCancel={handleTouchEnd}
                                             onTouchMove={handleTouchMove}
                                             onMouseDown={() => handleTouchStart(c.id, selectedIds.has(c.id))}
                                             onMouseUp={handleTouchEnd}
