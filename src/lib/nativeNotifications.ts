@@ -227,13 +227,16 @@ export async function schedulePaymentReminderNotification(count: number, totalAm
     try {
         await cancelNotification(NOTIFICATION_IDS.PAYMENT_REMINDER);
 
-        const now = new Date();
-        const scheduledTime = new Date();
-        scheduledTime.setHours(6, 0, 0, 0);
+        // TEST MODE: Schedule for 1 minute from now to test closed app behavior
+        // const now = new Date();
+        // const scheduledTime = new Date();
+        // scheduledTime.setHours(6, 0, 0, 0);
 
-        if (now.getHours() >= 6) {
-            scheduledTime.setDate(scheduledTime.getDate() + 1);
-        }
+        // if (now.getHours() >= 6) {
+        //     scheduledTime.setDate(scheduledTime.getDate() + 1);
+        // }
+
+        const scheduledTime = new Date(Date.now() + 60 * 1000); // 1 minute from now
 
         const formattedAmount = totalAmount.toLocaleString('en-IN');
 
