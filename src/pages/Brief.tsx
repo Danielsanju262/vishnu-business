@@ -256,8 +256,14 @@ export default function Brief() {
             " Stay focused and win today."
         ]);
 
-        // 6. Comparative Analysis (New Layer)
+        // 6. Comparative Analysis (Dynamic & Randomized)
         let comparativeText = '';
+
+        // We have multiple "insight modules" we can choose from.
+        // We will randomly pick ONE to display to keep it fresh.
+        const insightModules: string[] = [];
+
+        // Module A: Day-over-Day (Yesterday vs Day Before)
         if (dbyStats && yStats.revenue > 0) {
             const revDiff = yStats.revenue - dbyStats.revenue;
             const profitDiff = yStats.netProfit - dbyStats.netProfit;
@@ -266,30 +272,65 @@ export default function Brief() {
                 : null;
 
             if (revDiff > 0) {
-                comparativeText = getRandom([
+                let modText = getRandom([
                     ` This is an improvement from the previous day's sales of ₹${dbyStats.revenue.toLocaleString()}.`,
                     ` You beat the previous day's sales by ₹${Math.abs(revDiff).toLocaleString()}.`,
-                    ` That's an upward trend compared to the day before (${percentDiff}% growth!).`,
-                    ` Better than the day before yesterday!`
+                    ` That's an upward trend compared to the day before (${percentDiff}% growth!).`
                 ]);
 
                 // Bonus insight if profit also improved significantly
                 if (profitDiff > 1000) {
-                    comparativeText += getRandom([
+                    modText += getRandom([
                         ` Plus, your profit jumped by ₹${profitDiff.toLocaleString()}!`,
                         ` Profit is also up by ₹${profitDiff.toLocaleString()}. Great job!`
                     ]);
                 }
+                insightModules.push(modText);
+
             } else if (revDiff < 0) {
-                // Gentle reinforcement
-                comparativeText = getRandom([
+                insightModules.push(getRandom([
                     ` A slight dip from the previous day (${dbyStats.revenue.toLocaleString()}), but today is a new chance.`,
                     ` Lower than the day before yesterday, so let's push hard today!`,
                     ` You did ₹${dbyStats.revenue.toLocaleString()} the day before, so there's room to grow back up today.`,
-                ]);
-            } else {
-                comparativeText = " Consistency is key—revenue matched the previous day exactly.";
+                ]));
             }
+        }
+
+        // Module B: 30-Day High (Record Breaking)
+        if (historyStats && yStats.revenue > 0 && historyStats.highestRevenue > 0) {
+            if (yStats.revenue >= historyStats.highestRevenue) {
+                comparativeText = getRandom([
+                    " 🏆 Amazing! Yesterday was your HIGHEST revenue day in the last 30 days!",
+                    " Incredible work—you hit a new monthly high yesterday!",
+                    " That's a new 30-day record! Momentum is on your side."
+                ]);
+                return `${greeting} ${revenueText}${comparativeText}${financeText}${taskText}${closing}`;
+            } else if (yStats.revenue > historyStats.highestRevenue * 0.95) {
+                insightModules.push(" You were very close to your monthly revenue record yesterday!");
+            }
+        }
+
+        // Module C: 30-Day Average Comparison
+        if (historyStats && historyStats.thirtyDayAvg > 0 && yStats.revenue > 0) {
+            if (yStats.revenue > historyStats.thirtyDayAvg * 1.1) {
+                insightModules.push(getRandom([
+                    ` You performed well above your 30-day average of ₹${Math.round(historyStats.thirtyDayAvg).toLocaleString()}.`,
+                    ` That's a strong day—beating your monthly daily average.`,
+                    ` You're tracking higher than your usual daily average.`
+                ]));
+            } else if (yStats.revenue < historyStats.thirtyDayAvg * 0.8) {
+                insightModules.push(getRandom([
+                    ` Slightly below your 30-day average (${Math.round(historyStats.thirtyDayAvg).toLocaleString()}).`,
+                    ` A bit lower than your usual daily average, but it happens.`,
+                ]));
+            }
+        }
+
+        // Select an insight
+        if (!comparativeText && insightModules.length > 0) {
+            comparativeText = getRandom(insightModules);
+        } else if (!comparativeText && dbyStats) {
+            comparativeText = " Consistency is key—revenue is stable.";
         }
 
         return `${greeting} ${revenueText}${comparativeText}${financeText}${taskText}${closing}`;

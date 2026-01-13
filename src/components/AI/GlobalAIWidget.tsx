@@ -529,7 +529,7 @@ export default function GlobalAIWidget() {
             handleEnd(touch.clientX, touch.clientY);
         };
 
-        const onTouchCancel = (e: TouchEvent) => {
+        const onTouchCancel = () => {
             // Reset drag state if touch is interrupted (e.g. incoming call, screen off)
             dragRef.current.isDragging = false;
             dragRef.current.hasMoved = false;
