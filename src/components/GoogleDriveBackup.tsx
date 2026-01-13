@@ -7,7 +7,7 @@ import { uploadToDrive, listBackups, downloadFile } from "../lib/drive";
 import { exportData, importData, getBackupStats, getCurrentStats } from "../lib/backup";
 import { Modal } from "./ui/Modal";
 import { cn } from "../lib/utils";
-import { setBackupEnabled, getBackupConfig, getLastBackupDate } from "../lib/serverBackup";
+import { setBackupEnabled, getBackupConfig, getLastBackupDate, triggerManualServerBackup } from "../lib/serverBackup";
 import {
     exchangeCodeForTokens,
     refreshAccessToken,
@@ -287,6 +287,27 @@ export function GoogleDriveBackup() {
             // Revert on failure
             setIsServerBackupEnabled(!newState);
             toast("Failed to update server backup setting", "error");
+        }
+    };
+
+    const handleTestBackup = async () => {
+        setIsLoading(true);
+        try {
+            const result = await triggerManualServerBackup();
+            if (result.success) {
+                toast(result.message || "Backup test successful! Check your Google Drive.", "success");
+                // Refresh last backup date
+                const lastBackup = await getLastBackupDate();
+                if (lastBackup) {
+                    setLastServerBackup(lastBackup);
+                }
+            } else {
+                toast(result.message || "Backup test failed", "error");
+            }
+        } catch (e) {
+            toast("Failed to trigger backup: " + String(e), "error");
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -753,6 +774,19 @@ export function GoogleDriveBackup() {
                             </div>
                         )}
                     </div>
+                )}
+
+                {/* Test Backup Button - Only show if server backup is enabled */}
+                {isPersistentConnection && isServerBackupEnabled && (
+                    <Button
+                        onClick={handleTestBackup}
+                        disabled={isLoading}
+                        variant="outline"
+                        className="w-full h-10 mb-4 border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/30 font-semibold"
+                    >
+                        {isLoading ? <Loader2 className="animate-spin mr-2" size={16} /> : <Server className="mr-2" size={16} />}
+                        Test Backup Now
+                    </Button>
                 )}
 
 

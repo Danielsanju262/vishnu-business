@@ -110,52 +110,189 @@ export default function Brief() {
 
     const generateDailySummary = (
         yStats: { revenue: number, netProfit: number },
+        dbyStats: { revenue: number, netProfit: number } | null,
+        historyStats: { thirtyDayAvg: number, highestRevenue: number } | null,
         tPay: AccountPayable[],
         oPay: AccountPayable[],
         tRec: PaymentReminder[],
         oRec: PaymentReminder[],
         pendingTasks: any[]
     ) => {
+        const getRandom = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)];
         const hour = new Date().getHours();
-        const timeGreeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
-        // Revenue sentiment
-        let revenueText = '';
-        if (yStats.revenue > 0) {
-            revenueText = `Yesterday was productive with ₹${yStats.revenue.toLocaleString()} in sales`;
-            if (yStats.netProfit > 0) revenueText += ` and a healthy profit of ₹${yStats.netProfit.toLocaleString()}.`;
-            else revenueText += `.`;
+        // 1. Greeting
+        let greeting = '';
+        if (hour < 12) {
+            greeting = getRandom([
+                'Good morning!', 'Rise and shine!', 'Top of the morning!',
+                'Hello there!', 'Welcome back!', 'Ready for a new day?',
+                'Morning check-in.'
+            ]);
+        } else if (hour < 17) {
+            greeting = getRandom([
+                'Good afternoon!', 'Hope your day is going well.',
+                'Afternoon check-in.', 'Hello!', 'How is the day treating you?'
+            ]);
         } else {
-            revenueText = "Yesterday was quiet on the sales front.";
+            greeting = getRandom([
+                'Good evening!', 'Winding down?', 'Evening brief.',
+                'Hello!', 'End of day check-in.'
+            ]);
         }
 
-        // Financial obligations
+        // 2. Revenue sentiment
+        let revenueText = '';
+        const revStr = `₹${yStats.revenue.toLocaleString()}`;
+        const profStr = `₹${yStats.netProfit.toLocaleString()}`;
+
+        if (yStats.revenue > 0) {
+            const revenuePhrases = [
+                `Yesterday was solid with ${revStr} in sales`,
+                `You generated ${revStr} in revenue yesterday`,
+                `Business brought in ${revStr} yesterday`,
+                `Sales totaled ${revStr} yesterday`,
+                `You recorded ${revStr} in sales yesterday`,
+                `Yesterday's numbers came in at ${revStr}`
+            ];
+
+            revenueText = getRandom(revenuePhrases);
+
+            if (yStats.netProfit > 0) {
+                const profitPhrases = [
+                    `, netting a profit of ${profStr}.`,
+                    `, with a take-home of ${profStr}.`,
+                    `, leaving you ${profStr} in the green.`,
+                    ` and a positive net of ${profStr}.`,
+                    `, clearing ${profStr} after costs.`,
+                    ` contributing ${profStr} to your bottom line.`
+                ];
+                revenueText += getRandom(profitPhrases);
+            } else if (yStats.netProfit < 0) {
+                const lossPhrases = [
+                    `, although expenses put you at ${profStr}.`,
+                    `, but costs ran high at ${profStr}.`,
+                    `, dipping into the red by ${profStr.replace('-', '')}.`
+                ];
+                revenueText += getRandom(lossPhrases);
+            } else {
+                revenueText += `, breaking even.`;
+            }
+        } else {
+            revenueText = getRandom([
+                "Yesterday didn't see any sales action.",
+                "No revenue was recorded yesterday.",
+                "Sales were flat yesterday.",
+                "Yesterday was a quiet day for business.",
+                "No transactions logged for yesterday."
+            ]);
+        }
+
+        // 3. Financial obligations
         const totalDueCount = tPay.length + oPay.length;
         const totalRecCount = tRec.length + oRec.length;
 
         let financeText = '';
         if (totalDueCount > 0 || totalRecCount > 0) {
-            financeText = " Financially, ";
+            financeText = getRandom([" On the money front, ", " Financially, ", " Regarding cash flow, ", " looking at your accounts, "]);
+
             if (totalDueCount > 0 && totalRecCount > 0) {
-                financeText += `you have some payments to settle and collections to make today.`;
+                financeText += getRandom([
+                    "it's a busy day for both payments and collections.",
+                    "money is moving in and out today.",
+                    "you have a mix of inflows and outflows to manage.",
+                    "pending payments and expected collections are on the docket."
+                ]);
             } else if (totalDueCount > 0) {
-                financeText += `you have payments to clear today.`;
+                financeText += getRandom([
+                    "you have some bills to clear today.",
+                    "there are outgoing payments scheduled.",
+                    "a few payments need your attention.",
+                    "you'll need to settle some dues today."
+                ]);
             } else {
-                financeText += `you have reliable collections coming in today.`;
+                financeText += getRandom([
+                    "looks like you'll be receiving funds today.",
+                    "collections are expected to come in.",
+                    "inflows are scheduled for today.",
+                    "customers are due to pay you today."
+                ]);
             }
         } else {
-            financeText = " No major payments or collections are due today.";
+            financeText = getRandom([
+                " No payments or collections are due today.",
+                " Cash flow obligations are clear for today.",
+                " No scheduled financial movements today.",
+                " You have no dues or collections pending today."
+            ]);
         }
 
-        // Tasks
+        // 4. Tasks
         let taskText = '';
         if (pendingTasks.length > 0) {
-            taskText = ` You have ${pendingTasks.length} pending action items to look into.`;
+            taskText = getRandom([
+                ` You have ${pendingTasks.length} items on your agenda.`,
+                ` There are ${pendingTasks.length} tasks awaiting action.`,
+                ` Your to-do list has ${pendingTasks.length} items.`,
+                ` Keep an eye on your ${pendingTasks.length} pending tasks.`,
+                ` Don't forget, there are ${pendingTasks.length} things to do.`
+            ]);
         } else {
-            taskText = ` You're all caught up on tasks!`;
+            taskText = getRandom([
+                ` Use the extra time wisely—no pending tasks!`,
+                ` Your task list is completely clear.`,
+                ` Nothing on your plate task-wise right now.`,
+                ` You're all caught up on work items.`
+            ]);
         }
 
-        return `${timeGreeting}! ${revenueText}${financeText}${taskText} Let's make today count.`;
+        // 5. Closing
+        const closing = getRandom([
+            " Let's make it a good one.",
+            " Have a great day ahead!",
+            " Let's get things moving.",
+            " Time to execute.",
+            " Here's to a profitable day.",
+            " Stay focused and win today."
+        ]);
+
+        // 6. Comparative Analysis (New Layer)
+        let comparativeText = '';
+        if (dbyStats && yStats.revenue > 0) {
+            const revDiff = yStats.revenue - dbyStats.revenue;
+            const profitDiff = yStats.netProfit - dbyStats.netProfit;
+            const percentDiff = dbyStats.revenue > 0
+                ? ((revDiff / dbyStats.revenue) * 100).toFixed(0)
+                : null;
+
+            if (revDiff > 0) {
+                comparativeText = getRandom([
+                    ` This is an improvement from the previous day's sales of ₹${dbyStats.revenue.toLocaleString()}.`,
+                    ` You beat the previous day's sales by ₹${Math.abs(revDiff).toLocaleString()}.`,
+                    ` That's an upward trend compared to the day before (${percentDiff}% growth!).`,
+                    ` Better than the day before yesterday!`
+                ]);
+
+                // Bonus insight if profit also improved significantly
+                if (profitDiff > 1000) {
+                    comparativeText += getRandom([
+                        ` Plus, your profit jumped by ₹${profitDiff.toLocaleString()}!`,
+                        ` Profit is also up by ₹${profitDiff.toLocaleString()}. Great job!`
+                    ]);
+                }
+            } else if (revDiff < 0) {
+                // Gentle reinforcement
+                comparativeText = getRandom([
+                    ` A slight dip from the previous day (${dbyStats.revenue.toLocaleString()}), but today is a new chance.`,
+                    ` Lower than the day before yesterday, so let's push hard today!`,
+                    ` You did ₹${dbyStats.revenue.toLocaleString()} the day before, so there's room to grow back up today.`,
+                ]);
+            } else {
+                comparativeText = " Consistency is key—revenue matched the previous day exactly.";
+            }
+        }
+
+        return `${greeting} ${revenueText}${comparativeText}${financeText}${taskText}${closing}`;
     };
 
     const loadAllData = async () => {
@@ -195,6 +332,76 @@ export default function Brief() {
                 netProfit: yRevenue - yCost - yExpenseTotal
             };
             setYesterdayStats(stats);
+
+            // Fetch DAY BEFORE YESTERDAY stats for comparison
+            const dbyDate = new Date();
+            dbyDate.setDate(dbyDate.getDate() - 2);
+            const dbyStr = dbyDate.toISOString().split('T')[0];
+
+            let dbyStats = null;
+            try {
+                // DBY Revenue
+                const { data: dbySales } = await supabase
+                    .from('transactions')
+                    .select('sell_price, buy_price, quantity')
+                    .eq('date', dbyStr)
+                    .is('deleted_at', null);
+
+                const dbyRev = (dbySales || []).reduce((sum, t) => sum + (t.sell_price * t.quantity), 0);
+                const dbyCost = (dbySales || []).reduce((sum, t) => sum + (t.buy_price * t.quantity), 0);
+
+                // DBY Expenses
+                const { data: dbyExpenses } = await supabase
+                    .from('expenses')
+                    .select('amount')
+                    .eq('date', dbyStr)
+                    .is('deleted_at', null);
+
+                const dbyExp = (dbyExpenses || []).reduce((sum, e) => sum + Number(e.amount), 0);
+
+                dbyStats = {
+                    revenue: dbyRev,
+                    netProfit: dbyRev - dbyCost - dbyExp
+                };
+                dbyStats = {
+                    revenue: dbyRev,
+                    netProfit: dbyRev - dbyCost - dbyExp
+                };
+            } catch (e) {
+                console.error("Error fetching DBY stats", e);
+            }
+
+            // Fetch LAST 30 DAYS stats for deeper analysis
+            let historyStats = null;
+            try {
+                const thirtyDaysAgo = new Date();
+                thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+                const thirtyDaysStr = thirtyDaysAgo.toISOString().split('T')[0];
+
+                const { data: monthSales } = await supabase
+                    .from('transactions')
+                    .select('date, sell_price, quantity')
+                    .gte('date', thirtyDaysStr)
+                    .is('deleted_at', null);
+
+                if (monthSales && monthSales.length > 0) {
+                    // Group by date to find daily totals
+                    const dailyTotals: Record<string, number> = {};
+                    monthSales.forEach(t => {
+                        const val = t.sell_price * t.quantity;
+                        dailyTotals[t.date] = (dailyTotals[t.date] || 0) + val;
+                    });
+
+                    const dailyValues = Object.values(dailyTotals);
+                    const highestRevenue = Math.max(...dailyValues);
+                    const totalRevenue = dailyValues.reduce((a, b) => a + b, 0);
+                    const thirtyDayAvg = totalRevenue / 30; // Simple average over 30 days
+
+                    historyStats = { highestRevenue, thirtyDayAvg };
+                }
+            } catch (e) {
+                console.error("Error fetching history stats", e);
+            }
 
             const todayStr = new Date().toISOString().split('T')[0];
             let tReminders: PaymentReminder[] = [];
@@ -246,8 +453,8 @@ export default function Brief() {
                 .eq('is_active', true);
             if (suppliersData) setSuppliers(suppliersData);
 
-            // Generate Summary using filtered lists
-            setAiSummary(generateDailySummary(stats, tPayables, oPayables, tReminders, oReminders, tasks));
+            // Generate Summary using filtered lists AND dbyStats AND historyStats
+            setAiSummary(generateDailySummary(stats, dbyStats, historyStats, tPayables, oPayables, tReminders, oReminders, tasks));
 
         } catch (error) {
             console.error('Error loading brief data:', error);
@@ -483,69 +690,6 @@ export default function Brief() {
 
                     {isFinancialsOpen && (
                         <div className="grid md:grid-cols-2 gap-4 animate-in slide-in-from-top-2 fade-in duration-200">
-                            {/* To Pay Today */}
-                            <div className="bg-zinc-900 border border-white/5 rounded-2xl p-4">
-                                <div className="flex items-center gap-3 mb-4">
-                                    <div className="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center">
-                                        <Receipt size={20} className="text-orange-400" />
-                                    </div>
-                                    <div>
-                                        <h3 className="font-bold text-white">To Pay Today</h3>
-                                        <p className="text-xs text-neutral-400">Bills & Suppliers</p>
-                                    </div>
-                                    <div className="ml-auto text-right">
-                                        <div className="text-lg font-bold text-white">
-                                            ₹{totalToPay.toLocaleString()}
-                                        </div>
-                                        <div className="text-[10px] text-orange-400 font-medium">Total Due</div>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    {/* Overdue Items */}
-                                    {overduePayables.length > 0 && (
-                                        <div className="space-y-1">
-                                            <p className="text-[10px] font-bold text-red-400 uppercase tracking-wider px-1">Overdue</p>
-                                            {overduePayables.map((item) => {
-                                                const supplier = suppliers.find(s => s.id === item.supplier_id);
-                                                const daysOverdue = differenceInDays(new Date(), new Date(item.due_date));
-                                                return (
-                                                    <div key={item.id} className="flex items-center justify-between p-2.5 rounded-lg bg-red-500/10 border border-red-500/20">
-                                                        <div>
-                                                            <div className="text-sm font-medium text-red-200">{supplier?.name || 'Unknown Supplier'}</div>
-                                                            <div className="text-[10px] text-red-400">Due {daysOverdue} days ago</div>
-                                                        </div>
-                                                        <div className="font-bold text-red-200">₹{item.amount.toLocaleString()}</div>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    )}
-
-                                    {/* Due Today Items */}
-                                    {todayPayables.length > 0 && (
-                                        <div className="space-y-1 mt-2">
-                                            <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider px-1">Due Today</p>
-                                            {todayPayables.map((item) => {
-                                                const supplier = suppliers.find(s => s.id === item.supplier_id);
-                                                return (
-                                                    <div key={item.id} className="flex items-center justify-between p-2.5 rounded-lg bg-white/5 border border-white/5">
-                                                        <div className="text-sm font-medium text-white">{supplier?.name || 'Unknown Supplier'}</div>
-                                                        <div className="font-bold text-white">₹{item.amount.toLocaleString()}</div>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    )}
-
-                                    {overduePayables.length === 0 && todayPayables.length === 0 && (
-                                        <div className="text-center py-4 text-xs text-neutral-500">
-                                            No payments due today.
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
                             {/* To Receive Today */}
                             <div className="bg-zinc-900 border border-white/5 rounded-2xl p-4">
                                 <div className="flex items-center gap-3 mb-4">
@@ -604,6 +748,69 @@ export default function Brief() {
                                     {overdueReminders.length === 0 && todayReminders.length === 0 && (
                                         <div className="text-center py-4 text-xs text-neutral-500">
                                             No payments expected today.
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* To Pay Today */}
+                            <div className="bg-zinc-900 border border-white/5 rounded-2xl p-4">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center">
+                                        <Receipt size={20} className="text-orange-400" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-white">To Pay Today</h3>
+                                        <p className="text-xs text-neutral-400">Bills & Suppliers</p>
+                                    </div>
+                                    <div className="ml-auto text-right">
+                                        <div className="text-lg font-bold text-white">
+                                            ₹{totalToPay.toLocaleString()}
+                                        </div>
+                                        <div className="text-[10px] text-orange-400 font-medium">Total Due</div>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    {/* Overdue Items */}
+                                    {overduePayables.length > 0 && (
+                                        <div className="space-y-1">
+                                            <p className="text-[10px] font-bold text-red-400 uppercase tracking-wider px-1">Overdue</p>
+                                            {overduePayables.map((item) => {
+                                                const supplier = suppliers.find(s => s.id === item.supplier_id);
+                                                const daysOverdue = differenceInDays(new Date(), new Date(item.due_date));
+                                                return (
+                                                    <div key={item.id} className="flex items-center justify-between p-2.5 rounded-lg bg-red-500/10 border border-red-500/20">
+                                                        <div>
+                                                            <div className="text-sm font-medium text-red-200">{supplier?.name || 'Unknown Supplier'}</div>
+                                                            <div className="text-[10px] text-red-400">Due {daysOverdue} days ago</div>
+                                                        </div>
+                                                        <div className="font-bold text-red-200">₹{item.amount.toLocaleString()}</div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+
+                                    {/* Due Today Items */}
+                                    {todayPayables.length > 0 && (
+                                        <div className="space-y-1 mt-2">
+                                            <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider px-1">Due Today</p>
+                                            {todayPayables.map((item) => {
+                                                const supplier = suppliers.find(s => s.id === item.supplier_id);
+                                                return (
+                                                    <div key={item.id} className="flex items-center justify-between p-2.5 rounded-lg bg-white/5 border border-white/5">
+                                                        <div className="text-sm font-medium text-white">{supplier?.name || 'Unknown Supplier'}</div>
+                                                        <div className="font-bold text-white">₹{item.amount.toLocaleString()}</div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+
+                                    {overduePayables.length === 0 && todayPayables.length === 0 && (
+                                        <div className="text-center py-4 text-xs text-neutral-500">
+                                            No payments due today.
                                         </div>
                                     )}
                                 </div>

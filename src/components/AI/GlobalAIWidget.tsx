@@ -100,6 +100,7 @@ export default function GlobalAIWidget() {
     const [isOpen, setIsOpen] = useState(false);
     const [openModalCount, setOpenModalCount] = useState(0);
     const isKeyboardOpen = useIsMobileKeyboardOpen();
+    const [listenerRefreshKey, setListenerRefreshKey] = useState(0);
 
     // DRAG STATE
     // We use direct DOM manipulation for dragging to ensure 60fps performance on mobile
@@ -164,6 +165,30 @@ export default function GlobalAIWidget() {
         return () => {
             window.removeEventListener('ai-widget-visibility-changed', handleStorageChange);
             window.removeEventListener('storage', handleStorageChange);
+        };
+    }, []);
+
+    // Force re-attach listeners when app wakes up or becomes visible
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                // Small delay to ensure DOM is ready/stabilized after wake
+                setTimeout(() => {
+                    setListenerRefreshKey(prev => prev + 1);
+                }, 100);
+            }
+        };
+
+        const handlePageShow = () => {
+            setListenerRefreshKey(prev => prev + 1);
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        window.addEventListener('pageshow', handlePageShow);
+
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            window.removeEventListener('pageshow', handlePageShow);
         };
     }, []);
 
@@ -496,13 +521,40 @@ export default function GlobalAIWidget() {
         };
 
         const onTouchEnd = (e: TouchEvent) => {
+            // Prevent default mouse emulation to avoid double-firing events (blinking)
+            if (e.cancelable) e.preventDefault();
+
             // Use changedTouches for the final position
             const touch = e.changedTouches[0];
             handleEnd(touch.clientX, touch.clientY);
         };
 
+        const onTouchCancel = (e: TouchEvent) => {
+            // Reset drag state if touch is interrupted (e.g. incoming call, screen off)
+            dragRef.current.isDragging = false;
+            dragRef.current.hasMoved = false;
+            setIsDragging(false);
+            if (buttonRef.current) {
+                buttonRef.current.style.transition = ''; // Restore snap transition if needed? No, just reset.
+                buttonRef.current.style.opacity = '1';
+                // Snap back to nearest edge effectively
+                // We rely on the fact that handleEnd wasn't called, so position state is unchanged.
+                // We just need to reset the visual transform that might be mid-drag.
+                buttonRef.current.style.transform = 'translateY(-50%)';
+
+                // Re-apply static positioning based on last known state
+                const isRight = position.side === 'right';
+                buttonRef.current.style.left = isRight ? 'auto' : '16px';
+                buttonRef.current.style.right = isRight ? '16px' : 'auto';
+                buttonRef.current.style.top = `${position.yPercent}%`;
+            }
+        };
+
         // Mouse handlers
         const onMouseDown = (e: MouseEvent) => {
+            // If touch is active/supported, mouse down might still fire in some hybrids, 
+            // but usually preventDefault in touchStart/End handles it. 
+            // To be safe, we can leave this as is, relying on touchEnd's preventDefault.
             handleStart(e.clientX, e.clientY);
 
             const onMouseMove = (moveE: MouseEvent) => {
@@ -523,7 +575,8 @@ export default function GlobalAIWidget() {
         // Attach listeners
         button.addEventListener('touchstart', onTouchStart, { passive: false });
         button.addEventListener('touchmove', onTouchMove, { passive: false });
-        button.addEventListener('touchend', onTouchEnd);
+        button.addEventListener('touchend', onTouchEnd, { passive: false }); // Passive false needed for preventDefault
+        button.addEventListener('touchcancel', onTouchCancel);
         button.addEventListener('mousedown', onMouseDown);
 
         return () => {
@@ -531,9 +584,10 @@ export default function GlobalAIWidget() {
             button.removeEventListener('touchstart', onTouchStart);
             button.removeEventListener('touchmove', onTouchMove);
             button.removeEventListener('touchend', onTouchEnd);
+            button.removeEventListener('touchcancel', onTouchCancel);
             button.removeEventListener('mousedown', onMouseDown);
         };
-    }, [isOpen, position.side, position.yPercent, handleOpen, isVisible]);
+    }, [isOpen, position.side, position.yPercent, handleOpen, isVisible, listenerRefreshKey]);
 
     // Send message
     const handleSendMessage = async (e?: React.FormEvent) => {
@@ -692,11 +746,11 @@ export default function GlobalAIWidget() {
                         // to allow instant movement start. The JS logic handles adding it back for snap.
                     }}
                 >
-                    <Sparkles size={24} className="text-white" />
+                    <Sparkles size={24} className="text-white pointer-events-none" />
 
                     {/* Notification Badge */}
                     {badgeCount > 0 && (
-                        <span className="absolute -top-1 -right-1 min-w-[22px] h-[22px] flex items-center justify-center px-1.5 bg-red-500 text-white text-xs font-bold rounded-full shadow-lg animate-pulse">
+                        <span className="absolute -top-1 -right-1 min-w-[22px] h-[22px] flex items-center justify-center px-1.5 bg-red-500 text-white text-xs font-bold rounded-full shadow-lg animate-pulse pointer-events-none">
                             {badgeCount > 9 ? '9+' : badgeCount}
                         </span>
                     )}
