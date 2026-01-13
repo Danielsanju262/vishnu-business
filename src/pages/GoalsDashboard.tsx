@@ -24,7 +24,13 @@ import {
     ShoppingCart,
     FileText,
     Trophy,
-    Flame
+    Flame,
+    Users,
+    Percent,
+    Package,
+    TrendingUp,
+    Calendar,
+    AlertCircle
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from '../components/ui/Button';
@@ -47,15 +53,50 @@ const goalTypeIcons: Record<string, React.ReactNode> = {
     net_profit: <DollarSign size={20} />,
     revenue: <BarChart3 size={20} />,
     sales_count: <ShoppingCart size={20} />,
-    manual_check: <FileText size={20} />
+    manual_check: <FileText size={20} />,
+    customer_count: <Users size={20} />,
+    gross_profit: <DollarSign size={20} />,
+    margin: <Percent size={20} />,
+    product_sales: <Package size={20} />,
+    daily_revenue: <TrendingUp size={20} />,
+    daily_margin: <Percent size={20} />,
+    avg_margin: <Calendar size={20} />,
+    avg_revenue: <Calendar size={20} />,
+    avg_profit: <Calendar size={20} />
 };
 
 // Goal type labels
 const goalTypeLabels: Record<string, string> = {
-    net_profit: 'Net Profit Target',
-    revenue: 'Revenue Target',
-    sales_count: 'Sales Count Target',
-    manual_check: 'Manual Confirmation (EMI, etc.)'
+    net_profit: 'Net Profit (Cumulative)',
+    revenue: 'Revenue (Cumulative)',
+    sales_count: 'Sales Count',
+    manual_check: 'Manual Confirmation (EMI, etc.)',
+    customer_count: 'Customer Count',
+    gross_profit: 'Gross Profit (Cumulative)',
+    margin: 'Margin % (Any Day)',
+    product_sales: 'Product Sales',
+    daily_revenue: 'Daily Revenue Target',
+    daily_margin: 'Daily Margin % Target',
+    avg_margin: 'Average Margin %',
+    avg_revenue: 'Average Revenue/Day',
+    avg_profit: 'Average Profit/Day'
+};
+
+// Goal type descriptions for UI
+const goalTypeDescriptions: Record<string, string> = {
+    net_profit: 'Track total net profit from start date',
+    revenue: 'Track total revenue from start date',
+    sales_count: 'Track number of sales transactions',
+    manual_check: 'Manually update progress (for EMI, etc.)',
+    customer_count: 'Reach target customer count',
+    gross_profit: 'Track total gross profit',
+    margin: 'Achieve this margin % on any single day',
+    product_sales: 'Track specific product sales quantity',
+    daily_revenue: 'Hit this revenue target on any day',
+    daily_margin: 'Achieve this margin % on any day',
+    avg_margin: 'Achieve average margin % by deadline',
+    avg_revenue: 'Achieve average daily revenue by deadline',
+    avg_profit: 'Achieve average daily profit by deadline'
 };
 
 export default function GoalsDashboard() {
@@ -75,9 +116,10 @@ export default function GoalsDashboard() {
     const [formDescription, setFormDescription] = useState('');
     const [formTargetAmount, setFormTargetAmount] = useState('');
     const [formDeadline, setFormDeadline] = useState('');
-    const [formMetricType, setFormMetricType] = useState<'net_profit' | 'revenue' | 'sales_count' | 'manual_check'>('net_profit');
+    const [formMetricType, setFormMetricType] = useState<'net_profit' | 'revenue' | 'sales_count' | 'manual_check' | 'customer_count' | 'gross_profit' | 'margin' | 'product_sales' | 'daily_revenue' | 'daily_margin' | 'avg_margin' | 'avg_revenue' | 'avg_profit'>('net_profit');
     const [formIsRecurring, setFormIsRecurring] = useState(false);
     const [formRecurrenceType, setFormRecurrenceType] = useState<'monthly' | 'weekly' | 'yearly'>('monthly');
+    const [formStartDate, setFormStartDate] = useState(new Date().toISOString().split('T')[0]);
 
     // Load goals
     useEffect(() => {
@@ -102,7 +144,11 @@ export default function GoalsDashboard() {
 
         // Listen for internal app updates
         const handleGoalUpdate = () => {
-            loadGoals();
+            // Add a small delay to ensure DB propagation
+            setTimeout(() => {
+                console.log('Received goal update event, reloading...');
+                loadGoals();
+            }, 500);
         };
 
         window.addEventListener('goal-updated', handleGoalUpdate);
@@ -144,6 +190,7 @@ export default function GoalsDashboard() {
         setFormMetricType('net_profit');
         setFormIsRecurring(false);
         setFormRecurrenceType('monthly');
+        setFormStartDate(new Date().toISOString().split('T')[0]);
         setEditingGoal(null);
     };
 
@@ -160,6 +207,7 @@ export default function GoalsDashboard() {
         setFormMetricType(goal.metric_type);
         setFormIsRecurring(!!goal.is_recurring);
         setFormRecurrenceType(goal.recurrence_type || 'monthly');
+        setFormStartDate(goal.start_tracking_date?.split('T')[0] || new Date().toISOString().split('T')[0]);
         setEditingGoal(goal);
         setShowAddModal(true);
     };
@@ -185,7 +233,8 @@ export default function GoalsDashboard() {
                     deadline: formDeadline || undefined,
                     metric_type: formMetricType,
                     is_recurring: formIsRecurring,
-                    recurrence_type: formIsRecurring ? formRecurrenceType : undefined
+                    recurrence_type: formIsRecurring ? formRecurrenceType : undefined,
+                    start_tracking_date: formMetricType !== 'manual_check' ? formStartDate : undefined
                 });
                 toast('Goal updated! 🎯', 'success');
             } else {
@@ -203,7 +252,7 @@ export default function GoalsDashboard() {
                     target_amount: parseFloat(formTargetAmount),
                     deadline: formDeadline || undefined,
                     metric_type: formMetricType,
-                    start_tracking_date: new Date().toISOString(),
+                    start_tracking_date: formMetricType !== 'manual_check' ? formStartDate : new Date().toISOString().split('T')[0],
                     is_recurring: formIsRecurring,
                     recurrence_type: formIsRecurring ? formRecurrenceType : undefined
                 });
@@ -447,11 +496,23 @@ export default function GoalsDashboard() {
                                     <div className="grid grid-cols-3 gap-3 mb-3">
                                         <div className="bg-white/5 rounded-lg p-2 text-center">
                                             <div className="text-xs text-neutral-400">Current</div>
-                                            <div className="font-bold text-white text-sm">₹{goal.current_amount.toLocaleString()}</div>
+                                            <div className="font-bold text-white text-sm">
+                                                {['margin', 'daily_margin', 'avg_margin'].includes(goal.metric_type)
+                                                    ? `${goal.current_amount.toFixed(1)}%`
+                                                    : ['customer_count', 'sales_count'].includes(goal.metric_type)
+                                                        ? goal.current_amount.toLocaleString()
+                                                        : `₹${goal.current_amount.toLocaleString()}`}
+                                            </div>
                                         </div>
                                         <div className="bg-white/5 rounded-lg p-2 text-center">
                                             <div className="text-xs text-neutral-400">Target</div>
-                                            <div className="font-bold text-white text-sm">₹{goal.target_amount.toLocaleString()}</div>
+                                            <div className="font-bold text-white text-sm">
+                                                {['margin', 'daily_margin', 'avg_margin'].includes(goal.metric_type)
+                                                    ? `${goal.target_amount.toFixed(1)}%`
+                                                    : ['customer_count', 'sales_count'].includes(goal.metric_type)
+                                                        ? goal.target_amount.toLocaleString()
+                                                        : `₹${goal.target_amount.toLocaleString()}`}
+                                            </div>
                                         </div>
                                         <div className="bg-white/5 rounded-lg p-2 text-center">
                                             <div className="text-xs text-neutral-400">Remaining</div>
@@ -459,54 +520,97 @@ export default function GoalsDashboard() {
                                                 "font-bold text-sm",
                                                 remaining <= 0 ? "text-emerald-400" : "text-amber-400"
                                             )}>
-                                                ₹{Math.max(0, remaining).toLocaleString()}
+                                                {remaining <= 0 ? (
+                                                    <span className="flex items-center justify-center gap-1">
+                                                        <CheckCircle2 size={12} /> Done
+                                                    </span>
+                                                ) : (
+                                                    ['margin', 'daily_margin', 'avg_margin'].includes(goal.metric_type)
+                                                        ? `${remaining.toFixed(1)}%`
+                                                        : ['customer_count', 'sales_count'].includes(goal.metric_type)
+                                                            ? remaining.toLocaleString()
+                                                            : `₹${remaining.toLocaleString()}`
+                                                )}
                                             </div>
                                         </div>
                                     </div>
 
                                     {/* Deadline & Actions */}
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2 text-xs">
-                                            {goal.deadline && (
-                                                <span className={cn(
-                                                    "flex items-center gap-1 px-2 py-1 rounded-lg",
-                                                    isOverdue ? "bg-red-500/20 text-red-400" :
-                                                        isUrgent ? "bg-amber-500/20 text-amber-400" :
-                                                            "bg-white/10 text-neutral-300"
-                                                )}>
-                                                    <Clock size={12} />
-                                                    {isOverdue ? `Overdue by ${Math.abs(daysLeft!)} days` :
-                                                        daysLeft === 0 ? 'Due Today!' :
-                                                            `${daysLeft} days left`}
-                                                </span>
-                                            )}
-                                        </div>
-
-                                        <div className="flex items-center gap-2">
-                                            {/* Update Progress Button */}
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                onClick={() => handleOpenUpdateProgress(goal)}
-                                                className="bg-zinc-800 border-white/10 hover:bg-zinc-700 h-8 px-3 text-xs text-white"
-                                            >
-                                                <Edit3 size={12} className="mr-1" />
-                                                Update
-                                            </Button>
-
-                                            {/* Mark Complete Button */}
-                                            {progress >= 100 || goal.metric_type === 'manual_check' ? (
+                                    {isOverdue ? (
+                                        <div className="mt-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20">
+                                            <div className="flex items-center gap-2 mb-3 text-red-400">
+                                                <AlertCircle size={16} />
+                                                <span className="text-xs font-semibold">Goal Expired & Locked</span>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2">
                                                 <Button
                                                     size="sm"
-                                                    onClick={() => setConfirmComplete(goal.id)}
-                                                    className="bg-emerald-600 hover:bg-emerald-500 h-8 px-3 text-xs"
+                                                    variant="outline"
+                                                    onClick={() => handleOpenEdit(goal)}
+                                                    className="bg-zinc-800 border-white/10 hover:bg-zinc-700 h-8 text-xs text-white"
                                                 >
-                                                    <CheckCircle2 size={14} className="mr-1" />
-                                                    Mark Complete
+                                                    Extend Deadline
                                                 </Button>
-                                            ) : null}
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() => handleOpenEdit(goal)}
+                                                    className="bg-zinc-800 border-white/10 hover:bg-zinc-700 h-8 text-xs text-white"
+                                                >
+                                                    Adjust Target
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    onClick={() => handleDeleteGoal(goal.id)}
+                                                    className="col-span-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/20 h-8 text-xs font-medium"
+                                                >
+                                                    Delete Goal
+                                                </Button>
+                                            </div>
                                         </div>
-                                    </div>
+                                    ) : (
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2 text-xs">
+                                                {goal.deadline && (
+                                                    <span className={cn(
+                                                        "flex items-center gap-1 px-2 py-1 rounded-lg",
+                                                        isUrgent ? "bg-amber-500/20 text-amber-400" :
+                                                            "bg-white/10 text-neutral-300"
+                                                    )}>
+                                                        <Clock size={12} />
+                                                        {daysLeft === 0 ? 'Due Today!' : `${daysLeft} days left`}
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            <div className="flex items-center gap-2">
+                                                {/* Update Progress Button - Only show for manual_check (EMI) goals */}
+                                                {goal.metric_type === 'manual_check' && (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={() => handleOpenUpdateProgress(goal)}
+                                                        className="bg-zinc-800 border-white/10 hover:bg-zinc-700 h-8 px-3 text-xs text-white"
+                                                    >
+                                                        <Edit3 size={12} className="mr-1" />
+                                                        Update
+                                                    </Button>
+                                                )}
+
+                                                {/* Mark Complete Button */}
+                                                {(progress >= 100 || goal.metric_type === 'manual_check') && (
+                                                    <Button
+                                                        size="sm"
+                                                        onClick={() => setConfirmComplete(goal.id)}
+                                                        className="bg-emerald-600 hover:bg-emerald-500 h-8 px-3 text-xs"
+                                                    >
+                                                        <CheckCircle2 size={14} className="mr-1" />
+                                                        Mark Complete
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
 
                                     {/* Motivation Message */}
                                     {remaining > 0 && !isOverdue && (
@@ -625,20 +729,31 @@ export default function GoalsDashboard() {
                                 >
                                     <div className="flex items-center gap-2 mb-1">
                                         {goalTypeIcons[type]}
-                                        <span className="font-medium">{label.split(' ')[0]}</span>
+                                        <span className="font-medium">{label}</span>
                                     </div>
+                                    <p className="text-[10px] text-neutral-500 pl-7">
+                                        {goalTypeDescriptions[type]}
+                                    </p>
                                 </button>
                             ))}
                         </div>
                     </div>
 
                     <div>
-                        <label className="text-xs font-medium text-neutral-400 mb-1.5 block">Target Amount (₹) *</label>
+                        <label className="text-xs font-medium text-neutral-400 mb-1.5 block">
+                            {['margin', 'daily_margin', 'avg_margin'].includes(formMetricType)
+                                ? 'Target Margin (%) *'
+                                : ['customer_count', 'sales_count'].includes(formMetricType)
+                                    ? 'Target Count *'
+                                    : 'Target Amount (₹) *'}
+                        </label>
                         <Input
                             type="number"
                             value={formTargetAmount}
                             onChange={(e) => setFormTargetAmount(e.target.value)}
-                            placeholder="e.g., 15000"
+                            placeholder={['margin', 'daily_margin', 'avg_margin'].includes(formMetricType)
+                                ? 'e.g., 20'
+                                : 'e.g., 15000'}
                             className="bg-white/5"
                         />
                     </div>
@@ -652,6 +767,22 @@ export default function GoalsDashboard() {
                             className="bg-white/5"
                         />
                     </div>
+
+                    {/* Start Date - Only show for auto-tracked goals */}
+                    {formMetricType !== 'manual_check' && (
+                        <div>
+                            <label className="text-xs font-medium text-neutral-400 mb-1.5 block">Start Tracking From</label>
+                            <Input
+                                type="date"
+                                value={formStartDate}
+                                onChange={(e) => setFormStartDate(e.target.value)}
+                                className="bg-white/5"
+                            />
+                            <p className="text-[10px] text-neutral-500 mt-1">
+                                Net profit/progress will be calculated from this date onwards
+                            </p>
+                        </div>
+                    )}
 
                     {/* Recurrence Toggle */}
                     <div className="flex items-center justify-between bg-white/5 p-3 rounded-xl border border-white/10">

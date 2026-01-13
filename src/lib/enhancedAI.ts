@@ -14,8 +14,10 @@ import {
     addGoal,
     updateGoal,
     deleteGoal,
-    completeGoal,
-    calculateWaterfallGoals
+    calculateWaterfallGoals,
+    calculateAvailableSurplus,
+    allocateToGoal,
+    completeGoalWithTimestamp
 } from './aiMemory';
 
 // Mistral AI Configuration
@@ -243,9 +245,21 @@ async function toolSaveMemory(content: string, bucket: 'preference' | 'fact' | '
     }
 }
 
-// Tool: Delete a Memory by content match
+// Tool: Delete a Memory by ID or content match
+async function toolDeleteMemoryById(memoryId: string): Promise<string> {
+    try {
+        console.log('[AI Tool] Deleting memory by ID:', memoryId);
+        await deleteMemory(memoryId);
+        return `✅ Memory deleted successfully!`;
+    } catch (error) {
+        console.error('[AI Tool] Delete memory by ID error:', error);
+        return `❌ Error deleting memory: ${error instanceof Error ? error.message : 'Unknown error'}`;
+    }
+}
+
 async function toolDeleteMemory(searchText: string): Promise<string> {
     try {
+        console.log('[AI Tool] Deleting memory by search:', searchText);
         const memories = await getActiveMemories();
         const match = memories.find(m =>
             m.content.toLowerCase().includes(searchText.toLowerCase())
@@ -262,9 +276,21 @@ async function toolDeleteMemory(searchText: string): Promise<string> {
     }
 }
 
-// Tool: Update a Memory
+// Tool: Update a Memory by ID (for confirmed actions)
+async function toolUpdateMemoryById(memoryId: string, newContent: string): Promise<string> {
+    try {
+        console.log('[AI Tool] Updating memory by ID:', memoryId, 'to:', newContent);
+        await updateMemory(memoryId, newContent);
+        return `✅ Memory updated successfully to: "${newContent}"`;
+    } catch (error) {
+        console.error('[AI Tool] Update memory by ID error:', error);
+        return `❌ Error updating memory: ${error instanceof Error ? error.message : 'Unknown error'}`;
+    }
+}
+
 async function toolUpdateMemoryContent(searchText: string, newContent: string): Promise<string> {
     try {
+        console.log('[AI Tool] Updating memory by search:', searchText);
         const memories = await getActiveMemories();
         const match = memories.find(m =>
             m.content.toLowerCase().includes(searchText.toLowerCase())
@@ -288,19 +314,33 @@ async function toolCreateGoal(
     deadline?: string,
     metricType: 'net_profit' | 'revenue' | 'sales_count' | 'manual_check' = 'net_profit',
     isRecurring: boolean = false,
-    recurrenceType?: 'monthly' | 'weekly' | 'yearly'
+    recurrenceType?: 'monthly' | 'weekly' | 'yearly',
+    startTrackingDate?: string
 ): Promise<string> {
     try {
-        console.log('[AI Tool] Creating goal:', { title, targetAmount, deadline, metricType, isRecurring, recurrenceType });
+        console.log('[AI Tool] Creating goal:', { title, targetAmount, deadline, metricType, isRecurring, recurrenceType, startTrackingDate });
+
+        // Auto-detect if this is an EMI/payment goal
+        const titleLower = title.toLowerCase();
+        const isEMIGoal = titleLower.includes('emi') || titleLower.includes('payment') ||
+            titleLower.includes('bill') || titleLower.includes('loan') ||
+            titleLower.includes('rent') || titleLower.includes('installment');
+
+        // For EM goals, set to manual_check and emi type
+        const finalMetricType = isEMIGoal ? 'manual_check' : metricType;
+        const goalType = isEMIGoal ? 'emi' : 'auto';
 
         const goal = await addGoal({
             title,
             target_amount: targetAmount,
             deadline: deadline,
-            metric_type: metricType,
-            start_tracking_date: new Date().toISOString(),
+            metric_type: finalMetricType,
+            start_tracking_date: startTrackingDate || new Date().toISOString(),
             is_recurring: isRecurring,
-            recurrence_type: recurrenceType
+            recurrence_type: recurrenceType,
+            goal_type: goalType,
+            allocated_amount: 0,
+            reminder_enabled: true
         });
 
         const recurrenceText = isRecurring ? ` (${recurrenceType})` : '';
@@ -310,10 +350,17 @@ async function toolCreateGoal(
             if (typeof window !== 'undefined') {
                 window.dispatchEvent(new Event('goal-updated'));
             }
-            return `✅ Goal created successfully!\n- Title: "${title}"\n- Target: ₹${targetAmount.toLocaleString()}\n- Deadline: ${deadline || 'No deadline'}\n- Type: ${metricType}${recurrenceText}\n\nYou can view it at Insights > Goals.`;
+
+            let response = `✅ Goal created successfully!\n- Title: "${title}"\n- Target: ₹${targetAmount.toLocaleString()}\n- Deadline: ${deadline || 'No deadline'}\n- Type: ${isEMIGoal ? '💳 EMI/Payment (Manual Allocation)' : '🎯 Auto-Tracked'}${recurrenceText}`;
+
+            if (isEMIGoal) {
+                response += `\n\n💡 This is an EMI goal. You can:\n• Allocate funds: "Allocate ₹X to ${title}"\n• Check surplus: "What's my surplus?"\n• Set tracking date: "Track from [date]"`;
+            }
+
+            return response;
         }
         console.error('[AI Tool] Goal creation returned null - check database connection and schema');
-        return '❌ Failed to create goal. The goal data was valid, but the database operation failed. Please check that the user_goals table has all required columns (is_recurring, recurrence_type).';
+        return '❌ Failed to create goal. The goal data was valid, but the database operation failed. Please check that the user_goals table has all required columns.';
     } catch (error) {
         console.error('[AI Tool] Create goal error:', error);
         return `❌ Error creating goal: ${error instanceof Error ? error.message : 'Unknown error'}`;
@@ -321,7 +368,7 @@ async function toolCreateGoal(
 }
 
 // Tool: Update Goal Progress or Details
-async function toolUpdateGoalProgress(searchTitle: string, updates: { targetAmount?: number; deadline?: string; isRecurring?: boolean; recurrenceType?: 'monthly' | 'weekly' | 'yearly'; currentAmount?: number; addAmount?: number }): Promise<string> {
+async function toolUpdateGoalProgress(searchTitle: string, updates: { targetAmount?: number; deadline?: string; isRecurring?: boolean; recurrenceType?: 'monthly' | 'weekly' | 'yearly'; currentAmount?: number; addAmount?: number; startDate?: string; newTitle?: string }): Promise<string> {
     try {
         const goals = await getActiveGoals();
         const match = goals.find(g =>
@@ -348,6 +395,14 @@ async function toolUpdateGoalProgress(searchTitle: string, updates: { targetAmou
                 updateData.recurrence_type = updates.recurrenceType;
                 message += ` Type: ${updates.recurrenceType}.`;
             }
+            if (updates.startDate) {
+                updateData.start_tracking_date = updates.startDate;
+                message += ` Start Date: ${updates.startDate}.`;
+            }
+            if (updates.newTitle) {
+                updateData.title = updates.newTitle;
+                message += ` Renamed to: "${updates.newTitle}".`;
+            }
 
             // Handle Progress Updates
             if (updates.currentAmount !== undefined) {
@@ -361,11 +416,15 @@ async function toolUpdateGoalProgress(searchTitle: string, updates: { targetAmou
             }
 
             if (Object.keys(updateData).length > 0) {
-                await updateGoal(match.id, updateData);
-                if (typeof window !== 'undefined') {
-                    window.dispatchEvent(new Event('goal-updated'));
+                const success = await updateGoal(match.id, updateData);
+                if (success) {
+                    if (typeof window !== 'undefined') {
+                        window.dispatchEvent(new Event('goal-updated'));
+                    }
+                    return `✅ Updated goal "${match.title}":${message}`;
+                } else {
+                    return `❌ Failed to update goal "${match.title}" in the database. Please try again.`;
                 }
-                return `✅ Updated goal "${match.title}":${message}`;
             } else {
                 return `ℹ️ No changes needed for goal "${match.title}".`;
             }
@@ -374,28 +433,6 @@ async function toolUpdateGoalProgress(searchTitle: string, updates: { targetAmou
     } catch (error) {
         console.error('[AI Tool] Update goal error:', error);
         return 'Error updating goal.';
-    }
-}
-
-// Tool: Complete a Goal
-async function toolCompleteGoal(searchTitle: string): Promise<string> {
-    try {
-        const goals = await getActiveGoals();
-        const match = goals.find(g =>
-            g.title.toLowerCase().includes(searchTitle.toLowerCase())
-        );
-
-        if (match) {
-            await completeGoal(match.id);
-            if (typeof window !== 'undefined') {
-                window.dispatchEvent(new Event('goal-updated'));
-            }
-            return `🎉 Marked goal "${match.title}" as complete! Great job!`;
-        }
-        return `❌ No active goal found matching "${searchTitle}"`;
-    } catch (error) {
-        console.error('[AI Tool] Complete goal error:', error);
-        return 'Error completing goal.';
     }
 }
 
@@ -408,12 +445,15 @@ async function toolDeleteGoal(searchTitle: string): Promise<string> {
         );
 
         if (match) {
-            await deleteGoal(match.id);
-
-            if (typeof window !== 'undefined') {
-                window.dispatchEvent(new Event('goal-updated'));
+            const success = await deleteGoal(match.id);
+            if (success) {
+                if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new Event('goal-updated'));
+                }
+                return `✅ Deleted goal: "${match.title}"`;
+            } else {
+                return `❌ Failed to delete goal "${match.title}" in the database.`;
             }
-            return `✅ Deleted goal: "${match.title}"`;
         }
         return `❌ No goal found matching "${searchTitle}"`;
     } catch (error) {
@@ -422,7 +462,479 @@ async function toolDeleteGoal(searchTitle: string): Promise<string> {
     }
 }
 
+// Tool: Get Available Surplus (net profit minus completed EMIs)
+async function toolGetSurplus(): Promise<string> {
+    try {
+        const { netProfitThisMonth, completedEMIsTotal, availableSurplus } = await calculateAvailableSurplus();
+        const goals = await getActiveGoals();
+        const pendingEMIs = goals.filter(g => g.goal_type === 'emi' || g.metric_type === 'manual_check');
+
+        let output = ``;
+        output += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+        output += `💰 **SURPLUS CALCULATION**\n`;
+        output += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+        output += `📈 Net Profit (This Month): ₹${netProfitThisMonth.toLocaleString()}\n`;
+        output += `✅ Completed EMIs/Payments: - ₹${completedEMIsTotal.toLocaleString()}\n`;
+        output += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+        output += `💵 **Available Surplus: ₹${availableSurplus.toLocaleString()}**\n\n`;
+
+        if (pendingEMIs.length > 0) {
+            output += `📋 **Pending EMIs (${pendingEMIs.length}):**\n`;
+            for (const emi of pendingEMIs) {
+                const remaining = Math.max(0, emi.target_amount - emi.current_amount);
+                output += `   • ${emi.title}: ₹${remaining.toLocaleString()} remaining\n`;
+            }
+            output += `\n`;
+        }
+
+        output += `💡 **Use Your Surplus:**\n`;
+        output += `   • "Allocate ₹X to [goal]"\n`;
+        output += `   • "Use surplus for [goal]"`;
+
+        return output;
+    } catch (error) {
+        console.error('[AI Tool] Get surplus error:', error);
+        return 'Error calculating surplus.';
+    }
+}
+
+// Tool: Allocate funds to a goal
+async function toolAllocateToGoalFunds(
+    goalTitle: string,
+    amount: number,
+    source: 'surplus' | 'daily_profit' | 'manual' = 'manual'
+): Promise<string> {
+    try {
+        const goals = await getActiveGoals();
+        const match = goals.find(g =>
+            g.title.toLowerCase().includes(goalTitle.toLowerCase())
+        );
+
+        if (!match) {
+            return `❌ No active goal found matching "${goalTitle}"`;
+        }
+
+        // Check if amount is valid
+        if (amount <= 0) {
+            return `❌ Amount must be greater than 0`;
+        }
+
+        // Allocate to goal
+        const success = await allocateToGoal(match.id, amount, source);
+
+        if (!success) {
+            return `❌ Failed to allocate funds to "${match.title}"`;
+        }
+
+        const newTotal = (match.current_amount || 0) + amount;
+        const progress = Math.min(100, (newTotal / match.target_amount) * 100);
+        const remaining = Math.max(0, match.target_amount - newTotal);
+        const progressBar = generateProgressBar(progress);
+
+        let message = ``;
+        message += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+        message += `✅ **ALLOCATION SUCCESSFUL**\n`;
+        message += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+        message += `📌 Goal: **${match.title}**\n`;
+        message += `💵 Allocated: + ₹${amount.toLocaleString()}\n\n`;
+
+        message += `📊 **Updated Progress:**\n`;
+        message += `   ${progressBar} ${progress.toFixed(0)}%\n`;
+        message += `   ₹${newTotal.toLocaleString()} / ₹${match.target_amount.toLocaleString()}\n\n`;
+
+        if (remaining <= 0) {
+            message += `🎉 **Goal is now 100% funded!**\n`;
+            message += `💡 Say "Mark ${match.title} complete" when paid`;
+        } else {
+            message += `💪 Remaining: ₹${remaining.toLocaleString()}`;
+        }
+
+        return message;
+    } catch (error) {
+        console.error('[AI Tool] Allocate to goal error:', error);
+        return 'Error allocating funds to goal.';
+    }
+}
+
+// Tool: List all goals with comprehensive status
+async function toolListAllGoals(): Promise<string> {
+    try {
+        const goals = await getActiveGoals();
+        const { availableSurplus, netProfitThisMonth, completedEMIsTotal } = await calculateAvailableSurplus();
+
+        if (goals.length === 0) {
+            return `📋 **No Active Goals**\n\nYou haven't set any goals yet.\n\n💡 **Get Started:**\n• "Set a goal for EMI of 15000 by 20th"\n• "Track 50k profit this month"`;
+        }
+
+        // Separate EMI and auto-tracked goals
+        const emiGoals = goals.filter(g => g.metric_type === 'manual_check' || g.goal_type === 'emi');
+        const autoGoals = goals.filter(g => g.metric_type !== 'manual_check' && g.goal_type !== 'emi');
+
+        let output = ``;
+        output += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+        output += `📊 **GOALS SUMMARY**\n`;
+        output += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+        // Financial Overview
+        output += `💰 **Financial Overview:**\n`;
+        output += `├─ Net Profit (This Month): ₹${netProfitThisMonth.toLocaleString()}\n`;
+        output += `├─ Completed EMIs: ₹${completedEMIsTotal.toLocaleString()}\n`;
+        output += `└─ Available Surplus: **₹${availableSurplus.toLocaleString()}**\n\n`;
+
+        // EMI Goals Section
+        if (emiGoals.length > 0) {
+            output += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+            output += `💳 **EMI / PAYMENT GOALS** (${emiGoals.length})\n`;
+            output += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+            for (const goal of emiGoals) {
+                const progress = Math.min(100, (goal.current_amount / goal.target_amount) * 100);
+                const remaining = Math.max(0, goal.target_amount - goal.current_amount);
+                const progressBar = generateProgressBar(progress);
+
+                let daysText = '';
+                let urgency = '';
+                if (goal.deadline) {
+                    const daysLeft = Math.ceil((new Date(goal.deadline).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+                    if (daysLeft < 0) {
+                        daysText = `⚠️ OVERDUE by ${Math.abs(daysLeft)} days`;
+                        urgency = '🔴';
+                    } else if (daysLeft === 0) {
+                        daysText = `🔥 DUE TODAY!`;
+                        urgency = '🔴';
+                    } else if (daysLeft <= 3) {
+                        daysText = `⚡ ${daysLeft} days left`;
+                        urgency = '🟡';
+                    } else {
+                        daysText = `${daysLeft} days left`;
+                        urgency = '🟢';
+                    }
+                }
+
+                output += `${urgency} **${goal.title}**\n`;
+                output += `   ${progressBar} ${progress.toFixed(0)}%\n`;
+                output += `   ₹${goal.current_amount.toLocaleString()} / ₹${goal.target_amount.toLocaleString()}\n`;
+
+                if (remaining > 0) {
+                    output += `   Remaining: ₹${remaining.toLocaleString()}`;
+                    if (daysText) {
+                        output += ` · ${daysText}`;
+                    }
+                    output += `\n`;
+                } else {
+                    output += `   ✅ Fully Funded! Ready to complete.\n`;
+                }
+                output += `\n`;
+            }
+        }
+
+        // Auto-Tracked Goals Section
+        if (autoGoals.length > 0) {
+            output += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+            output += `🎯 **AUTO-TRACKED GOALS** (${autoGoals.length})\n`;
+            output += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+            for (const goal of autoGoals) {
+                const progress = Math.min(100, (goal.current_amount / goal.target_amount) * 100);
+                const remaining = Math.max(0, goal.target_amount - goal.current_amount);
+                const progressBar = generateProgressBar(progress);
+
+                let daysText = '';
+                let dailyTarget = 0;
+                if (goal.deadline) {
+                    const daysLeft = Math.ceil((new Date(goal.deadline).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+                    daysText = daysLeft > 0 ? `${daysLeft} days left` : (daysLeft === 0 ? 'Due today!' : 'Overdue');
+                    dailyTarget = daysLeft > 0 ? Math.ceil(remaining / daysLeft) : 0;
+                }
+
+                const metricLabel = goal.metric_type === 'net_profit' ? '📈 Net Profit' :
+                    goal.metric_type === 'revenue' ? '💵 Revenue' :
+                        goal.metric_type === 'sales_count' ? '🛒 Sales Count' :
+                            goal.metric_type === 'customer_count' ? '👥 Customers' :
+                                goal.metric_type === 'gross_profit' ? '💰 Gross Profit' :
+                                    goal.metric_type === 'margin' ? '📊 Margin %' :
+                                        goal.metric_type === 'product_sales' ? '📦 Product Sales' : '🎯 Goal';
+
+                output += `${metricLabel}: **${goal.title}**\n`;
+                output += `   ${progressBar} ${progress.toFixed(0)}%\n`;
+                output += `   ₹${goal.current_amount.toLocaleString()} / ₹${goal.target_amount.toLocaleString()}\n`;
+
+                if (remaining > 0 && dailyTarget > 0) {
+                    output += `   Need: ₹${dailyTarget.toLocaleString()}/day · ${daysText}\n`;
+                } else if (remaining <= 0) {
+                    output += `   🎉 Goal Achieved!\n`;
+                }
+                output += `\n`;
+            }
+        }
+
+        // Actions Section
+        output += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+        output += `💡 **QUICK ACTIONS**\n`;
+        output += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+        output += `• "Allocate ₹X to [goal]" → Add funds\n`;
+        output += `• "Add surplus to [goal]" → Use available surplus\n`;
+        output += `• "Mark [goal] complete" → Complete a goal\n`;
+        output += `• "What's my surplus?" → Check available money`;
+
+        return output;
+    } catch (error) {
+        console.error('[AI Tool] List goals error:', error);
+        return 'Error fetching goals.';
+    }
+}
+
+// Helper: Generate visual progress bar
+function generateProgressBar(percent: number): string {
+    const filled = Math.round(percent / 10);
+    const empty = 10 - filled;
+    return '█'.repeat(filled) + '░'.repeat(empty);
+}
+
+
+// Tool: Mark goal as complete with timestamp
+async function toolMarkGoalComplete(searchTitle: string): Promise<string> {
+    try {
+        const goals = await getActiveGoals();
+        const match = goals.find(g =>
+            g.title.toLowerCase().includes(searchTitle.toLowerCase())
+        );
+
+        if (!match) {
+            return `❌ No active goal found matching "${searchTitle}"`;
+        }
+
+        const isEMIGoal = match.goal_type === 'emi' || match.metric_type === 'manual_check';
+
+        const success = await completeGoalWithTimestamp(match.id);
+
+        if (!success) {
+            return `❌ Failed to complete goal "${match.title}"`;
+        }
+
+        let response = ``;
+        response += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+        response += `🎉 **GOAL COMPLETED!**\n`;
+        response += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+        response += `📌 Goal: **${match.title}**\n`;
+        response += `💰 Amount: ₹${match.target_amount.toLocaleString()}\n`;
+        response += `📅 Completed: ${new Date().toLocaleDateString()}\n\n`;
+        response += `🏆 Great job! Keep it up!`;
+
+        // PROACTIVE POST-COMPLETION FLOW
+        if (isEMIGoal) {
+            // Calculate new surplus after marking this EMI complete
+            const { availableSurplus, netProfitThisMonth, completedEMIsTotal } = await calculateAvailableSurplus();
+
+            // Find other active EMI goals
+            const otherEMIs = goals.filter(g =>
+                g.id !== match.id &&
+                (g.goal_type === 'emi' || g.metric_type === 'manual_check')
+            );
+
+            if (availableSurplus > 0 && otherEMIs.length > 0) {
+                response += `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+                response += `📊 **UPDATED FINANCES**\n`;
+                response += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+                response += `├─ Net Profit: ₹${netProfitThisMonth.toLocaleString()}\n`;
+                response += `├─ Completed EMIs: ₹${completedEMIsTotal.toLocaleString()}\n`;
+                response += `└─ **Surplus: ₹${availableSurplus.toLocaleString()}**\n`;
+
+                // Find the next EMI with earliest deadline
+                const nextEMI = otherEMIs.sort((a, b) => {
+                    if (!a.deadline) return 1;
+                    if (!b.deadline) return -1;
+                    return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
+                })[0];
+
+                if (nextEMI) {
+                    const remaining = nextEMI.target_amount - (nextEMI.current_amount || 0);
+                    const daysLeft = nextEMI.deadline ? Math.ceil((new Date(nextEMI.deadline).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null;
+                    const progressBar = generateProgressBar(Math.min(100, ((nextEMI.current_amount || 0) / nextEMI.target_amount) * 100));
+
+                    response += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+                    response += `🎯 **NEXT EMI: ${nextEMI.title}**\n`;
+                    response += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+                    response += `   ${progressBar}\n`;
+                    response += `   ₹${(nextEMI.current_amount || 0).toLocaleString()} / ₹${nextEMI.target_amount.toLocaleString()}\n`;
+                    response += `   Remaining: ₹${remaining.toLocaleString()}`;
+                    if (daysLeft !== null) {
+                        response += ` · ${daysLeft} days left`;
+                    }
+                    response += `\n`;
+
+                    response += `\n💡 **Quick Action:**\n`;
+                    if (availableSurplus >= remaining) {
+                        response += `   You can fully fund this goal!\n`;
+                        response += `   → "Allocate ₹${remaining.toLocaleString()} to ${nextEMI.title}"`;
+                    } else {
+                        response += `   → "Use surplus for ${nextEMI.title}"`;
+                    }
+                }
+            } else if (availableSurplus > 0) {
+                response += `\n\n💰 **Surplus: ₹${availableSurplus.toLocaleString()}**\n`;
+                response += `✨ No other EMI goals pending. Amazing work!`;
+            }
+        }
+
+        return response;
+    } catch (error) {
+        console.error('[AI Tool] Complete goal error:', error);
+        return 'Error completing goal.';
+    }
+}
+
+// Tool: Set tracking date for a goal with surplus choice
+async function toolSetTrackingDate(
+    goalTitle: string,
+    startDate: string,
+    includeSurplus: boolean
+): Promise<string> {
+    try {
+        const goals = await getActiveGoals();
+        const match = goals.find(g =>
+            g.title.toLowerCase().includes(goalTitle.toLowerCase())
+        );
+
+        if (!match) {
+            return `❌ No active goal found matching "${goalTitle}"`;
+        }
+
+        // Update goal with tracking preferences
+        await updateGoal(match.id, {
+            allocation_start_date: startDate,
+            include_surplus: includeSurplus
+        });
+
+        const { availableSurplus } = await calculateAvailableSurplus();
+
+        let response = `✅ **Tracking configured for "${match.title}"**\n\n📅 Start Date: ${new Date(startDate).toLocaleDateString()}\n`;
+
+        if (includeSurplus) {
+            response += `💰 Including Previous Surplus: ₹${availableSurplus.toLocaleString()}\n`;
+            response += `\n📊 I'll track:\n• Previous surplus: ₹${availableSurplus.toLocaleString()}\n• + Net profit from ${new Date(startDate).toLocaleDateString()} onwards`;
+        } else {
+            response += `🆕 Starting Fresh (₹0)\n`;
+            response += `\n📊 I'll only count net profit from ${new Date(startDate).toLocaleDateString()} onwards`;
+        }
+
+        response += `\n\n💡 You can still add surplus later by saying "Add surplus to ${match.title}"`;
+
+        return response;
+    } catch (error) {
+        console.error('[AI Tool] Set tracking date error:', error);
+        return 'Error setting tracking date.';
+    }
+}
+
+// Tool: Add surplus to a goal
+async function toolAddSurplusToGoal(goalTitle: string): Promise<string> {
+    try {
+        const goals = await getActiveGoals();
+        const match = goals.find(g =>
+            g.title.toLowerCase().includes(goalTitle.toLowerCase())
+        );
+
+        if (!match) {
+            return `❌ No active goal found matching "${goalTitle}"`;
+        }
+
+        const { availableSurplus } = await calculateAvailableSurplus();
+
+        if (availableSurplus <= 0) {
+            return `📊 No surplus available to add.\n\nNet profit this month has already been allocated to completed EMIs.`;
+        }
+
+        // Allocate surplus to goal
+        const success = await allocateToGoal(match.id, availableSurplus, 'surplus');
+
+        if (!success) {
+            return `❌ Failed to add surplus to "${match.title}"`;
+        }
+
+        const newTotal = (match.current_amount || 0) + availableSurplus;
+        const progress = Math.min(100, (newTotal / match.target_amount) * 100);
+        const remaining = Math.max(0, match.target_amount - newTotal);
+
+        let response = `✅ **Added surplus to "${match.title}"**\n\n💰 Surplus Added: ₹${availableSurplus.toLocaleString()}\n\n📊 Updated Progress:\n- Total: ₹${newTotal.toLocaleString()} / ₹${match.target_amount.toLocaleString()} (${progress.toFixed(0)}%)`;
+
+        if (remaining <= 0) {
+            response += `\n\n🎉 Goal is now 100% funded! Ready to mark as complete?`;
+        } else {
+            response += `\n- Remaining: ₹${remaining.toLocaleString()}`;
+
+            if (match.deadline) {
+                const daysLeft = Math.ceil((new Date(match.deadline).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+                if (daysLeft > 0) {
+                    const dailyNeeded = Math.ceil(remaining / daysLeft);
+                    response += `\n- Daily target: ₹${dailyNeeded.toLocaleString()}/day for ${daysLeft} days`;
+                }
+            }
+        }
+
+        return response;
+    } catch (error) {
+        console.error('[AI Tool] Add surplus error:', error);
+        return 'Error adding surplus.';
+    }
+}
+
 // Parse goal creation from natural language
+// Helper to determine start date based on context
+// TODO: Integrate this with goal creation confirmation dialog
+
+function parseSmartDateRange(message: string): {
+    startDate: string;
+    suggestedStartDate?: string;
+    shouldAsk: boolean;
+    context: string
+} {
+    const today = new Date();
+    const lowerMessage = message.toLowerCase();
+
+    // Default: start from today
+    let startDate = format(today, 'yyyy-MM-dd');
+    let suggestedStartDate: string | undefined;
+    let shouldAsk = false;
+    let context = 'today';
+
+    // Context-based detection
+    if (lowerMessage.includes('this month')) {
+        // If they say "this month", they might want data from start of month
+        suggestedStartDate = format(startOfMonth(today), 'yyyy-MM-dd');
+        shouldAsk = true;
+        context = 'this month';
+    } else if (lowerMessage.includes('this week')) {
+        // If they say "this week", they might want data from start of week
+        const startOfWeek = subDays(today, today.getDay());
+        suggestedStartDate = format(startOfWeek, 'yyyy-MM-dd');
+        shouldAsk = true;
+        context = 'this week';
+    } else if (lowerMessage.match(/month\s+end|by\s+month\s+end/)) {
+        // "by month end" likely means from month start
+        suggestedStartDate = format(startOfMonth(today), 'yyyy-MM-dd');
+        shouldAsk = true;
+        context = 'month end';
+    } else if (lowerMessage.includes('week end') || lowerMessage.includes('by weekend')) {
+        // "by week end" likely means from week start
+        const startOfWeek = subDays(today, today.getDay());
+        suggestedStartDate = format(startOfWeek, 'yyyy-MM-dd');
+        shouldAsk = true;
+        context = 'week end';
+    }
+
+    // If we have a suggested start date, use it as default if not asking
+    if (suggestedStartDate && !shouldAsk) {
+        startDate = suggestedStartDate;
+    }
+
+    return { startDate, suggestedStartDate, shouldAsk, context };
+}
+
+
 function parseGoalFromMessage(message: string): { title: string; target: number; deadline?: string; isRecurring: boolean; recurrenceType?: 'monthly' | 'weekly' | 'yearly' } | null {
     const lowerMessage = message.toLowerCase();
 
@@ -626,6 +1138,31 @@ function detectRequiredTools(query: string): string[] {
         tools.push('update_goal');
     }
 
+    // Goal allocation (EMI tracking)
+    if (lowerQuery.match(/allocate|allot|assign.*to.*goal|fund.*goal|use.*surplus|add.*to.*emi|put.*towards/i)) {
+        tools.push('allocate_goal');
+    }
+
+    // List all goals query
+    if (lowerQuery.match(/list\s*(all\s*)?(my\s*)?goals|show\s*(all\s*)?(my\s*)?goals|what\s*are\s*my\s*goals|tell\s*me\s*about\s*my\s*goals/i)) {
+        tools.push('list_goals');
+    }
+
+    // Surplus query
+    if (lowerQuery.match(/surplus|available.*money|how\s*much\s*(can|do)\s*i\s*(have|allocate)|remaining.*profit/i)) {
+        tools.push('get_surplus');
+    }
+
+    // Set tracking date for goal
+    if (lowerQuery.match(/start\s+(tracking|counting|from)|track\s+from|begin\s+(tracking|from)|allocate\s+from/i)) {
+        tools.push('set_tracking_date');
+    }
+
+    // Add surplus to goal
+    if (lowerQuery.match(/add\s+(the\s+)?(previous\s+)?surplus|use\s+(the\s+)?surplus|include\s+surplus/i)) {
+        tools.push('add_surplus');
+    }
+
     // Memory/Remember queries (saving)
     if (lowerQuery.match(/remember\s*(that)?|save\s*(this)?|note\s*(that)?|my name\s*(is)?|i\s*am\s*\w+|i\s*prefer|always|never/)) {
         tools.push('save_memory');
@@ -658,7 +1195,7 @@ interface ChatMessage {
 // Pending action that requires user confirmation
 export interface PendingAction {
     id: string;
-    type: 'create_goal' | 'save_memory' | 'delete_goal' | 'delete_memory';
+    type: 'create_goal' | 'save_memory' | 'delete_goal' | 'delete_memory' | 'update_memory' | 'allocate_goal' | 'complete_goal' | 'set_tracking_date' | 'add_surplus' | 'update_goal';
     description: string;
     data: any;
 }
@@ -678,8 +1215,13 @@ export async function executePendingAction(action: PendingAction): Promise<strin
     try {
         switch (action.type) {
             case 'create_goal': {
-                const { title, targetAmount, deadline, metricType, isRecurring, recurrenceType } = action.data;
-                const result = await toolCreateGoal(title, targetAmount, deadline, metricType, isRecurring, recurrenceType);
+                const { title, targetAmount, deadline, metricType, isRecurring, recurrenceType, suggestedDate, todayDate } = action.data;
+
+                // If we have date choices, use the appropriate one
+                // (Date choice would have been made in the confirmation)
+                const startTrackingDate = suggestedDate || todayDate || undefined;
+
+                const result = await toolCreateGoal(title, targetAmount, deadline, metricType, isRecurring, recurrenceType, startTrackingDate);
                 return result;
             }
             case 'save_memory': {
@@ -693,8 +1235,51 @@ export async function executePendingAction(action: PendingAction): Promise<strin
                 return result;
             }
             case 'delete_memory': {
-                const { searchText } = action.data;
-                const result = await toolDeleteMemory(searchText);
+                const { memoryId, searchText } = action.data;
+                console.log('[AI] Executing delete_memory:', { memoryId, searchText });
+                // Use memoryId if available (from smart matching), otherwise fall back to search
+                const result = memoryId
+                    ? await toolDeleteMemoryById(memoryId)
+                    : await toolDeleteMemory(searchText);
+                return result;
+            }
+            case 'update_memory': {
+                const { memoryId, searchText, newContent } = action.data;
+                console.log('[AI] Executing update_memory:', { memoryId, searchText, newContent });
+                // Use memoryId if available (from smart matching), otherwise fall back to search
+                const result = memoryId
+                    ? await toolUpdateMemoryById(memoryId, newContent)
+                    : await toolUpdateMemoryContent(searchText, newContent);
+                return result;
+            }
+            case 'allocate_goal': {
+                const { goalId, goalTitle, amount, source } = action.data;
+                console.log('[AI] Executing allocate_goal:', { goalId, goalTitle, amount, source });
+                const result = await toolAllocateToGoalFunds(goalTitle, amount, source);
+                return result;
+            }
+            case 'complete_goal': {
+                const { goalTitle } = action.data;
+                console.log('[AI] Executing complete_goal:', { goalTitle });
+                const result = await toolMarkGoalComplete(goalTitle);
+                return result;
+            }
+            case 'set_tracking_date': {
+                const { goalTitle, startDate, includeSurplus } = action.data;
+                console.log('[AI] Executing set_tracking_date:', { goalTitle, startDate, includeSurplus });
+                const result = await toolSetTrackingDate(goalTitle, startDate, includeSurplus);
+                return result;
+            }
+            case 'add_surplus': {
+                const { goalTitle } = action.data;
+                console.log('[AI] Executing add_surplus:', { goalTitle });
+                const result = await toolAddSurplusToGoal(goalTitle);
+                return result;
+            }
+            case 'update_goal': {
+                const { goalTitle, updates } = action.data;
+                console.log('[AI] Executing update_goal:', { goalTitle, updates });
+                const result = await toolUpdateGoalProgress(goalTitle, updates);
                 return result;
             }
             default:
@@ -786,33 +1371,75 @@ export async function enhancedChatWithAI(
         if (requiredTools.includes('create_goal')) {
             const parsed = parseGoalFromMessage(userMessage);
             if (parsed) {
-                // Create a pending action instead of executing immediately
-                pendingAction = {
-                    id: `goal-${Date.now()}`,
-                    type: 'create_goal',
-                    description: `Create goal "${parsed.title}" with target ₹${parsed.target.toLocaleString()}${parsed.deadline ? ` by ${parsed.deadline}` : ''}${parsed.isRecurring ? ` (${parsed.recurrenceType})` : ''}`,
-                    data: {
-                        title: parsed.title,
-                        targetAmount: parsed.target,
-                        deadline: parsed.deadline,
-                        metricType: 'net_profit',
-                        isRecurring: parsed.isRecurring,
-                        recurrenceType: parsed.recurrenceType
-                    }
-                };
+                // Check if we need to ask about start date
+                const dateInfo = parseSmartDateRange(userMessage);
 
-                toolResults.push({
-                    name: 'Goal Creation (Pending Confirmation)',
-                    result: `I understood you want to create a goal:\n\n📌 **${parsed.title}**\n💰 Target: ₹${parsed.target.toLocaleString()}\n📅 Deadline: ${parsed.deadline || 'None'}\n🔁 Recurring: ${parsed.isRecurring ? parsed.recurrenceType : 'No'}\n\n⚠️ This action requires your confirmation.`
-                });
+                if (dateInfo.shouldAsk && dateInfo.suggestedStartDate) {
+                    // Create a pending action that asks about date choice
+                    const todayFormatted = format(new Date(), 'MMM d');
+                    const suggestedFormatted = format(new Date(dateInfo.suggestedStartDate), 'MMM d');
+
+                    pendingAction = {
+                        id: `goal-date-${Date.now()}`,
+                        type: 'create_goal',
+                        description: `Create goal "${parsed.title}" - Choose start date`,
+                        data: {
+                            title: parsed.title,
+                            targetAmount: parsed.target,
+                            deadline: parsed.deadline,
+                            metricType: 'net_profit',
+                            isRecurring: parsed.isRecurring,
+                            recurrenceType: parsed.recurrenceType,
+                            todayDate: format(new Date(), 'yyyy-MM-dd'),
+                            suggestedDate: dateInfo.suggestedStartDate,
+                            context: dateInfo.context
+                        }
+                    };
+
+                    toolResults.push({
+                        name: 'Goal Creation - Date Choice Needed',
+                        result: `I'll create a ${parsed.title} goal of ₹${parsed.target.toLocaleString()} for ${dateInfo.context}.
+
+📅 **Choose tracking start date:**
+
+**Option 1:** From ${suggestedFormatted} (${dateInfo.context} start)
+  • Includes existing sales data
+  • Shows full ${dateInfo.context} progress
+
+**Option 2:** From ${todayFormatted} (today)
+  • Fresh start from now
+  • Only future sales count
+
+💡 Which would you like? Reply with "1" or "2" or say "from ${dateInfo.context} start" or "from today"`
+                    });
+                } else {
+                    // No date choice needed, create normal pending action
+                    pendingAction = {
+                        id: `goal-${Date.now()}`,
+                        type: 'create_goal',
+                        description: `Create goal "${parsed.title}" with target ₹${parsed.target.toLocaleString()}${parsed.deadline ? ` by ${parsed.deadline}` : ''}${parsed.isRecurring ? ` (${parsed.recurrenceType})` : ''}`,
+                        data: {
+                            title: parsed.title,
+                            targetAmount: parsed.target,
+                            deadline: parsed.deadline,
+                            metricType: 'net_profit',
+                            isRecurring: parsed.isRecurring,
+                            recurrenceType: parsed.recurrenceType
+                        }
+                    };
+
+                    toolResults.push({
+                        name: 'Goal Creation (Pending Confirmation)',
+                        result: `I understood you want to create a goal:\n\n📌 **${parsed.title}**\n💰 Target: ₹${parsed.target.toLocaleString()}\n📅 Deadline: ${parsed.deadline || 'None'}\n🔁 Recurring: ${parsed.isRecurring ? parsed.recurrenceType : 'No'}\n\n⚠️ This action requires your confirmation.`
+                    });
+                }
             } else {
                 toolResults.push({
-                    name: 'Goal Creation Failed',
-                    result: "I tried to create a goal but couldn't find a clear Target Amount (e.g. '50k', '10000') or Title. Please ask the user to specify the amount."
+                    name: 'Clarification Needed',
+                    result: `🎯 **I'd love to help you set up a new goal!**\n\nI noticed you want to create a goal, but I need one more detail:\n\n❓ **What is your target amount for this goal?**\n\n_For example: "50,000" or "1 lakh"_`
                 });
             }
         }
-
         // Goal completion tool
         if (requiredTools.includes('complete_goal')) {
             // Extract goal name from message - improved patterns
@@ -834,11 +1461,18 @@ export async function enhancedChatWithAI(
             }
 
             if (goalName) {
-                const result = await toolCompleteGoal(goalName);
-                toolResults.push({ name: 'Goal Completion', result });
+                // Create pending action for confirmation
+                pendingAction = {
+                    id: `complete-goal-${Date.now()}`,
+                    type: 'complete_goal',
+                    description: `Mark goal "${goalName}" as complete`,
+                    data: { goalTitle: goalName }
+                };
 
-                // Refresh goals list
-                if (typeof window !== 'undefined') window.dispatchEvent(new Event('goal-updated'));
+                toolResults.push({
+                    name: 'Goal Completion (Pending Confirmation)',
+                    result: `I'll mark "${goalName}" as complete.\n\n⚠️ This action requires your confirmation.`
+                });
             }
         }
 
@@ -862,11 +1496,18 @@ export async function enhancedChatWithAI(
             }
 
             if (goalName) {
-                const result = await toolDeleteGoal(goalName);
-                toolResults.push({ name: 'Goal Deletion', result });
+                // Create pending action for confirmation
+                pendingAction = {
+                    id: `delete-goal-${Date.now()}`,
+                    type: 'delete_goal',
+                    description: `Delete goal "${goalName}"`,
+                    data: { searchTitle: goalName }
+                };
 
-                // Refresh goals list
-                if (typeof window !== 'undefined') window.dispatchEvent(new Event('goal-updated'));
+                toolResults.push({
+                    name: 'Goal Deletion (Pending Confirmation)',
+                    result: `I'll delete the goal "${goalName}".\n\n⚠️ This action requires your confirmation.`
+                });
             }
         }
 
@@ -896,7 +1537,7 @@ export async function enhancedChatWithAI(
             }
 
             if (goalName) {
-                const updates: { targetAmount?: number; deadline?: string; isRecurring?: boolean; recurrenceType?: 'monthly' | 'weekly' | 'yearly'; currentAmount?: number; addAmount?: number } = {};
+                const updates: { targetAmount?: number; deadline?: string; isRecurring?: boolean; recurrenceType?: 'monthly' | 'weekly' | 'yearly'; currentAmount?: number; addAmount?: number; startDate?: string; newTitle?: string } = {};
 
                 // Parse amount update if present
                 const amountMatch = userMessage.match(/(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:k|K|lakh|L)?/);
@@ -916,16 +1557,15 @@ export async function enhancedChatWithAI(
                     } else if (lower.includes('progress') || lower.includes('current') || lower.includes('reached') || lower.includes('set to') || lower.includes('now at')) {
                         // "Progress is 500", "Reached 5000"
                         updates.currentAmount = amount;
-                    } else {
-                        // Fallback: If amount is large (>100) and no other context, assume target. 
-                        // If it's small, maybe it's an addition? Hard to say. 
-                        // Let's assume target update for now to be safe, unless it says "add".
-                        if (amount > 100) updates.targetAmount = amount;
+                    } else if (amount > 100 && !lower.includes('date') && !lower.includes('start')) {
+                        // Only assume target if it's not part of a date string
+                        updates.targetAmount = amount;
                     }
                 }
 
-                // Check for recurrence updates
                 const lowerMsg = userMessage.toLowerCase();
+
+                // Check for recurrence updates
                 if (lowerMsg.includes('monthly') || lowerMsg.includes('every month')) {
                     updates.isRecurring = true;
                     updates.recurrenceType = 'monthly';
@@ -936,8 +1576,349 @@ export async function enhancedChatWithAI(
                     updates.isRecurring = false;
                 }
 
-                const result = await toolUpdateGoalProgress(goalName, updates);
-                toolResults.push({ name: 'Goal Update', result });
+                // Check for Start Date updates
+                if (lowerMsg.includes('start') || lowerMsg.includes('begin')) {
+                    const dateMatch = userMessage.match(/(?:from|to|on)\s+(\d{4}-\d{2}-\d{2}|\d{1,2}(?:st|nd|rd|th)?(?:\s+[a-zA-Z]+)?)/i);
+                    if (dateMatch) {
+                        let dateStr = dateMatch[1];
+                        // Simple date parsing for "1st", "2nd", etc to current month
+                        if (dateStr.match(/^\d{1,2}(?:st|nd|rd|th)?$/)) {
+                            const day = parseInt(dateStr);
+                            const now = new Date();
+                            dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                        } else if (dateStr.match(/^\d{1,2}(?:st|nd|rd|th)?\s+[a-zA-Z]+$/)) {
+                            // Date like "20th January"
+                            const parts = dateStr.split(' ');
+                            const day = parseInt(parts[0]);
+                            const monthStr = parts[1].toLowerCase();
+                            const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+                            const monthIndex = months.findIndex(m => monthStr.startsWith(m));
+                            if (monthIndex >= 0) {
+                                const now = new Date();
+                                dateStr = `${now.getFullYear()}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                            }
+                        }
+                        updates.startDate = dateStr;
+                    }
+                }
+
+                // Check for Title/Rename updates
+                if (lowerMsg.includes('rename') || lowerMsg.includes('change title') || lowerMsg.includes('call it') || lowerMsg.includes('name it')) {
+                    const titleMatch = userMessage.match(/(?:to|as|call it|name it)\s+["']?(.+?)["']?(?:\s|$)/i);
+                    if (titleMatch) {
+                        const potentialTitle = titleMatch[1].trim();
+                        // Ensure we didn't capture overlapping keywords
+                        if (!potentialTitle.toLowerCase().startsWith('start') && !potentialTitle.toLowerCase().startsWith('monthly')) {
+                            updates.newTitle = potentialTitle;
+                        }
+                    }
+                }
+
+                if (Object.keys(updates).length > 0) {
+                    // Create pending action for confirmation
+                    pendingAction = {
+                        id: `update-goal-${Date.now()}`,
+                        type: 'update_goal',
+                        description: `Update goal "${goalName}"`,
+                        data: { goalTitle: goalName, updates }
+                    };
+
+                    let updatesSummary = '';
+                    if (updates.targetAmount) updatesSummary += `\n• Target: ₹${updates.targetAmount.toLocaleString()}`;
+                    if (updates.currentAmount) updatesSummary += `\n• Current: ₹${updates.currentAmount.toLocaleString()}`;
+                    if (updates.addAmount) updatesSummary += `\n• Add: ₹${updates.addAmount.toLocaleString()}`;
+                    if (updates.deadline) updatesSummary += `\n• Deadline: ${updates.deadline}`;
+                    if (updates.startDate) updatesSummary += `\n• Start Date: ${updates.startDate}`;
+                    if (updates.newTitle) updatesSummary += `\n• Rename to: "${updates.newTitle}"`;
+                    if (updates.isRecurring !== undefined) updatesSummary += `\n• Recurring: ${updates.isRecurring ? updates.recurrenceType : 'No'}`;
+
+                    toolResults.push({
+                        name: 'Goal Update (Pending Confirmation)',
+                        result: `I'll update the goal "${goalName}" with:${updatesSummary}\n\n⚠️ This action requires your confirmation.`
+                    });
+                } else {
+                    toolResults.push({
+                        name: 'Clarification Needed',
+                        result: `📝 **Update Goal: ${goalName}**\n\nI found your goal! What would you like to change?\n\n• **Target** – Change the goal amount\n• **Deadline** – Adjust the due date\n• **Title** – Rename the goal\n• **Progress** – Update current progress\n\n❓ **Which one would you like to update?**`
+                    });
+                }
+            } else {
+                toolResults.push({
+                    name: 'Clarification Needed',
+                    result: `📝 **Update Goal**\n\nI'd be happy to help you update a goal!\n\n❓ **Which goal would you like to update?**\n\n_Just mention the goal name and what you'd like to change._`
+                });
+            }
+        }
+
+        // List all goals tool
+        if (requiredTools.includes('list_goals')) {
+            const result = await toolListAllGoals();
+            toolResults.push({ name: 'Goals Summary', result });
+        }
+
+        // Get surplus tool
+        if (requiredTools.includes('get_surplus')) {
+            const result = await toolGetSurplus();
+            toolResults.push({ name: 'Surplus Calculation', result });
+        }
+
+        // Goal allocation tool - Now returns pending action for confirmation
+        if (requiredTools.includes('allocate_goal') && !pendingAction) {
+            console.log('[AI Allocate] Triggered for message:', userMessage);
+
+            // Parse allocation request: "Allocate 5000 to bike EMI" or "Use surplus for car loan"
+            const amountMatch = userMessage.match(/(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:k|K|lakh|L)?/);
+            let amount = 0;
+            if (amountMatch) {
+                amount = parseFloat(amountMatch[1].replace(/,/g, ''));
+                if (userMessage.toLowerCase().includes('k')) amount *= 1000;
+                if (userMessage.toLowerCase().includes('lakh')) amount *= 100000;
+            }
+
+            // Find goal name from message
+            const goals = await getActiveGoals();
+            let matchedGoal = null;
+
+            // Extract keywords and find matching goal
+            const stopWords = ['allocate', 'allot', 'assign', 'put', 'use', 'add', 'to', 'towards', 'for', 'my', 'the', 'a', 'goal', 'emi', 'surplus'];
+            const messageWords = userMessage.toLowerCase()
+                .replace(/[^\w\s]/g, '')
+                .replace(/\d+/g, '') // Remove numbers
+                .split(/\s+/)
+                .filter(word => word.length > 2 && !stopWords.includes(word));
+
+            console.log('[AI Allocate] Search words:', messageWords);
+
+            for (const goal of goals) {
+                const goalTitle = goal.title.toLowerCase();
+                for (const word of messageWords) {
+                    if (goalTitle.includes(word)) {
+                        matchedGoal = goal;
+                        break;
+                    }
+                }
+                if (matchedGoal) break;
+            }
+
+            // If no amount specified but we have surplus, use it
+            if (amount === 0 && userMessage.toLowerCase().includes('surplus')) {
+                const { availableSurplus } = await calculateAvailableSurplus();
+                amount = availableSurplus;
+            }
+
+            if (matchedGoal && amount > 0) {
+                const newTotal = (matchedGoal.current_amount || 0) + amount;
+                const progress = Math.min(100, (newTotal / matchedGoal.target_amount) * 100);
+                const remaining = Math.max(0, matchedGoal.target_amount - newTotal);
+
+                pendingAction = {
+                    id: `allocate-${Date.now()}`,
+                    type: 'allocate_goal',
+                    description: `Allocate ₹${amount.toLocaleString()} to "${matchedGoal.title}"`,
+                    data: {
+                        goalId: matchedGoal.id,
+                        goalTitle: matchedGoal.title,
+                        amount,
+                        source: 'manual'
+                    }
+                };
+
+                let message = `I'll allocate funds to your goal:\n\n💳 **Goal:** ${matchedGoal.title}\n💰 **Amount:** ₹${amount.toLocaleString()}\n\n📊 **After allocation:**\n- Progress: ₹${newTotal.toLocaleString()} / ₹${matchedGoal.target_amount.toLocaleString()} (${progress.toFixed(0)}%)`;
+
+                if (remaining <= 0) {
+                    message += `\n- 🎉 **Goal will be 100% funded!**`;
+                } else {
+                    message += `\n- Remaining: ₹${remaining.toLocaleString()}`;
+                }
+
+                message += `\n\n⚠️ This action requires your confirmation.`;
+
+                toolResults.push({
+                    name: 'Goal Allocation (Pending Confirmation)',
+                    result: message
+                });
+            } else if (!matchedGoal && goals.length > 0) {
+                const goalList = goals.map(g => `• ${g.title}`).join('\n');
+                toolResults.push({
+                    name: 'Clarification Needed',
+                    result: `💰 **Allocate Funds**\n\nI couldn't identify which goal you're referring to.\n\n**Your active goals:**\n${goalList}\n\n❓ **Which goal would you like to allocate funds to?**`
+                });
+            } else if (amount <= 0) {
+                toolResults.push({
+                    name: 'Amount Required',
+                    result: `💰 **Amount Needed**\n\nPlease specify how much you'd like to allocate.\n\n**Examples:**\n• "Allocate 5000 to bike EMI"\n• "Use surplus for car loan"\n• "Put 10k towards savings goal"\n\n❓ **How much would you like to allocate?**`
+                });
+            } else {
+                toolResults.push({
+                    name: 'No Goals',
+                    result: `🎯 **No Active Goals**\n\nYou don't have any active goals yet!\n\nWould you like to create one?\n\n**Example:** "Set a goal for EMI of 15000 by 20th"`
+                });
+            }
+        }
+
+        // Set tracking date tool - Pending action with surplus choice
+        if (requiredTools.includes('set_tracking_date') && !pendingAction) {
+            console.log('[AI Set Tracking Date] Triggered for message:', userMessage);
+
+            // Find goal name
+            const goals = await getActiveGoals();
+            let matchedGoal = null;
+
+            // Extract keywords from message
+            const stopWords = ['start', 'track', 'tracking', 'from', 'begin', 'allocate', 'counting', 'for', 'the', 'my', 'a', 'an'];
+            const messageWords = userMessage.toLowerCase()
+                .replace(/\d+/g, '') // Remove dates/numbers temporarily
+                .replace(/[^\w\s]/g, '')
+                .split(/\s+/)
+                .filter(word => word.length > 2 && !stopWords.includes(word));
+
+            for (const goal of goals) {
+                const goalTitle = goal.title.toLowerCase();
+                for (const word of messageWords) {
+                    if (goalTitle.includes(word)) {
+                        matchedGoal = goal;
+                        break;
+                    }
+                }
+                if (matchedGoal) break;
+            }
+
+            // Extract date from message
+            let startDate = '';
+            const datePatterns = [
+                /from\s+(\d{1,2})(?:st|nd|rd|th)?/i,
+                /from\s+(\d{1,2})-(\d{1,2})-(\d{4})/i,
+                /from\s+(\d{4})-(\d{1,2})-(\d{1,2})/i,
+                /track\s+from\s+(\d{1,2})(?:st|nd|rd|th)?/i
+            ];
+
+            for (const pattern of datePatterns) {
+                const match = userMessage.match(pattern);
+                if (match) {
+                    if (match.length === 2) {
+                        // Just day number like "21st" - use current month/year
+                        const day = match[1];
+                        const now = new Date();
+                        startDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                    } else if (match.length === 4) {
+                        // Full date
+                        startDate = `${match[3]}-${String(match[2]).padStart(2, '0')}-${String(match[1]).padStart(2, '0')}`;
+                    }
+                    break;
+                }
+            }
+
+            if (matchedGoal && startDate) {
+                const { availableSurplus } = await calculateAvailableSurplus();
+
+                pendingAction = {
+                    id: `track-date-${Date.now()}`,
+                    type: 'set_tracking_date',
+                    description: `Set tracking for "${matchedGoal.title}" from ${new Date(startDate).toLocaleDateString()}`,
+                    data: {
+                        goalTitle: matchedGoal.title,
+                        startDate,
+                        includeSurplus: false // Will be asked in confirmation
+                    }
+                };
+
+                toolResults.push({
+                    name: 'Tracking Date Configuration (Pending)',
+                    result: `I'll configure tracking for "${matchedGoal.title}"\n\n📅 Start Date: ${new Date(startDate).toLocaleDateString()}\n💰 Available Surplus: ₹${availableSurplus.toLocaleString()}\n\n⚠️ Please confirm:\n\n**Would you like to:**\n1. 📦 Include previous surplus (₹${availableSurplus.toLocaleString()})\n2. 🆕 Start fresh from ₹0\n\n(The AI will ask you in the next message)`
+                });
+            } else if (!matchedGoal && goals.length > 0) {
+                const goalList = goals.map(g => `• ${g.title}`).join('\n');
+                toolResults.push({
+                    name: 'Goal Not Found',
+                    result: `📅 **Set Tracking Date**\n\nI couldn't identify which goal you're referring to.\n\n**Your active goals:**\n${goalList}\n\n❓ **Which goal would you like to set tracking for?**`
+                });
+            } else if (!startDate) {
+                toolResults.push({
+                    name: 'Date Required',
+                    result: `📅 **Start Date Needed**\n\nI need to know when to start tracking.\n\n**Examples:**\n• "Start tracking from 21st"\n• "Track my bike EMI from January 25th"\n• "Begin allocating from 2026-01-20"\n\n❓ **From which date should I start tracking?**`
+                });
+            } else {
+                toolResults.push({
+                    name: 'No Goals',
+                    result: `🎯 **No Active Goals**\n\nYou don't have any active goals yet!\n\nWould you like to create one?\n\n**Example:** "Set a goal for EMI of 15000 by 20th"`
+                });
+            }
+        }
+
+        // Add surplus tool - Pending action for confirmation
+        if (requiredTools.includes('add_surplus') && !pendingAction) {
+            console.log('[AI Add Surplus] Triggered for message:', userMessage);
+
+            // Find goal name
+            const goals = await getActiveGoals();
+            let matchedGoal = null;
+
+            // Extract keywords
+            const stopWords = ['add', 'use', 'include', 'the', 'previous', 'surplus', 'to', 'for', 'my', 'a', 'an'];
+            const messageWords = userMessage.toLowerCase()
+                .replace(/[^\w\s]/g, '')
+                .split(/\s+/)
+                .filter(word => word.length > 2 && !stopWords.includes(word));
+
+            for (const goal of goals) {
+                const goalTitle = goal.title.toLowerCase();
+                for (const word of messageWords) {
+                    if (goalTitle.includes(word)) {
+                        matchedGoal = goal;
+                        break;
+                    }
+                }
+                if (matchedGoal) break;
+            }
+
+            if (matchedGoal) {
+                const { availableSurplus } = await calculateAvailableSurplus();
+
+                if (availableSurplus <= 0) {
+                    toolResults.push({
+                        name: 'No Surplus Available',
+                        result: `📊 No surplus available to add.\n\nNet profit this month has already been allocated to completed EMIs.`
+                    });
+                } else {
+                    const newTotal = (matchedGoal.current_amount || 0) + availableSurplus;
+                    const progress = Math.min(100, (newTotal / matchedGoal.target_amount) * 100);
+                    const remaining = Math.max(0, matchedGoal.target_amount - newTotal);
+
+                    pendingAction = {
+                        id: `add-surplus-${Date.now()}`,
+                        type: 'add_surplus',
+                        description: `Add surplus ₹${availableSurplus.toLocaleString()} to "${matchedGoal.title}"`,
+                        data: {
+                            goalTitle: matchedGoal.title
+                        }
+                    };
+
+                    let message = `I'll add the available surplus to "${matchedGoal.title}"\n\n💰 Surplus: ₹${availableSurplus.toLocaleString()}\n\n📊 **After adding:**\n- Total: ₹${newTotal.toLocaleString()} / ₹${matchedGoal.target_amount.toLocaleString()} (${progress.toFixed(0)}%)`;
+
+                    if (remaining <= 0) {
+                        message += `\n- 🎉 **Goal will be 100% funded!**`;
+                    } else {
+                        message += `\n- Remaining: ₹${remaining.toLocaleString()}`;
+                    }
+
+                    message += `\n\n⚠️ This action requires your confirmation.`;
+
+                    toolResults.push({
+                        name: 'Add Surplus (Pending Confirmation)',
+                        result: message
+                    });
+                }
+            } else if (goals.length > 0) {
+                const goalList = goals.map(g => `• ${g.title}`).join('\n');
+                toolResults.push({
+                    name: 'Goal Not Found',
+                    result: `I couldn't find which goal you want to add surplus to.\n\n**Your active goals:**\n${goalList}\n\nPlease specify the goal name.`
+                });
+            } else {
+                toolResults.push({
+                    name: 'No Goals',
+                    result: `You don't have any active goals yet. Create one first!`
+                });
             }
         }
 
@@ -974,21 +1955,155 @@ export async function enhancedChatWithAI(
             }
         }
 
-        // Memory deletion tool
+        // Memory deletion tool - Now requires confirmation with SMART MATCHING
         if (requiredTools.includes('delete_memory')) {
-            const match = userMessage.match(/(?:forget|delete|remove).*?(?:about|memory|fact)?\s*[:\-]?\s*[\"']?([^\"']+)[\"']?/i);
-            if (match) {
-                const result = await toolDeleteMemory(match[1].trim());
-                toolResults.push({ name: 'Memory Deleted', result });
+            console.log('[AI Delete Memory] Triggered for message:', userMessage);
+
+            // Get all memories first
+            const memories = await getActiveMemories();
+            console.log('[AI Delete Memory] Found memories:', memories.length);
+
+            if (memories.length === 0) {
+                toolResults.push({
+                    name: 'No Memories',
+                    result: `You don't have any saved memories yet. Nothing to delete!`
+                });
+            } else {
+                // Extract keywords from the user's message (remove common words)
+                const stopWords = ['forget', 'delete', 'remove', 'about', 'my', 'the', 'a', 'an', 'that', 'this', 'preference', 'memory', 'fact', 'please', 'can', 'you', 'i', 'me', 'from', 'your', 'memories'];
+                const messageWords = userMessage.toLowerCase()
+                    .replace(/[^\w\s]/g, '') // Remove punctuation
+                    .split(/\s+/)
+                    .filter(word => word.length > 2 && !stopWords.includes(word));
+
+                console.log('[AI Delete Memory] Search keywords:', messageWords);
+
+                // Find the best matching memory by counting keyword hits
+                let bestMatch: { memory: typeof memories[0]; score: number } | null = null;
+
+                for (const memory of memories) {
+                    const memoryContent = memory.content.toLowerCase();
+                    let score = 0;
+
+                    for (const word of messageWords) {
+                        if (memoryContent.includes(word)) {
+                            score += 1;
+                        }
+                    }
+
+                    console.log('[AI Delete Memory] Memory:', memory.content, 'Score:', score);
+
+                    if (score > 0 && (!bestMatch || score > bestMatch.score)) {
+                        bestMatch = { memory, score };
+                    }
+                }
+
+                if (bestMatch) {
+                    console.log('[AI Delete Memory] Best match found:', bestMatch.memory.content);
+
+                    // Create pending action for confirmation
+                    pendingAction = {
+                        id: `delete-memory-${Date.now()}`,
+                        type: 'delete_memory',
+                        description: `Delete memory: "${bestMatch.memory.content}"`,
+                        data: { memoryId: bestMatch.memory.id, searchText: bestMatch.memory.content }
+                    };
+
+                    toolResults.push({
+                        name: 'Memory Deletion (Pending Confirmation)',
+                        result: `I found this memory:\n\n🗑️ **Memory to delete:**\n"${bestMatch.memory.content}"\n\n⚠️ Please confirm to delete this memory.`
+                    });
+                } else {
+                    // No match found - show available memories for reference
+                    const memoryList = memories.slice(0, 5).map(m => `• "${m.content}"`).join('\n');
+                    toolResults.push({
+                        name: 'Memory Not Found',
+                        result: `❌ I couldn't find a memory matching your request.\n\n**Your current memories:**\n${memoryList}\n\nPlease try again with more specific keywords.`
+                    });
+                }
             }
         }
 
-        // Memory update tool
+        // Memory update tool - Now requires confirmation with SMART MATCHING
         if (requiredTools.includes('update_memory')) {
-            const match = userMessage.match(/(?:update|change|modify).*?(?:memory|fact)?\s*[:\-]?\s*[\"']?([^\"']+)[\"']?\s*(?:to|with)\s*[\"']?([^\"']+)[\"']?/i);
-            if (match) {
-                const result = await toolUpdateMemoryContent(match[1].trim(), match[2].trim());
-                toolResults.push({ name: 'Memory Updated', result });
+            console.log('[AI Update Memory] Triggered for message:', userMessage);
+
+            // Try to extract "change X to Y" or "update X with Y" pattern
+            const updatePatterns = [
+                /(?:change|update|modify)\s+(?:my\s+)?(?:memory\s+)?(?:about\s+)?(.+?)\s+(?:to|with|into)\s+(.+)/i,
+                /(?:change|update)\s+(.+?)\s+(?:to|with)\s+(.+)/i
+            ];
+
+            let oldPart = '';
+            let newPart = '';
+
+            for (const pattern of updatePatterns) {
+                const match = userMessage.match(pattern);
+                if (match) {
+                    oldPart = match[1].trim();
+                    newPart = match[2].trim();
+                    break;
+                }
+            }
+
+            console.log('[AI Update Memory] Parsed - Old:', oldPart, 'New:', newPart);
+
+            if (!oldPart || !newPart) {
+                toolResults.push({
+                    name: 'Update Format',
+                    result: `Please use a format like:\n• "Change my name from John to Daniel"\n• "Update morning summaries to weekly summaries"\n• "Modify my preference to: I prefer evening updates"`
+                });
+            } else {
+                const memories = await getActiveMemories();
+
+                // Extract keywords from oldPart to find matching memory
+                const stopWords = ['my', 'the', 'a', 'an', 'that', 'this', 'preference', 'memory', 'fact', 'about', 'from'];
+                const searchWords = oldPart.toLowerCase()
+                    .replace(/[^\w\s]/g, '')
+                    .split(/\s+/)
+                    .filter(word => word.length > 2 && !stopWords.includes(word));
+
+                console.log('[AI Update Memory] Search keywords:', searchWords);
+
+                // Find best matching memory
+                let bestMatch: { memory: typeof memories[0]; score: number } | null = null;
+
+                for (const memory of memories) {
+                    const memoryContent = memory.content.toLowerCase();
+                    let score = 0;
+
+                    for (const word of searchWords) {
+                        if (memoryContent.includes(word)) {
+                            score += 1;
+                        }
+                    }
+
+                    if (score > 0 && (!bestMatch || score > bestMatch.score)) {
+                        bestMatch = { memory, score };
+                    }
+                }
+
+                if (bestMatch) {
+                    console.log('[AI Update Memory] Best match found:', bestMatch.memory.content);
+
+                    pendingAction = {
+                        id: `update-memory-${Date.now()}`,
+                        type: 'update_memory',
+                        description: `Update memory from "${bestMatch.memory.content}" to "${newPart}"`,
+                        data: { memoryId: bestMatch.memory.id, searchText: bestMatch.memory.content, newContent: newPart }
+                    };
+
+                    toolResults.push({
+                        name: 'Memory Update (Pending Confirmation)',
+                        result: `I found this memory:\n\n✏️ **Current:**\n"${bestMatch.memory.content}"\n\n✨ **New:**\n"${newPart}"\n\n⚠️ Please confirm to update this memory.`
+                    });
+                } else {
+                    const memoryList = memories.slice(0, 5).map(m => `• "${m.content}"`).join('\n');
+                    toolResults.push({
+                        name: 'Memory Not Found',
+                        result: `❌ I couldn't find a memory matching "${oldPart}".\n\n**Your current memories:**\n${memoryList}\n\nPlease try again with more specific keywords.`
+                    });
+                }
             }
         }
 

@@ -309,6 +309,115 @@ export async function calculateNetProfitSince(startDate: string): Promise<number
     return revenue - cost - totalExpenses;
 }
 
+// Calculate available surplus (net profit minus completed EMI/payment goals)
+export async function calculateAvailableSurplus(): Promise<{
+    netProfitThisMonth: number;
+    completedEMIsTotal: number;
+    availableSurplus: number;
+}> {
+    const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+
+    // Get net profit this month
+    const netProfitThisMonth = await calculateNetProfitSince(startOfMonth);
+
+    // Get all completed EMI goals this month (goals with goal_type = 'emi' or metric_type = 'manual_check' that are completed)
+    const { data: completedGoals } = await supabase
+        .from('user_goals')
+        .select('*')
+        .eq('status', 'completed')
+        .gte('completed_at', startOfMonth);
+
+    // Sum up the target amounts of completed EMI goals
+    const completedEMIsTotal = (completedGoals || [])
+        .filter(g => g.metric_type === 'manual_check' || g.goal_type === 'emi')
+        .reduce((sum, g) => sum + g.target_amount, 0);
+
+    return {
+        netProfitThisMonth,
+        completedEMIsTotal,
+        availableSurplus: Math.max(0, netProfitThisMonth - completedEMIsTotal)
+    };
+}
+
+// Calculate net profit for a specific date range
+export async function calculateNetProfitBetween(startDate: string, endDate: string): Promise<number> {
+    const { data: sales } = await supabase
+        .from('transactions')
+        .select('sell_price, buy_price, quantity')
+        .gte('date', startDate)
+        .lte('date', endDate)
+        .is('deleted_at', null);
+
+    const revenue = (sales || []).reduce((sum, t) => sum + (t.sell_price * t.quantity), 0);
+    const cost = (sales || []).reduce((sum, t) => sum + (t.buy_price * t.quantity), 0);
+
+    const { data: expenses } = await supabase
+        .from('expenses')
+        .select('amount')
+        .gte('date', startDate)
+        .lte('date', endDate)
+        .is('deleted_at', null);
+
+    const totalExpenses = (expenses || []).reduce((sum, e) => sum + Number(e.amount), 0);
+
+    return revenue - cost - totalExpenses;
+}
+
+// Allocate amount to a goal
+export async function allocateToGoal(
+    goalId: string,
+    amount: number,
+    _source: 'surplus' | 'daily_profit' | 'manual' = 'manual'
+): Promise<boolean> {
+    // Get current goal
+    const { data: goal } = await supabase
+        .from('user_goals')
+        .select('*')
+        .eq('id', goalId)
+        .single();
+
+    if (!goal) return false;
+
+    // Update goal's current_amount and allocated_amount
+    const newCurrentAmount = (goal.current_amount || 0) + amount;
+    const newAllocatedAmount = (goal.allocated_amount || 0) + amount;
+
+    const { error } = await supabase
+        .from('user_goals')
+        .update({
+            current_amount: newCurrentAmount,
+            allocated_amount: newAllocatedAmount
+        })
+        .eq('id', goalId);
+
+    if (error) {
+        console.error('[Goal Allocation] Error:', error);
+        return false;
+    }
+
+    // Dispatch event for UI refresh
+    window.dispatchEvent(new Event('goal-updated'));
+
+    return true;
+}
+
+// Complete a goal and set completed_at timestamp
+export async function completeGoalWithTimestamp(goalId: string): Promise<boolean> {
+    const { error } = await supabase
+        .from('user_goals')
+        .update({
+            status: 'completed',
+            completed_at: new Date().toISOString()
+        })
+        .eq('id', goalId);
+
+    if (!error) {
+        window.dispatchEvent(new Event('goal-updated'));
+    }
+
+    return !error;
+}
+
 // ===== WATERFALL GOAL LOGIC =====
 export interface WaterfallGoalStatus {
     goal: UserGoal;
@@ -387,6 +496,7 @@ export async function calculateWaterfallGoals(): Promise<WaterfallGoalStatus[]> 
     return results;
 }
 
+
 export async function updateGoalProgress(goalId: string): Promise<UserGoal | null> {
     // Get the goal
     const { data: goal } = await supabase
@@ -401,14 +511,32 @@ export async function updateGoalProgress(goalId: string): Promise<UserGoal | nul
     let currentAmount = goal.current_amount;
     let shouldUpdate = false;
 
+    // For EMI/Manual goals - NEVER recalculate, user updates manually
+    if (goal.metric_type === 'manual_check' || goal.goal_type === 'emi') {
+        return goal;
+    }
+
+    // For auto-tracked profit/revenue goals
+    const trackingStartDate = goal.start_tracking_date.split('T')[0];
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    // Determine the end date for calculations
+    // If a deadline exists and is in the past, stop calculating at the deadline
+    // Otherwise, calculate up to today
+    let effectiveEndDate = todayStr;
+    if (goal.deadline && goal.deadline < todayStr) {
+        effectiveEndDate = goal.deadline;
+    }
+
     if (goal.metric_type === 'net_profit') {
-        currentAmount = await calculateNetProfitSince(goal.start_tracking_date.split('T')[0]);
+        currentAmount = await calculateNetProfitBetween(trackingStartDate, effectiveEndDate);
         shouldUpdate = true;
     } else if (goal.metric_type === 'revenue') {
         const { data: sales } = await supabase
             .from('transactions')
             .select('sell_price, quantity')
-            .gte('date', goal.start_tracking_date.split('T')[0])
+            .gte('date', trackingStartDate)
+            .lte('date', effectiveEndDate)
             .is('deleted_at', null);
         currentAmount = (sales || []).reduce((sum, t) => sum + (t.sell_price * t.quantity), 0);
         shouldUpdate = true;
@@ -416,10 +544,201 @@ export async function updateGoalProgress(goalId: string): Promise<UserGoal | nul
         const { count } = await supabase
             .from('transactions')
             .select('*', { count: 'exact', head: true })
-            .gte('date', goal.start_tracking_date.split('T')[0])
+            .gte('date', trackingStartDate)
+            .lte('date', effectiveEndDate)
             .is('deleted_at', null);
         currentAmount = count || 0;
         shouldUpdate = true;
+    } else if (goal.metric_type === 'gross_profit') {
+        const { data: sales } = await supabase
+            .from('transactions')
+            .select('sell_price, buy_price, quantity')
+            .gte('date', trackingStartDate)
+            .lte('date', effectiveEndDate)
+            .is('deleted_at', null);
+
+        const revenue = (sales || []).reduce((sum, t) => sum + (t.sell_price * t.quantity), 0);
+        const cost = (sales || []).reduce((sum, t) => sum + (t.buy_price * t.quantity), 0);
+        currentAmount = revenue - cost;
+        shouldUpdate = true;
+
+    } else if (goal.metric_type === 'margin' || goal.metric_type === 'daily_margin') {
+        // For margin/daily_margin goals: check if ANY day within the period achieves the target margin
+        // Get all transactions grouped by date
+        const { data: sales } = await supabase
+            .from('transactions')
+            .select('date, sell_price, buy_price, quantity')
+            .gte('date', trackingStartDate)
+            .lte('date', effectiveEndDate)
+            .is('deleted_at', null)
+            .order('date', { ascending: true });
+
+        if (sales && sales.length > 0) {
+            // Group transactions by date
+            const salesByDate: Record<string, { revenue: number; cost: number }> = {};
+
+            for (const sale of sales) {
+                const dateKey = sale.date;
+                if (!salesByDate[dateKey]) {
+                    salesByDate[dateKey] = { revenue: 0, cost: 0 };
+                }
+                salesByDate[dateKey].revenue += sale.sell_price * sale.quantity;
+                salesByDate[dateKey].cost += sale.buy_price * sale.quantity;
+            }
+
+            // Check each day's margin
+            let highestMargin = 0;
+            let targetAchieved = false;
+
+            for (const dateKey of Object.keys(salesByDate)) {
+                const dayData = salesByDate[dateKey];
+                if (dayData.revenue > 0) {
+                    const dayMargin = ((dayData.revenue - dayData.cost) / dayData.revenue) * 100;
+
+                    // Track highest margin achieved
+                    if (dayMargin > highestMargin) {
+                        highestMargin = dayMargin;
+                    }
+
+                    // Check if this day achieved the target
+                    if (dayMargin >= goal.target_amount) {
+                        targetAchieved = true;
+                        break; // Goal achieved, no need to check more days
+                    }
+                }
+            }
+
+            // If target achieved on any day, set current to target (100% progress)
+            // Otherwise, show the highest margin achieved so far
+            currentAmount = targetAchieved ? goal.target_amount : highestMargin;
+        } else {
+            currentAmount = 0;
+        }
+        shouldUpdate = true;
+    } else if (goal.metric_type === 'daily_revenue') {
+        // Check if ANY single day achieves the target revenue
+        const { data: sales } = await supabase
+            .from('transactions')
+            .select('date, sell_price, quantity')
+            .gte('date', trackingStartDate)
+            .lte('date', effectiveEndDate)
+            .is('deleted_at', null);
+
+        if (sales && sales.length > 0) {
+            const salesByDate: Record<string, number> = {};
+
+            for (const sale of sales) {
+                const dateKey = sale.date;
+                salesByDate[dateKey] = (salesByDate[dateKey] || 0) + (sale.sell_price * sale.quantity);
+            }
+
+            let highestRevenue = 0;
+            let targetAchieved = false;
+
+            for (const dateKey of Object.keys(salesByDate)) {
+                const dayRevenue = salesByDate[dateKey];
+                if (dayRevenue > highestRevenue) highestRevenue = dayRevenue;
+                if (dayRevenue >= goal.target_amount) {
+                    targetAchieved = true;
+                    break;
+                }
+            }
+
+            currentAmount = targetAchieved ? goal.target_amount : highestRevenue;
+        } else {
+            currentAmount = 0;
+        }
+        shouldUpdate = true;
+    } else if (goal.metric_type === 'avg_margin') {
+        // Calculate total average margin over the period (Total Revenue - Total Cost) / Total Revenue
+        const { data: sales } = await supabase
+            .from('transactions')
+            .select('sell_price, buy_price, quantity')
+            .gte('date', trackingStartDate)
+            .lte('date', effectiveEndDate)
+            .is('deleted_at', null);
+
+        const revenue = (sales || []).reduce((sum, t) => sum + (t.sell_price * t.quantity), 0);
+        const cost = (sales || []).reduce((sum, t) => sum + (t.buy_price * t.quantity), 0);
+
+        if (revenue > 0) {
+            currentAmount = ((revenue - cost) / revenue) * 100;
+        } else {
+            currentAmount = 0;
+        }
+        shouldUpdate = true;
+    } else if (goal.metric_type === 'avg_revenue') {
+        // Total Revenue / Number of Days
+        const { data: sales } = await supabase
+            .from('transactions')
+            .select('sell_price, quantity')
+            .gte('date', trackingStartDate)
+            .lte('date', effectiveEndDate)
+            .is('deleted_at', null);
+
+        const totalRevenue = (sales || []).reduce((sum, t) => sum + (t.sell_price * t.quantity), 0);
+
+        // Calculate days elapsed (at least 1)
+        const start = new Date(trackingStartDate);
+        const end = new Date(effectiveEndDate);
+        // Add 1 day to end date to make it inclusive if we are just subtracting timestamps? 
+        // No, calculate days between dates.
+        const diffTime = Math.abs(end.getTime() - start.getTime());
+        // Add 1 to count the start date itself as a day
+        const daysElapsed = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1);
+
+        currentAmount = totalRevenue / daysElapsed;
+        shouldUpdate = true;
+    } else if (goal.metric_type === 'avg_profit') {
+        // Total Net Profit / Number of Days
+        const totalProfit = await calculateNetProfitBetween(trackingStartDate, effectiveEndDate);
+
+        const start = new Date(trackingStartDate);
+        const end = new Date(effectiveEndDate);
+        const diffTime = Math.abs(end.getTime() - start.getTime());
+        const daysElapsed = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1);
+
+        currentAmount = totalProfit / daysElapsed;
+        shouldUpdate = true;
+    } else if (goal.metric_type === 'customer_count') {
+        // Count unique customers who made purchases
+        const { data: sales } = await supabase
+            .from('transactions')
+            .select('customer_id')
+            .gte('date', trackingStartDate)
+            .lte('date', effectiveEndDate)
+            .is('deleted_at', null)
+            .not('customer_id', 'is', null);
+
+        const uniqueCustomers = new Set((sales || []).map(s => s.customer_id));
+        currentAmount = uniqueCustomers.size;
+        shouldUpdate = true;
+    } else if (goal.metric_type === 'product_sales') {
+        // Track sales of a specific product
+        if (goal.product_id) {
+            const { data: sales } = await supabase
+                .from('transactions')
+                .select('quantity')
+                .eq('product_id', goal.product_id)
+                .gte('date', trackingStartDate)
+                .lte('date', effectiveEndDate)
+                .is('deleted_at', null);
+
+            currentAmount = (sales || []).reduce((sum, t) => sum + t.quantity, 0);
+            shouldUpdate = true;
+        }
+    }
+
+
+    // Auto-complete validation
+    if (currentAmount >= goal.target_amount && goal.status !== 'completed') {
+        await completeGoalWithTimestamp(goalId);
+        return {
+            ...goal,
+            current_amount: currentAmount,
+            status: 'completed',
+            completed_at: new Date().toISOString()
+        };
     }
 
     // Only update if we calculated a new value (for auto-trackers) 
@@ -431,6 +750,7 @@ export async function updateGoalProgress(goalId: string): Promise<UserGoal | nul
             .eq('id', goalId);
         return { ...goal, current_amount: currentAmount };
     }
+
 
     return goal;
 }

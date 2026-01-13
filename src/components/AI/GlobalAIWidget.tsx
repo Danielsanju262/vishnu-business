@@ -170,27 +170,93 @@ export default function GlobalAIWidget() {
 
     // Force re-attach listeners when app wakes up or becomes visible
     useEffect(() => {
+        const resetDragState = () => {
+            // Reset drag state to prevent stuck interactions
+            dragRef.current = {
+                startX: 0,
+                startY: 0,
+                isDragging: false,
+                hasMoved: false,
+                isOverRemoveZone: false
+            };
+            setIsDragging(false);
+        };
+
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible') {
-                // Small delay to ensure DOM is ready/stabilized after wake
+                // Reset drag state first
+                resetDragState();
+
+                // Multiple delays to ensure DOM is ready/stabilized after wake
+                // This handles cases where the app takes a moment to fully resume
                 setTimeout(() => {
                     setListenerRefreshKey(prev => prev + 1);
+                    // Force reset button styles to ensure it's clickable
+                    if (buttonRef.current) {
+                        const isRight = position.side === 'right';
+                        buttonRef.current.style.transition = 'none';
+                        buttonRef.current.style.pointerEvents = 'auto';
+                        buttonRef.current.style.left = isRight ? 'auto' : '16px';
+                        buttonRef.current.style.right = isRight ? '16px' : 'auto';
+                        buttonRef.current.style.top = `${position.yPercent}%`;
+                        buttonRef.current.style.transform = 'translateY(-50%)';
+                        buttonRef.current.style.opacity = '1';
+                    }
                 }, 100);
+
+                // Second pass with longer delay for stubborn cases
+                setTimeout(() => {
+                    setListenerRefreshKey(prev => prev + 1);
+                }, 500);
             }
         };
 
-        const handlePageShow = () => {
-            setListenerRefreshKey(prev => prev + 1);
+        const handlePageShow = (event: PageTransitionEvent) => {
+            // event.persisted is true if the page was restored from bfcache
+            if (event.persisted) {
+                setListenerRefreshKey(prev => prev + 1);
+            }
+            // Always refresh on pageshow
+            setTimeout(() => {
+                setListenerRefreshKey(prev => prev + 1);
+            }, 100);
+        };
+
+        const handleFocus = () => {
+            // When window regains focus, refresh listeners
+            setTimeout(() => {
+                setListenerRefreshKey(prev => prev + 1);
+            }, 50);
+        };
+
+        // Capacitor/Mobile app resume event
+        const handleResume = () => {
+            console.log('[AI Widget] App resumed, refreshing listeners');
+            setTimeout(() => {
+                setListenerRefreshKey(prev => prev + 1);
+                // Force reset button styles
+                if (buttonRef.current) {
+                    buttonRef.current.style.pointerEvents = 'auto';
+                }
+            }, 200);
         };
 
         document.addEventListener('visibilitychange', handleVisibilityChange);
-        window.addEventListener('pageshow', handlePageShow);
+        window.addEventListener('pageshow', handlePageShow as any);
+        window.addEventListener('focus', handleFocus);
+        document.addEventListener('resume', handleResume); // Capacitor event
+
+        // Also listen on App object if available (Capacitor)
+        (window as any).Capacitor?.Plugins?.App?.addListener?.('resume', handleResume);
 
         return () => {
             document.removeEventListener('visibilitychange', handleVisibilityChange);
-            window.removeEventListener('pageshow', handlePageShow);
+            window.removeEventListener('pageshow', handlePageShow as any);
+            window.removeEventListener('focus', handleFocus);
+            document.removeEventListener('resume', handleResume);
+            (window as any).Capacitor?.Plugins?.App?.removeListener?.('resume', handleResume);
         };
-    }, []);
+    }, [position.side, position.yPercent]);
 
     // Listen for modal events to hide widget when modals are open
     useEffect(() => {
@@ -587,7 +653,7 @@ export default function GlobalAIWidget() {
             button.removeEventListener('touchcancel', onTouchCancel);
             button.removeEventListener('mousedown', onMouseDown);
         };
-    }, [isOpen, position.side, position.yPercent, handleOpen, isVisible, listenerRefreshKey]);
+    }, [isOpen, position.side, position.yPercent, handleOpen, isVisible, listenerRefreshKey, openModalCount, shouldHide]);
 
     // Send message
     const handleSendMessage = async (e?: React.FormEvent) => {
