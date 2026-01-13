@@ -697,10 +697,11 @@ export default function GlobalAIWidget() {
                 await addChatMessage(sessionId, 'assistant', response.text);
             }
 
-            // If there's a pending action, store it for user confirmation
-            if (response.pendingAction) {
-                setPendingAction(response.pendingAction);
-            }
+            // Always update pending action state (even if undefined) to clear old ones
+            console.log('[GlobalAIWidget] Response pendingAction:', response.pendingAction);
+            setPendingAction(response.pendingAction || null);
+            console.log('[GlobalAIWidget] Set pendingAction to:', response.pendingAction || null);
+
         } catch (error) {
             const errorMsg: ChatMessage = {
                 id: `error-${Date.now()}`,
@@ -743,6 +744,7 @@ export default function GlobalAIWidget() {
             };
             setMessages(prev => [...prev, errorMsg]);
         } finally {
+            console.log('[GlobalAIWidget] Confirm - Clearing pendingAction');
             setPendingAction(null);
             setIsLoading(false);
         }
@@ -757,6 +759,7 @@ export default function GlobalAIWidget() {
             timestamp: new Date()
         };
         setMessages(prev => [...prev, declineMsg]);
+        console.log('[GlobalAIWidget] Decline - Clearing pendingAction');
         setPendingAction(null);
     };
 
@@ -1068,9 +1071,10 @@ export default function GlobalAIWidget() {
                                     >
                                         <div className={cn(
                                             "prose prose-sm max-w-none break-words prose-invert",
-                                            "prose-p:my-1 prose-p:leading-relaxed",
+                                            "prose-p:my-3 prose-p:leading-relaxed",
                                             "prose-ul:my-2 prose-ul:pl-4",
-                                            "prose-li:my-0.5"
+                                            "prose-li:my-0.5",
+                                            "[&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
                                         )}>
                                             <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                                 {msg.content}

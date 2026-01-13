@@ -424,8 +424,8 @@ export default function GoalsDashboard() {
                                 <div
                                     key={goal.id}
                                     className={cn(
-                                        "bg-zinc-900/80 border rounded-2xl p-4 transition-all",
-                                        isOverdue ? "border-red-500/50" : isUrgent ? "border-amber-500/50" : "border-white/10"
+                                        "bg-zinc-900/80 border-2 rounded-2xl p-4 transition-all",
+                                        isOverdue ? "border-red-500" : isUrgent ? "border-amber-500" : "border-zinc-600"
                                     )}
                                 >
                                     <div className="flex items-start justify-between mb-3">
@@ -653,7 +653,7 @@ export default function GoalsDashboard() {
                         {completedGoals.slice(0, 5).map((goal) => (
                             <div
                                 key={goal.id}
-                                className="bg-zinc-900/50 border border-white/5 rounded-xl p-3 flex items-center justify-between"
+                                className="bg-zinc-900/50 border-2 border-zinc-700 rounded-xl p-3 flex items-center justify-between"
                             >
                                 <div className="flex items-center gap-3">
                                     <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">

@@ -129,14 +129,14 @@ export async function getAllGoals(): Promise<UserGoal[]> {
     return data || [];
 }
 
-export async function addGoal(goal: Omit<UserGoal, 'id' | 'created_at' | 'status' | 'current_amount'>): Promise<UserGoal | null> {
+export async function addGoal(goal: Omit<UserGoal, 'id' | 'created_at' | 'status' | 'current_amount'> & { current_amount?: number }): Promise<UserGoal | null> {
     // Build insert object, only including core fields that exist in all DB versions
     const insertData: any = {
         title: goal.title,
         target_amount: goal.target_amount,
         metric_type: goal.metric_type,
         start_tracking_date: goal.start_tracking_date,
-        current_amount: 0,
+        current_amount: goal.current_amount || 0, // Allow setting initial progress
         status: 'active'
     };
 

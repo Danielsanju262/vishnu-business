@@ -599,7 +599,7 @@ export default function Brief() {
                 </div>
             </div>
 
-            <div className="max-w-2xl mx-auto px-4 space-y-16 mt-8">
+            <div className="max-w-2xl mx-auto px-4 space-y-9 mt-8">
 
                 {/* AI Summary Block */}
                 {aiSummary && (
@@ -614,7 +614,7 @@ export default function Brief() {
                 )}
 
                 {/* Yesterday's Stats */}
-                <section className="bg-zinc-900 border border-white/10 rounded-2xl p-5">
+                <section className="bg-zinc-900 border border-white/25 rounded-2xl p-5">
                     <div className="flex items-center justify-between mb-5">
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10">
@@ -641,7 +641,7 @@ export default function Brief() {
                 </section>
 
                 {/* Tasks Section */}
-                <section>
+                <section className="bg-zinc-900 border border-white/25 rounded-2xl p-5">
                     <div className="flex items-center justify-between mb-4">
                         <div className="bg-emerald-500/10 rounded-xl px-4 py-3 inline-flex items-center gap-3 border border-emerald-500/20">
                             <CheckCircle2 size={20} className="text-emerald-400" />
@@ -655,7 +655,7 @@ export default function Brief() {
                         </button>
                     </div>
                     {tasks.length === 0 ? (
-                        <div className="bg-zinc-900/50 border border-white/5 rounded-xl p-6 text-center">
+                        <div className="bg-zinc-900/50 border border-white/25 rounded-xl p-6 text-center">
                             <CheckCircle2 className="w-8 h-8 text-emerald-400/50 mx-auto mb-2" />
                             <p className="text-sm text-neutral-400">All caught up! No pending tasks.</p>
                         </div>
@@ -664,7 +664,7 @@ export default function Brief() {
                             {tasks.slice(0, 3).map((task) => (
                                 <div
                                     key={task.id}
-                                    className="bg-zinc-900/50 border border-white/5 rounded-xl p-3 flex items-start gap-3"
+                                    className="bg-zinc-900/50 border border-white/25 rounded-xl p-3 flex items-start gap-3"
                                 >
                                     {task.severity === 'warning' ? (
                                         <AlertTriangle size={16} className="text-amber-400 mt-0.5" />
@@ -695,7 +695,7 @@ export default function Brief() {
                 <section>
                     <div
                         onClick={() => setIsFinancialsOpen(!isFinancialsOpen)}
-                        className="w-full bg-zinc-900 border border-white/10 rounded-2xl p-5 transition-all hover:bg-zinc-800/80 text-left mb-3 cursor-pointer"
+                        className="w-full bg-zinc-900 border border-white/25 rounded-2xl p-5 transition-all hover:bg-zinc-800/80 text-left mb-3 cursor-pointer"
                         role="button"
                         tabIndex={0}
                     >
@@ -732,7 +732,7 @@ export default function Brief() {
                     {isFinancialsOpen && (
                         <div className="grid md:grid-cols-2 gap-4 animate-in slide-in-from-top-2 fade-in duration-200">
                             {/* To Receive Today */}
-                            <div className="bg-zinc-900 border border-white/5 rounded-2xl p-4">
+                            <div className="bg-zinc-900 border border-white/25 rounded-2xl p-4">
                                 <div className="flex items-center gap-3 mb-4">
                                     <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
                                         <IndianRupee size={20} className="text-emerald-400" />
@@ -795,7 +795,7 @@ export default function Brief() {
                             </div>
 
                             {/* To Pay Today */}
-                            <div className="bg-zinc-900 border border-white/5 rounded-2xl p-4">
+                            <div className="bg-zinc-900 border border-white/25 rounded-2xl p-4">
                                 <div className="flex items-center gap-3 mb-4">
                                     <div className="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center">
                                         <Receipt size={20} className="text-orange-400" />
@@ -861,7 +861,7 @@ export default function Brief() {
                 </section>
 
                 {/* Goals Section */}
-                <section>
+                <section className="bg-zinc-900 border border-white/25 rounded-2xl p-5">
                     <div className="flex items-center justify-between mb-4">
                         <div className="bg-purple-500/10 rounded-xl px-4 py-3 inline-flex items-center gap-3 border border-purple-500/20">
                             <Target size={20} className="text-purple-400" />
@@ -875,7 +875,7 @@ export default function Brief() {
                         </button>
                     </div>
                     {goals.length === 0 ? (
-                        <div className="bg-zinc-900/50 border border-white/5 rounded-xl p-6 text-center">
+                        <div className="bg-zinc-900/50 border border-white/25 rounded-xl p-6 text-center">
                             <Target className="w-8 h-8 text-purple-400/50 mx-auto mb-2" />
                             <p className="text-sm text-neutral-400">No active goals</p>
                         </div>
@@ -894,7 +894,7 @@ export default function Brief() {
                                         onClick={() => handleGoalClick(goal)}
                                         className={cn(
                                             "bg-zinc-900/80 border rounded-xl p-4 transition-all",
-                                            isComplete ? "border-emerald-500/50 cursor-pointer hover:bg-zinc-900" : "border-white/10"
+                                            isComplete ? "border-emerald-500/50 cursor-pointer hover:bg-zinc-900" : "border-white/25"
                                         )}
                                     >
                                         <div className="flex items-start justify-between mb-3">
