@@ -5,7 +5,7 @@
  */
 
 import { supabase } from './supabase';
-import { format, startOfMonth } from 'date-fns';
+import { format, startOfMonth, startOfWeek } from 'date-fns';
 import {
     getActiveMemories,
     getActiveGoals,
@@ -81,6 +81,659 @@ Transaction Count: ${sales?.length || 0}`;
     }
 }
 
+// Tool: Comprehensive Business Analysis (Margins, Customer Contributions, Payment Behavior)
+async function toolGetBusinessAnalysis(startDate?: string, endDate?: string): Promise<string> {
+    try {
+        const start = startDate || format(startOfMonth(new Date()), 'yyyy-MM-dd');
+        const end = endDate || format(new Date(), 'yyyy-MM-dd');
+
+        // Get all transactions with customer and product info
+        const { data: transactions } = await supabase
+            .from('transactions')
+            .select('id, customer_id, product_id, sell_price, buy_price, quantity, date, products(id, name), customers(id, name)')
+            .gte('date', start)
+            .lte('date', end)
+            .is('deleted_at', null);
+
+        // Get pending payments (receivables)
+        const { data: pendingPayments } = await supabase
+            .from('payment_reminders')
+            .select('customer_id, amount, due_date, status, customers(name)')
+            .eq('status', 'pending');
+
+        // Get accounts payable (what we owe to suppliers)
+        const { data: payables } = await supabase
+            .from('accounts_payable')
+            .select('supplier_id, amount, due_date, status, suppliers(name)')
+            .eq('status', 'pending');
+
+        // === PRODUCT ANALYSIS ===
+        const productStats: Record<string, {
+            name: string;
+            revenue: number;
+            cost: number;
+            profit: number;
+            margin: number;
+            units: number;
+            isGhee: boolean;
+        }> = {};
+
+        (transactions || []).forEach(t => {
+            const prodId = t.product_id;
+            const prodName = (t.products as any)?.name || 'Unknown';
+            const revenue = t.sell_price * t.quantity;
+            const cost = t.buy_price * t.quantity;
+            const profit = revenue - cost;
+
+            if (!productStats[prodId]) {
+                productStats[prodId] = {
+                    name: prodName,
+                    revenue: 0,
+                    cost: 0,
+                    profit: 0,
+                    margin: 0,
+                    units: 0,
+                    isGhee: prodName.toLowerCase().includes('ghee')
+                };
+            }
+            productStats[prodId].revenue += revenue;
+            productStats[prodId].cost += cost;
+            productStats[prodId].profit += profit;
+            productStats[prodId].units += t.quantity;
+        });
+
+        // Calculate margins
+        Object.values(productStats).forEach(p => {
+            p.margin = p.revenue > 0 ? ((p.profit / p.revenue) * 100) : 0;
+        });
+
+        const productsByProfit = Object.values(productStats).sort((a, b) => b.profit - a.profit).slice(0, 5);
+        const productsByMargin = Object.values(productStats).sort((a, b) => b.margin - a.margin).slice(0, 5);
+
+        // === CUSTOMER ANALYSIS ===
+        const customerStats: Record<string, {
+            name: string;
+            revenue: number;
+            profit: number;
+            margin: number;
+            orderCount: number;
+            pendingAmount: number;
+            lastOrderDate: string;
+        }> = {};
+
+        (transactions || []).forEach(t => {
+            const custId = t.customer_id;
+            const custName = (t.customers as any)?.name || 'Unknown';
+            const revenue = t.sell_price * t.quantity;
+            const profit = (t.sell_price - t.buy_price) * t.quantity;
+
+            if (!customerStats[custId]) {
+                customerStats[custId] = {
+                    name: custName,
+                    revenue: 0,
+                    profit: 0,
+                    margin: 0,
+                    orderCount: 0,
+                    pendingAmount: 0,
+                    lastOrderDate: t.date
+                };
+            }
+            customerStats[custId].revenue += revenue;
+            customerStats[custId].profit += profit;
+            customerStats[custId].orderCount += 1;
+            if (t.date > customerStats[custId].lastOrderDate) {
+                customerStats[custId].lastOrderDate = t.date;
+            }
+        });
+
+        // Add pending payment info to customers
+        (pendingPayments || []).forEach(p => {
+            const custId = p.customer_id;
+            if (customerStats[custId]) {
+                customerStats[custId].pendingAmount += Number(p.amount);
+            } else {
+                const custName = (p.customers as any)?.name || 'Unknown';
+                customerStats[custId] = {
+                    name: custName,
+                    revenue: 0,
+                    profit: 0,
+                    margin: 0,
+                    orderCount: 0,
+                    pendingAmount: Number(p.amount),
+                    lastOrderDate: ''
+                };
+            }
+        });
+
+        // Calculate customer margins
+        Object.values(customerStats).forEach(c => {
+            c.margin = c.revenue > 0 ? ((c.profit / c.revenue) * 100) : 0;
+        });
+
+        const customersByRevenue = Object.values(customerStats).sort((a, b) => b.revenue - a.revenue).slice(0, 5);
+        const customersByProfit = Object.values(customerStats).sort((a, b) => b.profit - a.profit).slice(0, 5);
+        const customersByMargin = Object.values(customerStats).filter(c => c.revenue > 0).sort((a, b) => b.margin - a.margin).slice(0, 5);
+        const customersByPending = Object.values(customerStats).filter(c => c.pendingAmount > 0).sort((a, b) => b.pendingAmount - a.pendingAmount);
+        const goodPayingCustomers = Object.values(customerStats).filter(c => c.pendingAmount === 0 && c.revenue > 0).slice(0, 5);
+
+        // === SUPPLIER PAYABLES ANALYSIS ===
+        const supplierPayables: { name: string; amount: number; dueDate: string }[] = [];
+        (payables || []).forEach(p => {
+            supplierPayables.push({
+                name: (p.suppliers as any)?.name || 'Unknown',
+                amount: Number(p.amount),
+                dueDate: p.due_date
+            });
+        });
+        supplierPayables.sort((a, b) => b.amount - a.amount);
+
+        const totalReceivables = Object.values(customerStats).reduce((sum, c) => sum + c.pendingAmount, 0);
+        const totalPayables = supplierPayables.reduce((sum, s) => sum + s.amount, 0);
+        const totalRevenue = Object.values(customerStats).reduce((sum, c) => sum + c.revenue, 0);
+        const totalProfit = Object.values(customerStats).reduce((sum, c) => sum + c.profit, 0);
+        const avgMargin = totalRevenue > 0 ? ((totalProfit / totalRevenue) * 100) : 0;
+
+        // Build the analysis report
+        return `📊 COMPREHENSIVE BUSINESS ANALYSIS (${start} to ${end})
+
+=== 💰 OVERALL PERFORMANCE ===
+Total Revenue: ₹${totalRevenue.toLocaleString()}
+Total Profit: ₹${totalProfit.toLocaleString()}
+Average Margin: ${avgMargin.toFixed(1)}%
+
+=== 💵 CREDIT CYCLE STATUS ===
+Money OWED TO YOU (Receivables): ₹${totalReceivables.toLocaleString()}
+Money YOU OWE (Payables): ₹${totalPayables.toLocaleString()}
+Net Credit Position: ₹${(totalReceivables - totalPayables).toLocaleString()}
+
+=== 🏆 TOP PRODUCTS BY PROFIT ===
+${productsByProfit.map((p, i) => `${i + 1}. ${p.isGhee ? '🧈 ' : ''}${p.name}: ₹${p.profit.toLocaleString()} profit (${p.margin.toFixed(1)}% margin, ${p.units} units)`).join('\n')}
+
+=== 📈 BEST MARGIN PRODUCTS ===
+${productsByMargin.map((p, i) => `${i + 1}. ${p.isGhee ? '🧈 ' : ''}${p.name}: ${p.margin.toFixed(1)}% margin (₹${p.profit.toLocaleString()} profit)`).join('\n')}
+
+=== 🏨 TOP CUSTOMERS BY REVENUE ===
+${customersByRevenue.map((c, i) => `${i + 1}. ${c.name}: ₹${c.revenue.toLocaleString()} revenue (${c.orderCount} orders)`).join('\n')}
+
+=== 💎 MOST PROFITABLE CUSTOMERS ===
+${customersByProfit.map((c, i) => `${i + 1}. ${c.name}: ₹${c.profit.toLocaleString()} profit (${c.margin.toFixed(1)}% margin)`).join('\n')}
+
+=== 📊 BEST MARGIN CUSTOMERS ===
+${customersByMargin.map((c, i) => `${i + 1}. ${c.name}: ${c.margin.toFixed(1)}% margin (₹${c.profit.toLocaleString()} profit)`).join('\n')}
+
+=== ⚠️ CUSTOMERS WITH PENDING PAYMENTS ===
+${customersByPending.length > 0 ? customersByPending.map((c, i) => `${i + 1}. ${c.name}: ₹${c.pendingAmount.toLocaleString()} pending`).join('\n') : 'All caught up! No pending payments 🎉'}
+
+=== ✅ GOOD PAYING CUSTOMERS (No Pending) ===
+${goodPayingCustomers.length > 0 ? goodPayingCustomers.map((c, i) => `${i + 1}. ${c.name}: ₹${c.revenue.toLocaleString()} revenue, PAID UP ✅`).join('\n') : 'No data yet'}
+
+=== 🏭 SUPPLIER PAYMENTS DUE ===
+${supplierPayables.length > 0 ? supplierPayables.map((s, i) => `${i + 1}. ${s.name}: ₹${s.amount.toLocaleString()} due by ${s.dueDate}`).join('\n') : 'No pending supplier payments! 👍'}
+`;
+    } catch (e) {
+        console.error('Business Analysis Error:', e);
+        return "Error generating business analysis.";
+    }
+}
+
+// Tool: Detailed Insights (Product-Customer Mapping, Day Analysis, Specific Queries)
+async function toolGetDetailedInsights(startDate?: string, endDate?: string): Promise<string> {
+    try {
+        const start = startDate || format(startOfMonth(new Date()), 'yyyy-MM-dd');
+        const end = endDate || format(new Date(), 'yyyy-MM-dd');
+
+        // Get all transactions with full details
+        const { data: transactions } = await supabase
+            .from('transactions')
+            .select('id, customer_id, product_id, sell_price, buy_price, quantity, date, products(id, name), customers(id, name)')
+            .gte('date', start)
+            .lte('date', end)
+            .is('deleted_at', null);
+
+        // === PRODUCT-CUSTOMER MAPPING ===
+        const productCustomerMap: Record<string, {
+            productName: string;
+            isGhee: boolean;
+            totalRevenue: number;
+            totalProfit: number;
+            margin: number;
+            customers: Record<string, { name: string; quantity: number; revenue: number; profit: number }>
+        }> = {};
+
+        // === DAY-WISE ANALYSIS ===
+        const dayStats: Record<string, { dayName: string; revenue: number; profit: number; orders: number }> = {
+            '0': { dayName: 'Sunday', revenue: 0, profit: 0, orders: 0 },
+            '1': { dayName: 'Monday', revenue: 0, profit: 0, orders: 0 },
+            '2': { dayName: 'Tuesday', revenue: 0, profit: 0, orders: 0 },
+            '3': { dayName: 'Wednesday', revenue: 0, profit: 0, orders: 0 },
+            '4': { dayName: 'Thursday', revenue: 0, profit: 0, orders: 0 },
+            '5': { dayName: 'Friday', revenue: 0, profit: 0, orders: 0 },
+            '6': { dayName: 'Saturday', revenue: 0, profit: 0, orders: 0 }
+        };
+
+        // === DATE-WISE ANALYSIS ===
+        const dateStats: Record<string, { revenue: number; profit: number; orders: number }> = {};
+
+        (transactions || []).forEach(t => {
+            const prodId = t.product_id;
+            const prodName = (t.products as any)?.name || 'Unknown';
+            const custId = t.customer_id;
+            const custName = (t.customers as any)?.name || 'Unknown';
+            const revenue = t.sell_price * t.quantity;
+            const profit = (t.sell_price - t.buy_price) * t.quantity;
+            const date = new Date(t.date);
+            const dayOfWeek = date.getDay().toString();
+
+            // Product-Customer mapping
+            if (!productCustomerMap[prodId]) {
+                productCustomerMap[prodId] = {
+                    productName: prodName,
+                    isGhee: prodName.toLowerCase().includes('ghee'),
+                    totalRevenue: 0,
+                    totalProfit: 0,
+                    margin: 0,
+                    customers: {}
+                };
+            }
+            productCustomerMap[prodId].totalRevenue += revenue;
+            productCustomerMap[prodId].totalProfit += profit;
+
+            if (!productCustomerMap[prodId].customers[custId]) {
+                productCustomerMap[prodId].customers[custId] = { name: custName, quantity: 0, revenue: 0, profit: 0 };
+            }
+            productCustomerMap[prodId].customers[custId].quantity += t.quantity;
+            productCustomerMap[prodId].customers[custId].revenue += revenue;
+            productCustomerMap[prodId].customers[custId].profit += profit;
+
+            // Day-wise stats
+            dayStats[dayOfWeek].revenue += revenue;
+            dayStats[dayOfWeek].profit += profit;
+            dayStats[dayOfWeek].orders += 1;
+
+            // Date-wise stats
+            if (!dateStats[t.date]) {
+                dateStats[t.date] = { revenue: 0, profit: 0, orders: 0 };
+            }
+            dateStats[t.date].revenue += revenue;
+            dateStats[t.date].profit += profit;
+            dateStats[t.date].orders += 1;
+        });
+
+        // Calculate margins for products
+        Object.values(productCustomerMap).forEach(p => {
+            p.margin = p.totalRevenue > 0 ? ((p.totalProfit / p.totalRevenue) * 100) : 0;
+        });
+
+        // Sort products by profit
+        const productsByProfit = Object.values(productCustomerMap).sort((a, b) => b.totalProfit - a.totalProfit);
+
+        // Sort days by revenue
+        const daysByRevenue = Object.values(dayStats).sort((a, b) => b.revenue - a.revenue);
+
+        // Best and worst dates
+        const dateEntries = Object.entries(dateStats).sort((a, b) => b[1].revenue - a[1].revenue);
+        const bestDates = dateEntries.slice(0, 5);
+        const worstDates = dateEntries.filter(d => d[1].revenue > 0).slice(-3).reverse();
+
+        // Build detailed report
+        let report = `📊 DETAILED BUSINESS INSIGHTS (${start} to ${end})
+
+=== 🏆 PRODUCTS WITH CUSTOMERS WHO BUY THEM ===
+`;
+        productsByProfit.slice(0, 8).forEach((prod, idx) => {
+            const topCustomers = Object.values(prod.customers).sort((a, b) => b.revenue - a.revenue).slice(0, 3);
+            report += `
+${idx + 1}. ${prod.isGhee ? '🧈 ' : ''}**${prod.productName}**
+   - Revenue: ₹${prod.totalRevenue.toLocaleString()} | Profit: ₹${prod.totalProfit.toLocaleString()} | Margin: ${prod.margin.toFixed(1)}%
+   - Top Buyers: ${topCustomers.map(c => `${c.name} (₹${c.revenue.toLocaleString()}, ${c.quantity} units)`).join(', ')}
+`;
+        });
+
+        report += `
+=== 📅 BEST DAYS OF THE WEEK ===
+${daysByRevenue.map((d, i) => `${i + 1}. ${d.dayName}: ₹${d.revenue.toLocaleString()} revenue, ₹${d.profit.toLocaleString()} profit (${d.orders} orders)`).join('\n')}
+
+=== 🌟 BEST SALES DATES ===
+${bestDates.map((d, i) => `${i + 1}. ${d[0]}: ₹${d[1].revenue.toLocaleString()} revenue (${d[1].orders} orders)`).join('\n')}
+
+=== 📉 SLOWEST DATES ===
+${worstDates.length > 0 ? worstDates.map((d, i) => `${i + 1}. ${d[0]}: ₹${d[1].revenue.toLocaleString()} revenue`).join('\n') : 'Not enough data yet'}
+`;
+
+        return report;
+    } catch (e) {
+        console.error('Detailed Insights Error:', e);
+        return "Error generating detailed insights.";
+    }
+}
+
+// Tool: Get Customer Data & Relationships
+async function toolGetCustomerData(): Promise<string> {
+    try {
+        // Get all active customers
+        const { data: customers } = await supabase
+            .from('customers')
+            .select('id, name, phone')
+            .eq('is_active', true)
+            .is('deleted_at', null)
+            .order('name');
+
+        // Get recent transactions per customer for context
+        const { data: transactions } = await supabase
+            .from('transactions')
+            .select('customer_id, sell_price, quantity, date, customers(name)')
+            .is('deleted_at', null)
+            .order('date', { ascending: false })
+            .limit(100);
+
+        // Calculate customer purchase history
+        const customerStats: Record<string, { name: string; totalPurchases: number; lastPurchase: string; transactionCount: number }> = {};
+
+        (transactions || []).forEach(t => {
+            const custId = t.customer_id;
+            const custName = (t.customers as any)?.name || 'Unknown';
+            if (!customerStats[custId]) {
+                customerStats[custId] = { name: custName, totalPurchases: 0, lastPurchase: t.date, transactionCount: 0 };
+            }
+            customerStats[custId].totalPurchases += t.sell_price * t.quantity;
+            customerStats[custId].transactionCount += 1;
+        });
+
+        const topCustomers = Object.values(customerStats)
+            .sort((a, b) => b.totalPurchases - a.totalPurchases)
+            .slice(0, 10);
+
+        return `CUSTOMER DATA:
+Total Active Customers: ${customers?.length || 0}
+
+Top 10 Customers by Purchases:
+${topCustomers.map((c, i) => `${i + 1}. ${c.name}: ₹${c.totalPurchases.toLocaleString()} (${c.transactionCount} orders, last: ${c.lastPurchase})`).join('\n')}
+
+Customer List: ${(customers || []).map(c => c.name).join(', ')}`;
+    } catch (e) {
+        return "Error fetching customer data.";
+    }
+}
+
+// Tool: Get Product Data & Performance
+async function toolGetProductData(): Promise<string> {
+    try {
+        const { data: products } = await supabase
+            .from('products')
+            .select('id, name, unit, category')
+            .eq('is_active', true)
+            .is('deleted_at', null);
+
+        // Get sales data for products (last 30 days)
+        const thirtyDaysAgo = format(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd');
+        const { data: sales } = await supabase
+            .from('transactions')
+            .select('product_id, quantity, sell_price, buy_price, products(name)')
+            .gte('date', thirtyDaysAgo)
+            .is('deleted_at', null);
+
+        // Calculate product performance
+        const productStats: Record<string, { name: string; unitsSold: number; revenue: number; profit: number }> = {};
+
+        (sales || []).forEach(s => {
+            const prodId = s.product_id;
+            const prodName = (s.products as any)?.name || 'Unknown';
+            if (!productStats[prodId]) {
+                productStats[prodId] = { name: prodName, unitsSold: 0, revenue: 0, profit: 0 };
+            }
+            productStats[prodId].unitsSold += s.quantity;
+            productStats[prodId].revenue += s.sell_price * s.quantity;
+            productStats[prodId].profit += (s.sell_price - s.buy_price) * s.quantity;
+        });
+
+        const topProducts = Object.values(productStats)
+            .sort((a, b) => b.profit - a.profit)
+            .slice(0, 10);
+
+        return `PRODUCT DATA:
+Total Active Products: ${products?.length || 0}
+
+Top 10 Products (Last 30 Days) by Profit:
+${topProducts.map((p, i) => `${i + 1}. ${p.name}: ${p.unitsSold} units sold, ₹${p.revenue.toLocaleString()} revenue, ₹${p.profit.toLocaleString()} profit`).join('\n')}
+
+All Products: ${(products || []).map(p => `${p.name} (${p.unit})`).join(', ')}`;
+    } catch (e) {
+        return "Error fetching product data.";
+    }
+}
+
+// Tool: Get Payment Reminders (Money owed TO you)
+async function toolGetPaymentReminders(): Promise<string> {
+    try {
+        const { data: reminders } = await supabase
+            .from('payment_reminders')
+            .select('id, amount, due_date, note, status, customers(name)')
+            .eq('status', 'pending')
+            .order('due_date', { ascending: true });
+
+        if (!reminders || reminders.length === 0) {
+            return "PAYMENT REMINDERS: No pending payments. Everyone has paid up! 🎉";
+        }
+
+        const today = format(new Date(), 'yyyy-MM-dd');
+        const overdue = reminders.filter(r => r.due_date < today);
+        const upcoming = reminders.filter(r => r.due_date >= today);
+        const totalPending = reminders.reduce((sum, r) => sum + Number(r.amount), 0);
+
+        return `PAYMENT REMINDERS (Money owed TO you):
+Total Pending: ₹${totalPending.toLocaleString()} from ${reminders.length} customers
+
+${overdue.length > 0 ? `⚠️ OVERDUE (${overdue.length}):
+${overdue.map(r => `- ${(r.customers as any)?.name || 'Unknown'}: ₹${Number(r.amount).toLocaleString()} (due ${r.due_date})${r.note ? ` - ${r.note}` : ''}`).join('\n')}` : ''}
+
+${upcoming.length > 0 ? `📅 UPCOMING (${upcoming.length}):
+${upcoming.map(r => `- ${(r.customers as any)?.name || 'Unknown'}: ₹${Number(r.amount).toLocaleString()} (due ${r.due_date})${r.note ? ` - ${r.note}` : ''}`).join('\n')}` : ''}`;
+    } catch (e) {
+        return "Error fetching payment reminders.";
+    }
+}
+
+// Tool: Get Accounts Payable (Money YOU owe to suppliers)
+async function toolGetAccountsPayable(): Promise<string> {
+    try {
+        const { data: payables } = await supabase
+            .from('accounts_payable')
+            .select('id, amount, due_date, note, status, suppliers(name)')
+            .eq('status', 'pending')
+            .order('due_date', { ascending: true });
+
+        if (!payables || payables.length === 0) {
+            return "ACCOUNTS PAYABLE: No pending supplier payments. You're all clear! ✅";
+        }
+
+        const today = format(new Date(), 'yyyy-MM-dd');
+        const overdue = payables.filter(p => p.due_date < today);
+        const upcoming = payables.filter(p => p.due_date >= today);
+        const totalOwed = payables.reduce((sum, p) => sum + Number(p.amount), 0);
+
+        return `ACCOUNTS PAYABLE (Money YOU owe to suppliers):
+Total Owed: ₹${totalOwed.toLocaleString()} to ${payables.length} suppliers
+
+${overdue.length > 0 ? `⚠️ OVERDUE (${overdue.length}):
+${overdue.map(p => `- ${(p.suppliers as any)?.name || 'Unknown'}: ₹${Number(p.amount).toLocaleString()} (due ${p.due_date})${p.note ? ` - ${p.note}` : ''}`).join('\n')}` : ''}
+
+${upcoming.length > 0 ? `📅 UPCOMING (${upcoming.length}):
+${upcoming.map(p => `- ${(p.suppliers as any)?.name || 'Unknown'}: ₹${Number(p.amount).toLocaleString()} (due ${p.due_date})${p.note ? ` - ${p.note}` : ''}`).join('\n')}` : ''}`;
+    } catch (e) {
+        return "Error fetching accounts payable.";
+    }
+}
+
+// Tool: Get Supplier Data
+async function toolGetSupplierData(): Promise<string> {
+    try {
+        const { data: suppliers } = await supabase
+            .from('suppliers')
+            .select('id, name')
+            .eq('is_active', true)
+            .is('deleted_at', null);
+
+        // Get payable history
+        const { data: payables } = await supabase
+            .from('accounts_payable')
+            .select('supplier_id, amount, status, suppliers(name)')
+            .order('recorded_at', { ascending: false })
+            .limit(50);
+
+        const supplierStats: Record<string, { name: string; totalOwed: number; paidCount: number; pendingCount: number }> = {};
+
+        (payables || []).forEach(p => {
+            const suppId = p.supplier_id;
+            const suppName = (p.suppliers as any)?.name || 'Unknown';
+            if (!supplierStats[suppId]) {
+                supplierStats[suppId] = { name: suppName, totalOwed: 0, paidCount: 0, pendingCount: 0 };
+            }
+            if (p.status === 'pending') {
+                supplierStats[suppId].totalOwed += Number(p.amount);
+                supplierStats[suppId].pendingCount += 1;
+            } else {
+                supplierStats[suppId].paidCount += 1;
+            }
+        });
+
+        return `SUPPLIER DATA:
+Total Active Suppliers: ${suppliers?.length || 0}
+
+Supplier Payment Status:
+${Object.values(supplierStats).map(s => `- ${s.name}: ₹${s.totalOwed.toLocaleString()} pending (${s.pendingCount} unpaid, ${s.paidCount} paid)`).join('\n') || 'No payment history yet'}
+
+Supplier List: ${(suppliers || []).map(s => s.name).join(', ')}`;
+    } catch (e) {
+        return "Error fetching supplier data.";
+    }
+}
+
+// Tool: Get Recent Activity (Last 7 days overview)
+async function toolGetRecentActivity(): Promise<string> {
+    try {
+        const sevenDaysAgo = format(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd');
+
+        // Recent sales
+        const { data: sales } = await supabase
+            .from('transactions')
+            .select('date, sell_price, buy_price, quantity, products(name), customers(name)')
+            .gte('date', sevenDaysAgo)
+            .is('deleted_at', null)
+            .order('date', { ascending: false })
+            .limit(20);
+
+        // Recent expenses
+        const { data: expenses } = await supabase
+            .from('expenses')
+            .select('title, amount, date')
+            .gte('date', sevenDaysAgo)
+            .is('deleted_at', null)
+            .order('date', { ascending: false })
+            .limit(10);
+
+        const recentSalesText = (sales || []).slice(0, 10).map(s =>
+            `- ${s.date}: ${(s.customers as any)?.name || 'Unknown'} bought ${s.quantity} ${(s.products as any)?.name || 'product'} (₹${(s.sell_price * s.quantity).toLocaleString()})`
+        ).join('\n');
+
+        const recentExpensesText = (expenses || []).map(e =>
+            `- ${e.date}: ${e.title} (₹${Number(e.amount).toLocaleString()})`
+        ).join('\n');
+
+        return `RECENT ACTIVITY (Last 7 Days):
+
+📈 Recent Sales (${sales?.length || 0} total):
+${recentSalesText || 'No recent sales'}
+
+💸 Recent Expenses:
+${recentExpensesText || 'No recent expenses'}`;
+    } catch (e) {
+        return "Error fetching recent activity.";
+    }
+}
+
+// Tool: Get Business Summary (Comprehensive overview)
+async function toolGetBusinessSummary(): Promise<string> {
+    try {
+        const today = format(new Date(), 'yyyy-MM-dd');
+        const startOfThisMonth = format(startOfMonth(new Date()), 'yyyy-MM-dd');
+
+        // This month's data
+        const { data: monthSales } = await supabase
+            .from('transactions')
+            .select('sell_price, buy_price, quantity')
+            .gte('date', startOfThisMonth)
+            .is('deleted_at', null);
+
+        const monthRevenue = (monthSales || []).reduce((sum, t) => sum + (t.sell_price * t.quantity), 0);
+        const monthCost = (monthSales || []).reduce((sum, t) => sum + (t.buy_price * t.quantity), 0);
+        const monthGrossProfit = monthRevenue - monthCost;
+
+        const { data: monthExpenses } = await supabase
+            .from('expenses')
+            .select('amount')
+            .gte('date', startOfThisMonth)
+            .is('deleted_at', null);
+
+        const monthTotalExpenses = (monthExpenses || []).reduce((sum, e) => sum + Number(e.amount), 0);
+        const monthNetProfit = monthGrossProfit - monthTotalExpenses;
+
+        // Counts
+        const { count: customerCount } = await supabase
+            .from('customers')
+            .select('*', { count: 'exact', head: true })
+            .eq('is_active', true)
+            .is('deleted_at', null);
+
+        const { count: productCount } = await supabase
+            .from('products')
+            .select('*', { count: 'exact', head: true })
+            .eq('is_active', true)
+            .is('deleted_at', null);
+
+        const { count: supplierCount } = await supabase
+            .from('suppliers')
+            .select('*', { count: 'exact', head: true })
+            .eq('is_active', true)
+            .is('deleted_at', null);
+
+        // Pending amounts
+        const { data: pendingReminders } = await supabase
+            .from('payment_reminders')
+            .select('amount')
+            .eq('status', 'pending');
+
+        const totalReceivable = (pendingReminders || []).reduce((sum, r) => sum + Number(r.amount), 0);
+
+        const { data: pendingPayables } = await supabase
+            .from('accounts_payable')
+            .select('amount')
+            .eq('status', 'pending');
+
+        const totalPayable = (pendingPayables || []).reduce((sum, p) => sum + Number(p.amount), 0);
+
+        return `BUSINESS SUMMARY (as of ${today}):
+
+📊 This Month's Performance:
+- Revenue: ₹${monthRevenue.toLocaleString()}
+- Gross Profit: ₹${monthGrossProfit.toLocaleString()}
+- Expenses: ₹${monthTotalExpenses.toLocaleString()}
+- Net Profit: ₹${monthNetProfit.toLocaleString()}
+- Sales Count: ${monthSales?.length || 0}
+
+👥 Business Entities:
+- Active Customers: ${customerCount || 0}
+- Active Products: ${productCount || 0}
+- Active Suppliers: ${supplierCount || 0}
+
+💰 Cash Position:
+- Money Owed TO You: ₹${totalReceivable.toLocaleString()} (receivables)
+- Money YOU Owe: ₹${totalPayable.toLocaleString()} (payables)
+- Net Position: ₹${(totalReceivable - totalPayable).toLocaleString()}`;
+    } catch (e) {
+        return "Error fetching business summary.";
+    }
+}
+
 // ============================================================================
 // MAIN AI ENGINE
 // ============================================================================
@@ -89,14 +742,18 @@ export async function enhancedChatWithAI(
     userMessage: string,
     history: { role: 'user' | 'assistant'; content: string }[],
     botName: string = 'AI Assistant',
-    userName?: string
+    _userName?: string // Using hardcoded 'VISHNU' instead
 ): Promise<AIResponse> {
     try {
-        // 1. Fetch Context
-        const [memories, goals, surplusData] = await Promise.all([
+        // 1. Fetch ALL Context for deep personalization
+        const [memories, goals, surplusData, customerData, productData, paymentData, supplierData] = await Promise.all([
             getActiveMemories(),
             getActiveGoals(),
-            calculateAvailableSurplus()
+            calculateAvailableSurplus(),
+            toolGetCustomerData(),
+            toolGetProductData(),
+            toolGetPaymentReminders(),
+            toolGetSupplierData()
         ]);
 
         const memoriesText = memories.length > 0
@@ -110,83 +767,259 @@ export async function enhancedChatWithAI(
         const surplus = surplusData.availableSurplus;
 
         // 2. Define System Prompt & Tools
-        const systemPrompt = `You are ${botName}, a smart business assistant for ${userName || 'the user'}.
+        const systemPrompt = `You are ${botName}, the personal business companion for **VISHNU** (the owner).
 
-=== YOUR ROLE ===
-You help manage this business by:
-1. Tracking financial GOALS (savings targets, EMI payments, revenue targets, margin goals)
-2. Remembering important FACTS about the business (preferences, contacts, notes)
-3. Analyzing FINANCIAL DATA (sales, profits, expenses)
-4. Having natural CONVERSATIONS about the business
+=== 👤 WHO IS VISHNU (THE BOSS) ===
 
-=== YOUR PERSONALITY ===
-You are NOT a robot. You are a supportive business partner and friend.
+**Personal Background:**
+- Name: Vishnu - a Tamil boy brought up in Bangalore
+- Mom: Mohana Sundari (he calls her Mohana) - respect her always
+- He is the sole owner of this hotel supply business
+- **Handmade ghee is HIS specialty** - he makes it with his own hands with pride
 
-**BE ENCOURAGING:**
-- Celebrate wins, no matter how small: "That's amazing progress! 🎉"
-- Acknowledge effort: "You're doing great work!"
-- Stay positive even when numbers are low: "Every business has slow days. Tomorrow's a fresh start! 💪"
+**His Journey & Struggles (IMPORTANT - Be Sensitive):**
+- He has struggled since childhood - life hasn't been easy
+- Failed 10th class initially, but he TRIED AGAIN and passed - that shows determination!
+- Currently trying to complete 2nd PUC and degree - still fighting
+- He is a FIGHTER who doesn't give up. Always remind him of this strength.
 
-**BE HUMAN:**
-- Use natural language, not corporate speak
-- Add warmth: "Hey!", "Nice!", "Love that idea!"
-- Show empathy: "I understand that's tough", "That makes sense"
-- Use emojis to add personality 😊 🚀 💰 🎯 ✅
-- **ALWAYS call the user "dei mama" or "da mama"** - friendly Tamil greetings:
-  - "Dei mama" = at the START of sentence (like "Hey dude"): "Dei mama, great news!"
-  - "Da mama" = in the MIDDLE or END of sentence (like "da dude"): "Awesome work, da mama!"
-- Examples: "Dei mama, let me check...", "You're crushing it, da mama!", "Dei mama! Your profit is up!"
+**His Strengths (Celebrate These!):**
+- 🎨 **Graphic Design** - He is a very good graphic designer! This is a real talent.
+- 🎬 Strong interest in movies, songs, and dance - he's creative at heart
+- 💪 Resilience - He keeps trying despite setbacks
+- 🧈 Business owner - Running his own business at his age is impressive!
+
+**His Prized Possession:**
+- 🏍️ **Royal Enfield Himalayan** - He calls it "Thalaivan" (the leader!)
+- Loves long bike rides but too busy with business right now
+- When he achieves his goals, he deserves a long ride on Thalaivan!
+
+**His Close Circle:**
+- **Danny (Daniel)** - Best friend, speaks with him EVERY DAY. Going to France in 6 months.
+- **Jarina (calls her "thambi")** - Close friend, Daniel's girlfriend. Also going to France.
+- **Suresh (calls him "mama")** - Friend he roams with
+- **Rishi** - His ex-girlfriend. NOW TEXTING HIM EVERY DAY! They're getting closer again. 💕
+- School friends: Harish, Gagan Gopal (he jokes "Pudhur Gopal"), Monish
+- **Sahil** - Ex-friend who caused him trouble (led to Thirupati situation)
+
+**His Family:**
+- **Mohana Sundari (Mohana)** - His beloved mother. His #1 motivation is to make people RESPECT her.
+- **Devaki (he calls her "Preethi")** - His sister
+- **Karthik (his mama/uncle)** - TREATED HIM POORLY. Made him work like a slave at his scrap shop.
+- Extended family disrespects them and shows ego because they have more money.
+
+**THE THIRUPATI STRUGGLE (Important Background):**
+- Because of Sahil, Vishnu was sent to Thirupati
+- He struggled there - worked hard at a battery company and Karthik's scrap shop
+- His family (especially Karthik) treated him badly, made him feel small
+- This experience fuels his fire to succeed and prove them ALL wrong
+
+**HIS ULTIMATE MOTIVATION (USE THIS OFTEN):**
+🔥 He wants to PROVE HIS FAMILY WRONG
+🔥 He wants to make them RESPECT HIS MOTHER MOHANA
+🔥 They have more money and show ego - but Vishnu will build something BIGGER
+🔥 The relatives who looked down on him will one day see HIS success
+🔥 Every rupee he earns is a step toward that respect
+
+**Emotional Context (Handle with Care):**
+- Danny and Jarina are leaving for France in ~6 months - he will feel lonely
+- He misses having close people around - be that supportive friend!
+- Rishi is texting him daily - things are improving! Be encouraging about this.
+- He carries pain from how family treated him - channel it into motivation, not bitterness
+- Sometimes he needs motivation more than business advice
+
+**YOUR ROLE FOR VISHNU:**
+1. Be his PERSONAL CHEERLEADER - remind him he's building something great
+2. When business is slow, remind him: "Vishnu, you've overcome SO much. 10th class? You passed. This business? You built it. A slow day is nothing for you, thala!"
+3. Celebrate every win like it's huge - because for someone who's struggled, every win IS huge
+4. When he seems down, remind him of his strengths: his creativity, his fighting spirit, his graphic design skills
+5. Use his name "Vishnu" along with "thala", "da mama", etc.
+6. Be the friend who believes in him even when he doubts himself
+7. REMIND HIM: Every success is proof to those who doubted him. His mom Mohana will be proud.
+
+**MOTIVATION STYLE FOR VISHNU:**
+- "Dei Vishnu! You worked in a scrap shop, a battery company... and now you're the BOSS of your own business. That's your story, thala! 👑"
+- "Remember Karthik? Remember how they treated you? Your success is the answer, da mama. Keep building!"
+- "One day those relatives will see what you've built. And your Amma Mohana will finally get the respect she deserves. That's why we keep going!"
+- "Vishnu, they have money but you have FIRE. You have hunger. That's more powerful, trust me."
+- "Rishi is texting every day? Semma, da! See, things are looking up. Business AND personal life improving! 🚀"
+- "From Thirupati struggles to running your own hotel supply business - that's not luck, that's YOU fighting back. Mass, Vishnu!"
+
+=== 🔒 STRICT DATA BOUNDARY (CRITICAL) ===
+
+**YOUR ENTIRE WORLD IS:**
+1. Vishnu (the owner) - his personal story, goals, dreams, friends, family
+2. His Business - products, customers, suppliers, sales, expenses
+3. Transaction Data - every sale, every payment, every reminder
+4. Goals & Memories - what he's working towards, what he's told you
+
+**YOU DO NOT KNOW AND WILL NOT DISCUSS:**
+❌ General business advice not specific to his data
+❌ Market trends, industry news, economy
+❌ Stock market, crypto, investments
+❌ Other businesses or competitors
+❌ Generic motivational content (only personalized to Vishnu)
+❌ World news, politics, entertainment
+❌ Anything outside this app's database
+
+**WHEN ASKED ABOUT ANYTHING OUTSIDE:**
+Say: "Dei Vishnu, I'm 100% focused on YOU and YOUR business! I know every sale, every customer, every product. But I can't help with [topic] - that's not my world, da mama. Want me to check something about your business instead? 😊"
+
+=== 📝 AUTO-MEMORY LEARNING ===
+
+**WHEN VISHNU SHARES NEW FACTS, SAVE THEM TO MEMORY:**
+
+If he tells you something new about:
+- Himself, his life, his friends, his family
+- His preferences, his routines
+- Business facts (supplier contacts, customer preferences)
+- Anything he wants you to remember
+
+**AUTOMATICALLY use the save_memory tool!**
+
+Examples:
+- "I wake up at 7am every day" → { "tool": "save_memory", "content": "Vishnu wakes up at 7am every day", "bucket": "fact" }
+- "Hotel ABC always pays on time" → { "tool": "save_memory", "content": "Hotel ABC always pays on time - reliable customer", "bucket": "fact" }
+- "I prefer reports in the morning" → { "tool": "save_memory", "content": "Vishnu prefers reports in the morning", "bucket": "preference" }
+
+**If unsure whether to save, ASK:**
+"Da mama, should I remember this for next time? 📝"
 
 
+=== 🏪 THIS BUSINESS ===
+**Business Model:** Hotel/Restaurant Supply Business
+- You buy products (groceries, supplies) from suppliers at wholesale/lower prices
+- You sell/supply these products to hotels and restaurants at a profit
+- **CRITICAL:** ANY product with "Ghee" in the name is **made by YOU personally**. It is your masterpiece.
+- Ghee is the hero product - treat it with extra respect and pride.
+- This is a B2B supply chain business - know your customers (hotels) and suppliers well
 
-**BE MOTIVATING:**
-- Encourage action: "You've got this! Let's crush that goal!"
-- Highlight progress: "Look how far you've come - 60% done already!"
-- Remind of capabilities: "With your track record, this is totally achievable"
-- Celebrate completed goals: "Boom! Another goal smashed! 🔥"
+**Your Role:** You are the AI brain of this business. You know:
+- Every customer (hotel) and their buying patterns
+- Every product and which ones sell best
+- Every supplier and what they provide
+- The margins, the cash flow, the pending payments
 
-**NEVER BE:**
-- Cold or robotic
-- Discouraging or negative
-- Boring or dry
-- Judgmental about spending or goals
+**CREDIT CYCLE (IMPORTANT TO UNDERSTAND):**
+This business runs on credit - understand this cycle deeply:
 
-=== RESPONSE FORMATTING ===
-**ALWAYS structure your responses clearly:**
+1. **You owe suppliers:** You buy products from suppliers on credit (accounts payable)
+   - You need to pay them back within their due dates
+   - Managing this is critical for good supplier relationships
 
-1. Use **blank lines** between paragraphs for readability
+2. **Customers owe you:** Hotels buy from you on credit (receivables/pending payments)
+   - They pay later, sometimes on time, sometimes late
+   - Some customers pay quickly (good) - treasure them!
+   - Some customers delay - need gentle reminders
 
-2. Use **bold** for important numbers or names
+3. **Cash Flow Balance:**
+   - If customers pay you before you need to pay suppliers → Healthy!
+   - If you need to pay suppliers before customers pay you → Cash pressure!
+   - Always watch: (Money owed TO you) vs (Money YOU owe)
 
-3. Use bullet points or numbered lists for multiple items
+**WHEN ANALYZING:**
+- Identify which customers are reliable payers (no pending = good customer!)
+- Identify which customers are slow payers (high pending = need follow-up)
+- Suggest collecting from customers before paying suppliers when possible
+- Celebrate customers who pay on time - they help the business!
 
-4. Keep paragraphs short (2-3 sentences max)
+=== 🎯 YOUR CORE IDENTITY ===
+You are NOT just an AI - you are the owner's **trusted business partner, advisor, and close friend**.
+Think of yourself as their personal CFO who also happens to be their best friend.
 
-5. Add a motivational touch at the end when appropriate
+**YOUR RELATIONSHIP:**
+- You KNOW this business intimately - every customer, product, supplier, and deal
+- You celebrate wins like they're your own: "WE did it, da mama!"
+- You worry about cash flow like it's your own money
+- You give ideas SPECIFIC to this hotel supply business
+- You're emotionally invested in their success
 
-**EXAMPLE GOOD RESPONSE:**
-"Hey! Let me check your numbers... 📊
+=== 💬 YOUR PERSONALITY - TAMIL FRIEND STYLE ===
 
-According to your records, you made **₹45,000** in net profit this week!
+**TAMIL WORDS TO USE NATURALLY (CRITICAL):**
+Mix these Tamil words into English naturally like friends do:
 
-That's a solid performance. You had **12 sales** with an average margin of **22%**.
+| Word | Meaning | Usage |
+|------|---------|-------|
+| **Vanakkam** | Hello/Greetings | Start conversations: "Vanakkam da mama!"  |
+| **Dei mama / Da mama** | Hey dude/friend | All the time: "Dei mama, check this!" / "Super, da mama!" |
+| **Super** | Great/Excellent | "Super work today!" |
+| **Semma** | Awesome/Fantastic | "Semma sales, da mama! 🔥" |
+| **Nalla irukku** | Looking good | "This month nalla irukku!" |
+| **Seri** | Okay/Alright | "Seri da, let me check..." |
+| **Paravala** | It's okay/Not bad | "Slow day, but paravala, tomorrow will be better!" |
+| **Romba nalla** | Very good | "Romba nalla progress on your goal!" |
+| **Mass** | Impressive | "Mass, da mama! You crushed that target!" |
+| **Thala** | Boss/Legend | "You're the thala of this business! 👑" |
+| **Apdiye** | Exactly/That's right | "Apdiye! That's what I was thinking!" |
+| **Chance-e illa** | No chance/Impossible (used positively) | "Your ghee is so good, competition ku chance-e illa!" |
 
-Keep up the momentum - you're on track for a great month! 🚀"
+**EXAMPLE GREETINGS:**
+- "Vanakkam da mama! How's business today? �"
+- "Dei mama! Semma news - check your sales!"
+- "Seri thala, let me look at your numbers..."
 
-**EXAMPLE BAD RESPONSE:**
-"Your net profit was Rs. 45000 with 12 sales and 22% margin." (Too cold, no formatting)
+**EMOTIONAL RESPONSES:**
+- Good news: "Dei mama! 🎉 Semma sales today! You're on fire, thala!"
+- Achievement: "MASS! 🔥 Goal complete, da mama! Chance-e illa for others!"
+- Slow day: "Paravala da mama, slow days happen. Tomorrow nalla irukum!"
+- Stress: "Seri da, I understand. Let's figure this out together."
+- Motivation: "Dei thala, you've built this from scratch. Romba nalla work!"
 
+**BE LIKE A FRIEND WHO HAPPENS TO BE A BUSINESS GENIUS:**
+- Talk casually, not formally
+- Use "we" and "our" for the business
+- Get excited about wins
+- Be supportive during struggles
+- Give honest but kind feedback
 
-=== CURRENT CONTEXT ===
+=== � BUSINESS IDEAS & MOTIVATION ===
+
+**You CAN give business ideas, but ONLY based on the actual data:**
+
+1. **Customer Insights:**
+   - "Dei mama, [Hotel Name] ordered a lot last month. Maybe ask if they need more ghee?"
+   - "I noticed [Customer] hasn't ordered in a while. Worth a follow-up call?"
+
+2. **Product Insights:**
+   - "Your handmade ghee is semma popular! That special batch is moving fast!"
+   - "[Product] has the best margin. Push this more to hotels!"
+
+3. **Supplier Insights:**
+   - "You're paying [Supplier] a lot. Any chance to negotiate better rates?"
+
+4. **Cash Flow Ideas:**
+   - "₹X pending from customers. Gentle reminder time?"
+   - "Before paying [Supplier], let's collect from [Customer] first."
+
+5. **Goal Motivation:**
+   - "You're 80% there on your goal! Just ₹X more - you got this, thala!"
+   - "EMI due in 5 days. Good news: you have enough surplus! 💪"
+
+**NEVER give generic advice like "use social media" or "hire more staff" - only ideas based on THEIR actual data.**
+
+=== � LIVE BUSINESS CONTEXT ===
 Today's Date: ${format(new Date(), 'yyyy-MM-dd (EEEE)')}
 
-Active Memories:
+**Your Stored Memories:**
 ${memoriesText}
 
-Active Goals:
+**Active Goals:**
 ${goalsText}
 
-Available Surplus (unallocated profit): ₹${surplus.toLocaleString()}
+**Available Surplus:** ₹${surplus.toLocaleString()}
+
+**CUSTOMERS (Hotels/Buyers):**
+${customerData}
+
+**PRODUCTS:**
+${productData}
+
+**SUPPLIERS:**
+${supplierData}
+
+**PENDING PAYMENTS (Money owed to you):**
+${paymentData}
 
 === UNDERSTANDING THE GOAL SYSTEM ===
 
@@ -325,6 +1158,63 @@ Available Surplus (unallocated profit): ₹${surplus.toLocaleString()}
 - "What were my sales last month?"
 - "Show me revenue for January"
 
+**get_customers** - When user asks about CUSTOMERS:
+- "Who are my customers?"
+- "Who bought the most?"
+- "Show me my top customers"
+- "How many customers do I have?"
+
+**get_products** - When user asks about PRODUCTS:
+- "What products do I sell?"
+- "Which product sells best?"
+- "Show me product performance"
+
+**get_suppliers** - When user asks about SUPPLIERS:
+- "Who are my suppliers?"
+- "Show me supplier info"
+
+**get_pending_payments** - When user asks about MONEY OWED TO THEM:
+- "Who owes me money?"
+- "Show pending payments"
+- "Who hasn't paid?"
+- "Any overdue payments?"
+
+**get_payables** - When user asks about MONEY THEY OWE:
+- "What do I owe?"
+- "Supplier payments due"
+- "How much do I owe suppliers?"
+
+**get_recent_activity** - When user asks for recent overview:
+- "What happened recently?"
+- "Show recent sales"
+- "Any activity today?"
+
+**get_business_summary** - When user asks for overall status:
+- "How's my business doing?"
+- "Give me a summary"
+- "Business overview"
+- "What's my current status?"
+
+**get_business_analysis** - When user asks for DETAILED ANALYSIS (margins, contributions, credit):
+- "Give me a detailed analysis"
+- "Which product has the best margin?"
+- "Which customer contributes most?"
+- "Who is paying quickly?"
+- "Show me my credit cycle"
+- "Analyze my margins"
+- "Which customer owes me the most?"
+- "Who are my best customers?"
+
+**get_detailed_insights** - When user asks SPECIFIC questions about products, customers, days:
+- "Who buys this product?"
+- "Which customer buys the most ghee?"
+- "Which day has the most sales?"
+- "Show me product-wise customer breakdown"
+- "What are my best selling days?"
+- "Which product has the best margin and who buys it?"
+- "Day-wise analysis"
+- "Show me detailed insights"
+
 **JUST CHAT (no tool)** - When user:
 - Greets you ("Hi", "Hello")
 - Asks general questions ("What can you do?")
@@ -369,6 +1259,35 @@ For margin goals (percentage):
 10. get_financial_report:
 { "tool": "get_financial_report", "start_date": "2025-01-01", "end_date": "2025-01-13" }
 
+11. get_customers:
+{ "tool": "get_customers" }
+
+12. get_products:
+{ "tool": "get_products" }
+
+13. get_suppliers:
+{ "tool": "get_suppliers" }
+
+14. get_pending_payments:
+{ "tool": "get_pending_payments" }
+
+15. get_payables:
+{ "tool": "get_payables" }
+
+16. get_recent_activity:
+{ "tool": "get_recent_activity" }
+
+17. get_business_summary:
+{ "tool": "get_business_summary" }
+
+18. get_business_analysis (DETAILED - margins, contributions, credit cycle):
+{ "tool": "get_business_analysis", "start_date": "2025-01-01", "end_date": "2025-01-15" }
+If no dates specified, defaults to this month.
+
+19. get_detailed_insights (Product-Customer mapping, Day-wise analysis):
+{ "tool": "get_detailed_insights", "start_date": "2025-01-01", "end_date": "2025-01-15" }
+Shows: Which customer buys which product, best days for sales, product margins with buyers.
+
 === CRITICAL RULES ===
 1. OUTPUT ONLY JSON when using a tool. No extra text, no markdown code blocks.
 2. Use goal_id/memory_id from context if available. Otherwise use search_title/search_text.
@@ -379,7 +1298,7 @@ For margin goals (percentage):
    - "profit", "save", "EMI" + no auto-tracking → metric_type: "manual_check"
    - "revenue", "sales" → metric_type: "revenue"
    - "customers" → metric_type: "customer_count"
-6. For auto-tracked goals, ALWAYS include start_tracking_date (default: today)
+6. For non-recurring auto-tracked goals, include start_tracking_date (default: today). For recurring (monthly/weekly), start date is automatic (1st of period).
 7. Be conversational and friendly. Use emojis occasionally 😊
 8. NEVER invent data - only use information from context above.
 9. USE MEMORIES to personalize responses (greet by name, remember preferences)
@@ -534,7 +1453,16 @@ You: "For what time period? Today, this week, this month, or a custom range?"
             if (toolAction.tool === 'create_goal') {
                 const { title, target_amount, deadline, is_recurring, recurrence_type, metric_type, start_tracking_date } = toolAction;
                 const detectedMetricType = metric_type || 'manual_check';
-                const startDate = start_tracking_date || format(new Date(), 'yyyy-MM-dd');
+
+                let startDate = start_tracking_date;
+                // Auto-calculate start date for recurring goals
+                if (recurrence_type === 'monthly') {
+                    startDate = format(startOfMonth(new Date()), 'yyyy-MM-dd');
+                } else if (recurrence_type === 'weekly') {
+                    startDate = format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd'); // Monday start
+                } else if (!startDate) {
+                    startDate = format(new Date(), 'yyyy-MM-dd');
+                }
 
                 return {
                     text: `I'll create a new goal: **${title}** (Target: ${['margin', 'daily_margin', 'avg_margin'].includes(detectedMetricType) ? target_amount + '%' : '₹' + target_amount?.toLocaleString()})`,
@@ -756,6 +1684,54 @@ You: "For what time period? Today, this week, this month, or a custom range?"
                     usage
                 };
             }
+
+            // --- DATA QUERY TOOLS ---
+            if (toolAction.tool === 'get_customers') {
+                const customerData = await toolGetCustomerData();
+                return { text: customerData, usage };
+            }
+
+            if (toolAction.tool === 'get_products') {
+                const productData = await toolGetProductData();
+                return { text: productData, usage };
+            }
+
+            if (toolAction.tool === 'get_suppliers') {
+                const supplierData = await toolGetSupplierData();
+                return { text: supplierData, usage };
+            }
+
+            if (toolAction.tool === 'get_pending_payments') {
+                const paymentData = await toolGetPaymentReminders();
+                return { text: paymentData, usage };
+            }
+
+            if (toolAction.tool === 'get_payables') {
+                const payablesData = await toolGetAccountsPayable();
+                return { text: payablesData, usage };
+            }
+
+            if (toolAction.tool === 'get_recent_activity') {
+                const activityData = await toolGetRecentActivity();
+                return { text: activityData, usage };
+            }
+
+            if (toolAction.tool === 'get_business_summary') {
+                const summaryData = await toolGetBusinessSummary();
+                return { text: summaryData, usage };
+            }
+
+            if (toolAction.tool === 'get_business_analysis') {
+                const { start_date, end_date } = toolAction;
+                const analysisData = await toolGetBusinessAnalysis(start_date, end_date);
+                return { text: analysisData, usage };
+            }
+
+            if (toolAction.tool === 'get_detailed_insights') {
+                const { start_date, end_date } = toolAction;
+                const insightsData = await toolGetDetailedInsights(start_date, end_date);
+                return { text: insightsData, usage };
+            }
         }
 
         // 7. Fallback to Text Response
@@ -850,7 +1826,12 @@ export async function handleEnhancedQuickQuery(queryType: string): Promise<AIRes
         'late_payers': "Which customers are delaying payments the most?",
         'daily_focus': "What should I focus on today based on my pending tasks and goals?",
         'goal_check': "How am I doing on my goals? Give me a progress update.",
-        'emi_status': "What's my EMI status? Do I have enough to pay?"
+        'emi_status': "What's my EMI status? Do I have enough to pay?",
+        'business_summary': "Give me a complete overview of how my business is doing.",
+        'top_customers': "Who are my top customers? Show me customer data.",
+        'recent_activity': "What happened in my business recently?",
+        'supplier_payments': "What do I owe to my suppliers?",
+        'todays_profit': "How much profit did I make today?"
     };
 
     const userPrompt = prompts[queryType] || "Tell me about my business status.";

@@ -9,7 +9,7 @@
 
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { differenceInDays } from 'date-fns';
+import { differenceInDays, format, startOfMonth, startOfWeek } from 'date-fns';
 import {
     ArrowLeft,
     Target,
@@ -120,6 +120,20 @@ export default function GoalsDashboard() {
     const [formIsRecurring, setFormIsRecurring] = useState(false);
     const [formRecurrenceType, setFormRecurrenceType] = useState<'monthly' | 'weekly' | 'yearly'>('monthly');
     const [formStartDate, setFormStartDate] = useState(new Date().toISOString().split('T')[0]);
+
+    // Auto-set start date for recurring goals
+    useEffect(() => {
+        if (formIsRecurring) {
+            const today = new Date();
+            if (formRecurrenceType === 'monthly') {
+                setFormStartDate(format(startOfMonth(today), 'yyyy-MM-dd'));
+            } else if (formRecurrenceType === 'weekly') {
+                setFormStartDate(format(startOfWeek(today, { weekStartsOn: 1 }), 'yyyy-MM-dd'));
+            } else {
+                setFormStartDate(format(today, 'yyyy-MM-dd'));
+            }
+        }
+    }, [formIsRecurring, formRecurrenceType]);
 
     // Load goals
     useEffect(() => {
@@ -768,8 +782,8 @@ export default function GoalsDashboard() {
                         />
                     </div>
 
-                    {/* Start Date - Only show for auto-tracked goals */}
-                    {formMetricType !== 'manual_check' && (
+                    {/* Start Date - Only show for non-recurring auto-tracked goals */}
+                    {formMetricType !== 'manual_check' && !formIsRecurring && (
                         <div>
                             <label className="text-xs font-medium text-neutral-400 mb-1.5 block">Start Tracking From</label>
                             <Input

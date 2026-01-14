@@ -1419,16 +1419,22 @@ export default function Reports() {
                                 </div>
 
                                 <div className="p-5 border-t border-neutral-800 bg-neutral-900 shrink-0">
-                                    <div className="grid grid-cols-3 gap-2">
-                                        <div className="text-center p-2 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
+                                    <div className="flex items-center gap-1.5">
+                                        <div className="flex-1 text-center p-2 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
                                             <p className="text-[9px] font-bold text-emerald-600/70 uppercase">Total Sold</p>
                                             <p className="text-sm font-black text-emerald-500">₹{totalSold.toLocaleString()}</p>
                                         </div>
-                                        <div className="text-center p-2 rounded-xl bg-rose-500/5 border border-rose-500/10">
+
+                                        <div className="font-black text-zinc-500 text-2xl">-</div>
+
+                                        <div className="flex-1 text-center p-2 rounded-xl bg-rose-500/5 border border-rose-500/10">
                                             <p className="text-[9px] font-bold text-rose-600/70 uppercase">Total Bought</p>
                                             <p className="text-sm font-black text-rose-500">₹{totalBought.toLocaleString()}</p>
                                         </div>
-                                        <div className="text-center p-2 rounded-xl bg-neutral-800 border border-neutral-700">
+
+                                        <div className="font-black text-zinc-500 text-2xl">=</div>
+
+                                        <div className="flex-1 text-center p-2 rounded-xl bg-neutral-800 border border-neutral-700">
                                             <p className="text-[9px] font-bold text-neutral-400 uppercase">Profit</p>
                                             <p className={cn("text-sm font-black", customerProfit >= 0 ? "text-white" : "text-rose-400")}>
                                                 ₹{customerProfit.toLocaleString()}
