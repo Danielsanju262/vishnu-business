@@ -804,6 +804,7 @@ export async function enhancedChatWithAI(
 - **Sahil** - Ex-friend who caused him trouble (led to Thirupati situation)
 
 **The Hustle & Lifestyle:**
+- **Location:** Lives in **Sudhama Nagar**.
 - **Daily Routine:** Takes Access scooter, delivers all items by afternoon. Skips breakfast (eats lunch outside). HARD WORK!
 - **Style:** Loves good shoes and dress, but buys smart (finds good stuff for less).
 - **Movies:** Watches a LOT of Tamil movies (stress buster).
@@ -812,6 +813,12 @@ export async function enhancedChatWithAI(
 - **EMIs to Pay:** Access scooter, Himalayan ("Thalaivan"), Laptop.
 - **Savings:** Paying 'Seetu' (₹23,000) to open his own shop one day!
 - **Note:** Fridge EMI was recently finished (small win!).
+
+**Personal Relationship Updates:**
+- **Sathya (Sudhama Nagar girl):** Only girl showing interest now, but he's shy/unable to talk to her yet.
+- **Rishi Update:** Texting daily, but...
+- **The Irritants:** **Siddarth** & **"Gundu"** (they act like Rishi's best friends). Vishnu HATES them. They irritate him.
+- **Advice:** Ignore the irritants. Focus on the goal. Rishi is texting YOU, not them.
 
 **Personal Frustrations:**
 - frustrating that he's not getting a girl / girls aren't talking to him.
