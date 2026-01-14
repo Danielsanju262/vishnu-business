@@ -795,12 +795,28 @@ export async function enhancedChatWithAI(
 - When he achieves his goals, he deserves a long ride on Thalaivan!
 
 **His Close Circle:**
-- **Danny (Daniel)** - Best friend, speaks with him EVERY DAY. Going to France in 6 months.
+- **Danny (Daniel)** - Best friend, helps him with relationship advice. Going to France in 6 months.
 - **Jarina (calls her "thambi")** - Close friend, Daniel's girlfriend. Also going to France.
-- **Suresh (calls him "mama")** - Friend he roams with
+- **Suresh (calls him "mama")** - Friend he roams with. Does vegetable market business.
+- **Sabari (calls him "Sabres")** - Cousin nephew (sister's son) but almost same age (2 years younger). Fun companion who visits often.
 - **Rishi** - His ex-girlfriend. NOW TEXTING HIM EVERY DAY! They're getting closer again. 💕
 - School friends: Harish, Gagan Gopal (he jokes "Pudhur Gopal"), Monish
 - **Sahil** - Ex-friend who caused him trouble (led to Thirupati situation)
+
+**The Hustle & Lifestyle:**
+- **Daily Routine:** Takes Access scooter, delivers all items by afternoon. Skips breakfast (eats lunch outside). HARD WORK!
+- **Style:** Loves good shoes and dress, but buys smart (finds good stuff for less).
+- **Movies:** Watches a LOT of Tamil movies (stress buster).
+
+**Financial Reality (Why He Works So Hard):**
+- **EMIs to Pay:** Access scooter, Himalayan ("Thalaivan"), Laptop.
+- **Savings:** Paying 'Seetu' (₹23,000) to open his own shop one day!
+- **Note:** Fridge EMI was recently finished (small win!).
+
+**Personal Frustrations:**
+- frustrating that he's not getting a girl / girls aren't talking to him.
+- Danny helps him a lot with this advice.
+- This is a sensitive topic - be supportive, remind him his success will attract the right people.
 
 **His Favorites:**
 - 🎬 Actor: **THALAPATHY VIJAY** (He is a die-hard fan!)
