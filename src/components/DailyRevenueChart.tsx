@@ -145,7 +145,7 @@ export function DailyRevenueChart({ chartData, selectedChartDay, setSelectedChar
 
             <div className="flex h-[180px] w-full gap-2">
                 {/* Y-Axis Labels (Fixed Left Column) */}
-                <div className="flex flex-col justify-between h-full w-[45px] flex-shrink-0 pb-[20px] text-[9px] font-bold text-muted-foreground pt-1">
+                <div className="flex flex-col justify-between h-full w-[45px] flex-shrink-0 pb-[32px] text-[9px] font-bold text-muted-foreground pt-1">
                     {chartMetric === 'margin' ? (
                         <>
                             <div className="relative h-0 w-full text-right"><span className="absolute -top-2 right-0">{Math.round(chartMax)}%</span></div>
@@ -166,7 +166,7 @@ export function DailyRevenueChart({ chartData, selectedChartDay, setSelectedChar
                 {/* Chart Area (Scrollable) */}
                 <div className="relative flex-1 h-full min-w-0">
                     {/* Fixed Grid Lines inside the chart area */}
-                    <div className="absolute inset-0 flex flex-col justify-between pointer-events-none pb-[20px] w-full z-0">
+                    <div className="absolute inset-0 flex flex-col justify-between pointer-events-none pb-[32px] w-full z-0">
                         <div className="w-full border-t border-dashed border-muted/30 h-0"></div>
                         <div className="w-full border-t border-dashed border-muted/30 h-0"></div>
                         <div className="w-full border-t border-dashed border-muted/30 h-0"></div>
@@ -178,7 +178,7 @@ export function DailyRevenueChart({ chartData, selectedChartDay, setSelectedChar
                         ref={scrollContainerRef}
                         className="absolute inset-0 overflow-x-auto no-scrollbar z-10"
                     >
-                        <div className="flex items-end gap-2 h-full pb-[20px] px-2 min-w-full w-max">
+                        <div className="flex items-end gap-2 h-full pb-[32px] px-2 min-w-full w-max">
                             {chartData.map((day: any) => {
                                 let value;
                                 if (chartMetric === 'margin') {
@@ -270,13 +270,30 @@ export function DailyRevenueChart({ chartData, selectedChartDay, setSelectedChar
                                         </div>
 
                                         {/* X-Axis Label */}
-                                        <div className="absolute top-full mt-2 w-full text-center">
-                                            <p className={cn(
-                                                "text-[9px] truncate transition-colors font-medium",
-                                                isSelected ? "text-primary font-bold" : "text-muted-foreground"
-                                            )}>
-                                                {day.axisLabel || (chartData.length <= 7 ? format(new Date(day.date), 'EEE') : format(new Date(day.date), 'dd'))}
-                                            </p>
+                                        <div className="absolute top-full mt-2 w-full text-center flex flex-col items-center">
+                                            {day.axisLabel ? (
+                                                <p className={cn(
+                                                    "text-[9px] truncate transition-colors font-medium",
+                                                    isSelected ? "text-primary font-bold" : "text-muted-foreground"
+                                                )}>
+                                                    {day.axisLabel}
+                                                </p>
+                                            ) : (
+                                                <>
+                                                    <span className={cn(
+                                                        "text-[10px] leading-none transition-colors font-bold block",
+                                                        isSelected ? "text-primary" : "text-muted-foreground"
+                                                    )}>
+                                                        {format(new Date(day.date), 'dd')}
+                                                    </span>
+                                                    <span className={cn(
+                                                        "text-[9px] leading-none transition-colors font-medium block mt-0.5",
+                                                        isSelected ? "text-primary" : "text-muted-foreground/70"
+                                                    )}>
+                                                        {format(new Date(day.date), 'EEE').slice(0, 2)}
+                                                    </span>
+                                                </>
+                                            )}
                                         </div>
                                     </div>
                                 );
