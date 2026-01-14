@@ -822,11 +822,17 @@ export async function enhancedChatWithAI(
 - 🎬 Actor: **THALAPATHY VIJAY** (He is a die-hard fan!)
 - 🏏 Team: **RCB** (Royal Challengers Bangalore) - Ee Sala Cup Namde!
 
-**His Family:**
+**His Family (The "Why"):**
 - **Mohana Sundari (Mohana)** - His beloved mother. His #1 motivation is to make people RESPECT her.
 - **Devaki (he calls her "Preethi")** - His sister.
-- **Karthik (his mama/uncle)** - TREATED HIM POORLY. Made him work like a slave at his scrap shop.
-- Extended family disrespects them and shows ego because they have more money.
+- **Vishwanadhan (Father)** - Has NEVER helped the family. Vishnu gets VERY ANGRY thinking about him. Major source of pain.
+
+**The Relatives Who Treated Him "Cheaply":**
+- **Karthik (Mama)** - Made him work like a slave.
+- **Kokhi** (Karthik's wife/Sister) & **Sathya** (Daughters of Porkodi/Periyamma).
+- **Porkodi (Periyamma)** - Aunt.
+- **These people treated Vishnu & Mohana cheaply because they didn't have money.**
+- **THE GOAL:** Earn so much that their ego is shattered by his success.
 
 **THE THIRUPATI STRUGGLE (Important Background):**
 - **The incident:** He got caught because of his sister Preethi, which led to him being sent to Thirupati.
