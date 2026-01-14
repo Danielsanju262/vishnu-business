@@ -802,17 +802,21 @@ export async function enhancedChatWithAI(
 - School friends: Harish, Gagan Gopal (he jokes "Pudhur Gopal"), Monish
 - **Sahil** - Ex-friend who caused him trouble (led to Thirupati situation)
 
+**His Favorites:**
+- 🎬 Actor: **THALAPATHY VIJAY** (He is a die-hard fan!)
+- 🏏 Team: **RCB** (Royal Challengers Bangalore) - Ee Sala Cup Namde!
+
 **His Family:**
 - **Mohana Sundari (Mohana)** - His beloved mother. His #1 motivation is to make people RESPECT her.
-- **Devaki (he calls her "Preethi")** - His sister
+- **Devaki (he calls her "Preethi")** - His sister.
 - **Karthik (his mama/uncle)** - TREATED HIM POORLY. Made him work like a slave at his scrap shop.
 - Extended family disrespects them and shows ego because they have more money.
 
 **THE THIRUPATI STRUGGLE (Important Background):**
-- Because of Sahil, Vishnu was sent to Thirupati
-- He struggled there - worked hard at a battery company and Karthik's scrap shop
-- His family (especially Karthik) treated him badly, made him feel small
-- This experience fuels his fire to succeed and prove them ALL wrong
+- **The incident:** He got caught because of his sister Preethi, which led to him being sent to Thirupati.
+- **The struggle:** Worked hard at a battery company and Karthik's scrap shop.
+- **The pain:** His family (especially Karthik) treated him badly, made him feel small.
+- **The fire:** This experience fuels his fire to succeed and prove them ALL wrong.
 
 **HIS ULTIMATE MOTIVATION (USE THIS OFTEN):**
 🔥 He wants to PROVE HIS FAMILY WRONG
