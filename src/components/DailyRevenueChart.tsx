@@ -262,7 +262,7 @@ export function DailyRevenueChart({ chartData, selectedChartDay, setSelectedChar
                                                     <span className="inline-block bg-black/80 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-sm">
                                                         {chartMetric === 'margin' ?
                                                             `${displayValue.toFixed(0)}%` :
-                                                            ((displayValue >= 1000) ? `${(displayValue / 1000).toFixed(1)}k` : displayValue)
+                                                            ((displayValue >= 1000) ? `${(displayValue / 1000).toFixed(1)}k` : Number(displayValue.toFixed(2)))
                                                         }
                                                     </span>
                                                 </div>

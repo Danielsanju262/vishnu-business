@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
 import { useGoogleLogin } from "@react-oauth/google";
-import { Cloud, Upload, Download, Loader2, FileJson, CheckCircle2, RefreshCw, AlertTriangle, ArrowRight, Database, ChevronDown, ChevronUp, LogIn, Server } from "lucide-react";
+import { Cloud, Upload, Download, Loader2, FileJson, CheckCircle2, RefreshCw, AlertTriangle, ArrowRight, Database, ChevronDown, ChevronUp, LogIn } from "lucide-react";
 import { Button } from "./ui/Button";
 import { useToast } from "./toast-provider";
 import { uploadToDrive, listBackups, downloadFile } from "../lib/drive";
 import { exportData, importData, getBackupStats, getCurrentStats } from "../lib/backup";
 import { Modal } from "./ui/Modal";
 import { cn } from "../lib/utils";
-import { setBackupEnabled, getBackupConfig, getLastBackupDate } from "../lib/serverBackup";
+// Server backup disabled - daily backup now happens on first app open
+// import { setBackupEnabled, getBackupConfig, getLastBackupDate } from "../lib/serverBackup";
 import {
     exchangeCodeForTokens,
     refreshAccessToken,
@@ -216,10 +217,11 @@ export function GoogleDriveBackup() {
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [isPersistentConnection, setIsPersistentConnection] = useState(hasRefreshToken());
 
-    // Server Backup State
-    const [isServerBackupEnabled, setIsServerBackupEnabled] = useState(false);
-    const [lastServerBackup, setLastServerBackup] = useState<Date | null>(null);
-    const [isLoadingServerConfig, setIsLoadingServerConfig] = useState(true);
+    // Server Backup State - DISABLED (7 AM scheduled backup not working)
+    // Daily backup now happens automatically on first app open
+    // const [isServerBackupEnabled, setIsServerBackupEnabled] = useState(false);
+    // const [lastServerBackup, setLastServerBackup] = useState<Date | null>(null);
+    // const [isLoadingServerConfig, setIsLoadingServerConfig] = useState(true);
 
     // Progress State
     const [progress, setProgress] = useState(0);
@@ -241,7 +243,8 @@ export function GoogleDriveBackup() {
         fileData: null
     });
 
-    // Load server backup config
+    // Load server backup config - DISABLED
+    /* 
     useEffect(() => {
         const loadServerConfig = async () => {
             setIsLoadingServerConfig(true);
@@ -269,8 +272,11 @@ export function GoogleDriveBackup() {
             setIsLoadingServerConfig(false);
         }
     }, []);
+    */
 
 
+    // toggleServerBackup - DISABLED (7 AM scheduled backup not working)
+    /*
     const toggleServerBackup = async () => {
         const newState = !isServerBackupEnabled;
         setIsServerBackupEnabled(newState);
@@ -289,6 +295,7 @@ export function GoogleDriveBackup() {
             toast("Failed to update server backup setting", "error");
         }
     };
+    */
 
 
 
@@ -706,7 +713,8 @@ export function GoogleDriveBackup() {
                     </div>
                 )}
 
-                {/* Server Scheduled Backup Toggle - Only show if persistent connection */}
+                {/* Server Scheduled Backup Toggle - DISABLED as per user request (not working)
+                   Daily backup now happens automatically when user opens the app for the first time each day
                 {isPersistentConnection && (
                     <div
                         onClick={isLoadingServerConfig ? undefined : toggleServerBackup}
@@ -756,6 +764,7 @@ export function GoogleDriveBackup() {
                         )}
                     </div>
                 )}
+                */}
 
 
 

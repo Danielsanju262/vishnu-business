@@ -63,7 +63,12 @@ const WIDGET_POSITION_KEY = 'ai_widget_position_v3'; // Bumped version for new l
 
 function getWidgetVisibility(): boolean {
     const stored = localStorage.getItem(WIDGET_VISIBLE_KEY);
-    return stored !== 'false'; // Default to visible
+    // Only default to visible if the key has NEVER been set (first time user)
+    // Once explicitly set to 'false', it should stay off until user turns it on in Settings
+    if (stored === null) {
+        return true; // First time user - show the widget
+    }
+    return stored === 'true'; // Respect the explicit preference
 }
 
 function setWidgetVisibility(visible: boolean): void {
