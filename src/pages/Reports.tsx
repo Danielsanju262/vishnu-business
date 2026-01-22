@@ -255,10 +255,6 @@ export default function Reports() {
             return;
         }
 
-        const today = new Date();
-        const dateStr = today.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-        const timeStr = today.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
-
         let updatedReminder = false;
         let updatedPayable = false;
 
@@ -276,14 +272,23 @@ export default function Reports() {
             if (pendingReminder && pendingReminder.amount > 0) {
                 const newAmount = Math.max(0, pendingReminder.amount - creditAmount);
 
-                // Update the note: find the last "Balance: ₹X" and update it to new balance
-                // This keeps the original log entry but updates the balance figure
+                // Update the note: find the LAST "Credit Sale: ₹X. Balance: ₹Y" and update BOTH values
+                // When deleting, set credit to 0 and update the running balance
                 let newNote = pendingReminder.note || '';
 
-                // Replace the last balance figure in the note with the new balance
-                const balancePattern = /Balance: ₹[\d,]+(?:\.\d+)?(?![\s\S]*Balance: ₹)/;
-                if (balancePattern.test(newNote)) {
-                    newNote = newNote.replace(balancePattern, `Balance: ₹${newAmount.toLocaleString()}`);
+                // Pattern to find the last "Credit Sale: ₹X. Balance: ₹Y" entry
+                const creditSalePattern = /Credit Sale: ₹[\d,]+(?:\.\d+)?\.?\s*Balance: ₹[\d,]+(?:\.\d+)?(?![\s\S]*Credit Sale:)/;
+
+                if (creditSalePattern.test(newNote)) {
+                    // Set credit to 0 (deleted) and update balance
+                    newNote = newNote.replace(creditSalePattern,
+                        `Credit Sale: ₹0. Balance: ₹${newAmount.toLocaleString()}`);
+                } else {
+                    // Fallback: just update balance
+                    const balancePattern = /Balance: ₹[\d,]+(?:\.\d+)?(?![\s\S]*Balance: ₹)/;
+                    if (balancePattern.test(newNote)) {
+                        newNote = newNote.replace(balancePattern, `Balance: ₹${newAmount.toLocaleString()}`);
+                    }
                 }
 
                 if (newAmount <= 0) {
@@ -449,17 +454,25 @@ export default function Reports() {
             if (pendingReminder) {
                 const newReminderAmount = Math.max(0, pendingReminder.amount + creditDiff);
 
-                // Update the note: find the last "Balance: ₹X" and update it to new balance
-                // This keeps the original log entry but updates the balance figure
+                // Update the note: find the LAST "Credit Sale: ₹X. Balance: ₹Y" and update BOTH values
+                // This keeps the original log entry format but updates both the credit amount and balance
                 let newNote = pendingReminder.note || "";
 
-                // Replace the last balance figure in the note with the new balance
-                // Pattern: "Balance: ₹X" where X is any number with optional commas
-                const balancePattern = /Balance: ₹[\d,]+(?:\.\d+)?(?![\s\S]*Balance: ₹)/;
-                if (balancePattern.test(newNote)) {
-                    newNote = newNote.replace(balancePattern, `Balance: ₹${newReminderAmount.toLocaleString()}`);
+                // Pattern to find the last "Credit Sale: ₹X. Balance: ₹Y" entry
+                // Uses negative lookahead to ensure we get the LAST occurrence
+                const creditSalePattern = /Credit Sale: ₹[\d,]+(?:\.\d+)?\.?\s*Balance: ₹[\d,]+(?:\.\d+)?(?![\s\S]*Credit Sale:)/;
+
+                if (creditSalePattern.test(newNote)) {
+                    // Update both the credit amount and the balance
+                    newNote = newNote.replace(creditSalePattern,
+                        `Credit Sale: ₹${newCredit.toLocaleString()}. Balance: ₹${newReminderAmount.toLocaleString()}`);
+                } else {
+                    // Fallback: try to just update the balance if pattern doesn't match
+                    const balancePattern = /Balance: ₹[\d,]+(?:\.\d+)?(?![\s\S]*Balance: ₹)/;
+                    if (balancePattern.test(newNote)) {
+                        newNote = newNote.replace(balancePattern, `Balance: ₹${newReminderAmount.toLocaleString()}`);
+                    }
                 }
-                // If no balance pattern found (old format), don't modify note - just update amount
 
                 const status = newReminderAmount <= 0 ? 'paid' : 'pending';
                 const { error: reminderError } = await supabase.from('payment_reminders').update({
@@ -593,9 +606,6 @@ export default function Reports() {
 
         if (success) {
             toast(`Deleted ${totalCount} items`, "success");
-            const today = new Date();
-            const dateStr = today.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-            const timeStr = today.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
 
             // Update Customer Credits
             for (const custId of Object.keys(customerCredits_map)) {
