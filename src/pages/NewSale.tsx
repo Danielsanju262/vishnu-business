@@ -582,24 +582,71 @@ export default function NewSale() {
             }
         }
 
-        // 1. Save Transaction (ALWAYS full value)
-        const transactions = cart.map(item => ({
-            customer_id: selectedCust.id,
-            product_id: item.product.id,
-            quantity: item.quantity,
-            sell_price: item.sellPrice,
-            buy_price: item.buyPrice,
-            date: date
-        }));
+        // 1. Calculate Totals & Distributed Amounts
+        const totalSaleValue = cart.reduce((acc, item) => acc + (item.quantity * item.sellPrice), 0);
 
+        // Calculate total credit amount (if any)
+        let totalCredit = 0;
+        if (addToOutstanding && totalSaleValue > 0) {
+            const paid = parseFloat(paidNowAmount) || 0;
+            totalCredit = Math.max(0, totalSaleValue - paid);
+        }
+
+        // Calculate total linked payable amount (if any)
+        let totalLinkedPayable = 0;
+        if (isLinkedPayable && payableAmount) {
+            totalLinkedPayable = parseFloat(payableAmount) || 0;
+        }
+
+        // 2. Prepare Transactions with Tracking Fields
+        const transactions = cart.map(item => {
+            const itemTotal = item.quantity * item.sellPrice;
+            const ratio = totalSaleValue > 0 ? (itemTotal / totalSaleValue) : 0;
+
+            return {
+                customer_id: selectedCust.id,
+                product_id: item.product.id,
+                quantity: item.quantity,
+                sell_price: item.sellPrice,
+                buy_price: item.buyPrice,
+                date: date,
+                // Tracking Fields (for delete/edit sync)
+                credit_amount: totalCredit * ratio,
+                linked_supplier_id: (isLinkedPayable && payableSelectedSupplierId) ? payableSelectedSupplierId : null,
+                linked_supplier_amount: totalLinkedPayable * ratio
+            };
+        });
+
+        // Try insert with tracking fields, fallback to basic insert if columns don't exist
+        let insertError = null;
         const { error } = await supabase.from("transactions").insert(transactions);
 
         if (error) {
+            // If error is about missing columns, try without tracking fields
+            if (error.message?.includes('column') || error.code === '42703') {
+                console.warn("Tracking columns not found, inserting without them:", error.message);
+                const basicTransactions = cart.map(item => ({
+                    customer_id: selectedCust.id,
+                    product_id: item.product.id,
+                    quantity: item.quantity,
+                    sell_price: item.sellPrice,
+                    buy_price: item.buyPrice,
+                    date: date
+                }));
+                const { error: fallbackError } = await supabase.from("transactions").insert(basicTransactions);
+                insertError = fallbackError;
+            } else {
+                insertError = error;
+            }
+        }
+
+        if (insertError) {
+            console.error("Failed to save sale:", insertError);
             toast("Failed to save sale", "error");
             return;
         }
 
-        // 1.5 Handle Linked Payable
+        // 3. Handle Linked Payable (Create Record)
         if (isLinkedPayable && payableSelectedSupplierId && payableAmount) {
             // Check for existing pending payable
             const { data: existingPayable } = await supabase

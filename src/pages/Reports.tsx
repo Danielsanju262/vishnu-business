@@ -209,21 +209,147 @@ export default function Reports() {
     useRealtimeTables(['transactions', 'expenses'], fetchData, [rangeType, startDate, endDate]);
 
     const deleteTransaction = async (id: string, customerName?: string, productName?: string) => {
-        const itemToDelete = data.transactions.find((t: any) => t.id === id);
-        if (!itemToDelete) return;
+        // 1. Fetch fresh transaction details from DB
+        let itemToDelete: any;
+        const { data: dbItem, error: fetchError } = await supabase
+            .from('transactions')
+            .select('*, customers(name), products(name)')
+            .eq('id', id)
+            .maybeSingle();
+
+        if (fetchError || !dbItem) {
+            console.warn("Fetch failed, falling back to local state", fetchError);
+            // Fallback to local state so delete is not blocked
+            itemToDelete = data.transactions.find((t: any) => t.id === id);
+
+            if (!itemToDelete) {
+                toast("Transaction not found. Please refresh.", "error");
+                return;
+            }
+        } else {
+            itemToDelete = dbItem;
+        }
 
         const name = itemToDelete.products?.name || productName || "Transaction";
         const customer = itemToDelete.customers?.name || customerName || "Customer";
-        if (!await confirm(`Delete sale of "${name}" to ${customer}?`)) return;
+        const customerId = itemToDelete.customer_id;
 
+        // Use new tracking fields
+        const creditAmount = itemToDelete.credit_amount ?? 0;
+        const linkedSupplierId = itemToDelete.linked_supplier_id;
+        const linkedSupplierAmount = itemToDelete.linked_supplier_amount ?? 0;
+
+        // Build confirmation message based on what will happen
+        let confirmMsg = `Delete sale of "${name}" to ${customer}?`;
+        if (creditAmount > 0) confirmMsg += `\n\nCredit amount (₹${creditAmount}) will be removed from customer balance.`;
+        if (linkedSupplierId && linkedSupplierAmount > 0) confirmMsg += `\n\nLinked supplier payment (₹${linkedSupplierAmount}) will be removed from accounts payable.`;
+
+        // Single confirmation - auto-updates linked records
+        if (!await confirm(confirmMsg)) return;
+
+        // Soft delete the transaction
         const { error } = await supabase.from('transactions').update({ deleted_at: new Date().toISOString() }).eq('id', id);
 
-        if (!error) {
-            toast("Transaction deleted", "success");
-            fetchData();
-        } else {
+        if (error) {
             toast("Failed to delete", "error");
+            return;
         }
+
+        const today = new Date();
+        const dateStr = today.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+        const timeStr = today.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+
+        let updatedReminder = false;
+        let updatedPayable = false;
+
+        // AUTO-UPDATE: Payment Reminder (Only if credit was tracked)
+        if (customerId && creditAmount > 0) {
+            const { data: pendingReminder } = await supabase
+                .from('payment_reminders')
+                .select('*')
+                .eq('customer_id', customerId)
+                .eq('status', 'pending')
+                .order('due_date', { ascending: true })
+                .limit(1)
+                .maybeSingle();
+
+            if (pendingReminder && pendingReminder.amount > 0) {
+                const newAmount = Math.max(0, pendingReminder.amount - creditAmount);
+
+                // Update the note: find the last "Balance: ₹X" and update it to new balance
+                // This keeps the original log entry but updates the balance figure
+                let newNote = pendingReminder.note || '';
+
+                // Replace the last balance figure in the note with the new balance
+                const balancePattern = /Balance: ₹[\d,]+(?:\.\d+)?(?![\s\S]*Balance: ₹)/;
+                if (balancePattern.test(newNote)) {
+                    newNote = newNote.replace(balancePattern, `Balance: ₹${newAmount.toLocaleString()}`);
+                }
+
+                if (newAmount <= 0) {
+                    await supabase
+                        .from('payment_reminders')
+                        .update({ amount: 0, status: 'paid', note: newNote.trim() })
+                        .eq('id', pendingReminder.id);
+                } else {
+                    await supabase
+                        .from('payment_reminders')
+                        .update({ amount: newAmount, note: newNote.trim() })
+                        .eq('id', pendingReminder.id);
+                }
+                updatedReminder = true;
+            }
+        }
+
+        // AUTO-UPDATE: Accounts Payable (Only if linked payment tracked)
+        if (linkedSupplierId && linkedSupplierAmount > 0) {
+            const { data: pendingPayables } = await supabase
+                .from('accounts_payable')
+                .select('*, suppliers(name)')
+                .eq('supplier_id', linkedSupplierId) // Strictly match supplier
+                .eq('status', 'pending')
+                .order('due_date', { ascending: true });
+
+            if (pendingPayables && pendingPayables.length > 0) {
+                // Find matching payable or use first one
+                const targetPayable = pendingPayables[0];
+
+                const newAmount = Math.max(0, targetPayable.amount - linkedSupplierAmount);
+
+                // Update the note: find the last "Balance: ₹X" and update it to new balance
+                let newNote = targetPayable.note || '';
+                const balancePattern = /Balance: ₹[\d,]+(?:\.\d+)?(?![\s\S]*Balance: ₹)/;
+                if (balancePattern.test(newNote)) {
+                    newNote = newNote.replace(balancePattern, `Balance: ₹${newAmount.toLocaleString()}`);
+                }
+
+                if (newAmount <= 0) {
+                    await supabase
+                        .from('accounts_payable')
+                        .update({ amount: 0, status: 'paid', note: newNote.trim() })
+                        .eq('id', targetPayable.id);
+                } else {
+                    await supabase
+                        .from('accounts_payable')
+                        .update({ amount: newAmount, note: newNote.trim() })
+                        .eq('id', targetPayable.id);
+                }
+                updatedPayable = true;
+            }
+        }
+
+        // Show single success message
+        let message = 'Sale deleted';
+        if (updatedReminder && updatedPayable) {
+            message += ' & adjusted balances';
+        } else if (updatedReminder) {
+            message += ' & adjusted customer balance';
+        } else if (updatedPayable) {
+            message += ' & adjusted supplier payable';
+        }
+        toast(message, 'success');
+
+        fetchData();
     };
 
     const deleteExpense = async (id: string) => {
@@ -252,18 +378,105 @@ export default function Reports() {
 
     const saveEdit = async () => {
         if (!editingId) return;
+
+        // 1. Calculate difference
+        const originalTx = data.transactions.find((t: any) => t.id === editingId);
+        if (!originalTx) return;
+
+        const oldQty = originalTx.quantity;
+        const oldPrice = originalTx.sell_price;
+        const oldTotal = oldQty * oldPrice;
+
+        // Use tracking field for accurate credit calculation (fallback to 0 if column doesn't exist)
+        const oldCredit = originalTx.credit_amount ?? 0;
+
+        // Calculate how much was "Paid" originally (Paid = Total - Credit)
+        const originalPaid = Math.max(0, oldTotal - oldCredit);
+
+        const newQty = parseFloat(editQty);
+        const newPrice = parseFloat(editPrice);
+        const newTotal = newQty * newPrice;
+
+        const newCredit = Math.max(0, newTotal - originalPaid);
+        const creditDiff = newCredit - oldCredit;
+
+        // Try update with credit_amount, fallback to basic update if column doesn't exist
+        let updateError = null;
         const { error } = await supabase.from('transactions').update({
-            quantity: parseFloat(editQty),
-            sell_price: parseFloat(editPrice),
+            quantity: newQty,
+            sell_price: newPrice,
             buy_price: parseFloat(editBuyPrice) || 0,
-            date: editDate
+            date: editDate,
+            credit_amount: newCredit
         }).eq('id', editingId);
 
-        if (!error) {
-            toast("Updated successfully", "success");
-            setEditingId(null);
-            fetchData();
+        if (error) {
+            // If error is about missing column, try without credit_amount
+            if (error.message?.includes('column') || error.code === '42703') {
+                console.warn("credit_amount column not found, updating without it:", error.message);
+                const { error: fallbackError } = await supabase.from('transactions').update({
+                    quantity: newQty,
+                    sell_price: newPrice,
+                    buy_price: parseFloat(editBuyPrice) || 0,
+                    date: editDate
+                }).eq('id', editingId);
+                updateError = fallbackError;
+            } else {
+                updateError = error;
+            }
         }
+
+        if (updateError) {
+            console.error("Failed to update transaction:", updateError);
+            toast("Failed to save changes", "error");
+            return;
+        }
+
+        toast("Updated successfully", "success");
+        setEditingId(null);
+
+        // 2. Update Payment Reminder if credit amount changed
+        if (Math.abs(creditDiff) > 0.01 && originalTx.customer_id) {
+            const { data: pendingReminder } = await supabase
+                .from('payment_reminders')
+                .select('*')
+                .eq('customer_id', originalTx.customer_id)
+                .eq('status', 'pending')
+                .order('due_date', { ascending: true })
+                .limit(1)
+                .maybeSingle();
+
+            if (pendingReminder) {
+                const newReminderAmount = Math.max(0, pendingReminder.amount + creditDiff);
+
+                // Update the note: find the last "Balance: ₹X" and update it to new balance
+                // This keeps the original log entry but updates the balance figure
+                let newNote = pendingReminder.note || "";
+
+                // Replace the last balance figure in the note with the new balance
+                // Pattern: "Balance: ₹X" where X is any number with optional commas
+                const balancePattern = /Balance: ₹[\d,]+(?:\.\d+)?(?![\s\S]*Balance: ₹)/;
+                if (balancePattern.test(newNote)) {
+                    newNote = newNote.replace(balancePattern, `Balance: ₹${newReminderAmount.toLocaleString()}`);
+                }
+                // If no balance pattern found (old format), don't modify note - just update amount
+
+                const status = newReminderAmount <= 0 ? 'paid' : 'pending';
+                const { error: reminderError } = await supabase.from('payment_reminders').update({
+                    amount: newReminderAmount,
+                    status: status,
+                    note: newNote
+                }).eq('id', pendingReminder.id);
+
+                if (!reminderError) {
+                    toast("Customer balance updated", "success");
+                } else {
+                    console.error("Failed to update reminder:", reminderError);
+                }
+            }
+        }
+
+        fetchData();
     };
 
     const startEditExpense = (e: any) => {
@@ -335,7 +548,40 @@ export default function Reports() {
 
         let success = true;
 
+        // Group amounts by Customer (Credit) and Supplier (Linked Payable)
+        const customerCredits_map: Record<string, { name: string, amount: number }> = {};
+        const supplierPayables_map: Record<string, { supplierId: string, amount: number }> = {};
+
         if (selectedTransactionIds.size > 0) {
+            const transactionsToDelete = data.transactions.filter((t: any) => selectedTransactionIds.has(t.id));
+
+            transactionsToDelete.forEach((t: any) => {
+                // 1. Aggregate Credit Amounts
+                const credit = t.credit_amount ?? 0;
+                if (t.customer_id && credit > 0) {
+                    if (!customerCredits_map[t.customer_id]) {
+                        customerCredits_map[t.customer_id] = {
+                            name: t.customers?.name || 'Unknown',
+                            amount: 0
+                        };
+                    }
+                    customerCredits_map[t.customer_id].amount += credit;
+                }
+
+                // 2. Aggregate Linked Supplier Payables
+                const linkedId = t.linked_supplier_id;
+                const linkedAmount = t.linked_supplier_amount ?? 0;
+                if (linkedId && linkedAmount > 0) {
+                    if (!supplierPayables_map[linkedId]) {
+                        supplierPayables_map[linkedId] = {
+                            supplierId: linkedId,
+                            amount: 0
+                        };
+                    }
+                    supplierPayables_map[linkedId].amount += linkedAmount;
+                }
+            });
+
             const { error } = await supabase.from('transactions').update({ deleted_at: new Date().toISOString() }).in('id', Array.from(selectedTransactionIds));
             if (error) success = false;
         }
@@ -347,6 +593,75 @@ export default function Reports() {
 
         if (success) {
             toast(`Deleted ${totalCount} items`, "success");
+            const today = new Date();
+            const dateStr = today.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+            const timeStr = today.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+
+            // Update Customer Credits
+            for (const custId of Object.keys(customerCredits_map)) {
+                const { amount: creditToRemove } = customerCredits_map[custId];
+                if (creditToRemove <= 0) continue;
+
+                const { data: pendingReminder } = await supabase
+                    .from('payment_reminders')
+                    .select('*')
+                    .eq('customer_id', custId)
+                    .eq('status', 'pending')
+                    .limit(1)
+                    .maybeSingle();
+
+                if (pendingReminder) {
+                    const newAmount = Math.max(0, pendingReminder.amount - creditToRemove);
+
+                    // Update the note: find the last "Balance: ₹X" and update it
+                    let newNote = pendingReminder.note || "";
+                    const balancePattern = /Balance: ₹[\d,]+(?:\.\d+)?(?![\s\S]*Balance: ₹)/;
+                    if (balancePattern.test(newNote)) {
+                        newNote = newNote.replace(balancePattern, `Balance: ₹${newAmount.toLocaleString()}`);
+                    }
+
+                    await supabase.from('payment_reminders').update({
+                        amount: newAmount,
+                        status: newAmount <= 0 ? 'paid' : 'pending',
+                        note: newNote
+                    }).eq('id', pendingReminder.id);
+                }
+            }
+            if (Object.keys(customerCredits_map).length > 0) toast("Updated customer balances", "success");
+
+
+            // Update Supplier Payables
+            for (const suppId of Object.keys(supplierPayables_map)) {
+                const { amount: payableToRemove } = supplierPayables_map[suppId];
+                if (payableToRemove <= 0) continue;
+
+                const { data: pendingPayable } = await supabase
+                    .from('accounts_payable')
+                    .select('*')
+                    .eq('supplier_id', suppId)
+                    .eq('status', 'pending')
+                    .limit(1)
+                    .maybeSingle();
+
+                if (pendingPayable) {
+                    const newAmount = Math.max(0, pendingPayable.amount - payableToRemove);
+
+                    // Update the note: find the last "Balance: ₹X" and update it
+                    let newNote = pendingPayable.note || "";
+                    const balancePattern = /Balance: ₹[\d,]+(?:\.\d+)?(?![\s\S]*Balance: ₹)/;
+                    if (balancePattern.test(newNote)) {
+                        newNote = newNote.replace(balancePattern, `Balance: ₹${newAmount.toLocaleString()}`);
+                    }
+
+                    await supabase.from('accounts_payable').update({
+                        amount: newAmount,
+                        status: newAmount <= 0 ? 'paid' : 'pending',
+                        note: newNote
+                    }).eq('id', pendingPayable.id);
+                }
+            }
+            if (Object.keys(supplierPayables_map).length > 0) toast("Updated supplier payables", "success");
+
             toggleSelectionMode();
             fetchData();
         } else {
@@ -1039,7 +1354,7 @@ export default function Reports() {
                                 )}
 
                                 {data.transactions.map((t: any) => (
-                                    <div key={t.id} className={cn("bg-card p-3 md:p-4 rounded-xl shadow-sm border border-border/60 transition-all relative group touch-manipulation select-none", isSelectionMode && selectedTransactionIds.has(t.id) && "ring-2 ring-primary bg-primary/5", activeMenuId === t.id && "z-[150]")}>
+                                    <div key={t.id} className={cn("bg-card p-3 md:p-4 rounded-xl shadow-sm border border-border/60 transition-all relative group touch-manipulation select-none overflow-visible", isSelectionMode && selectedTransactionIds.has(t.id) && "ring-2 ring-primary bg-primary/5", activeMenuId === t.id && "z-[150]")}>
                                         {/* Editing Mode Override */}
                                         {editingId === t.id ? (
                                             <div className="space-y-4 animate-in fade-in">
@@ -1142,6 +1457,8 @@ export default function Reports() {
                                                         <div className="relative">
                                                             <button
                                                                 onClick={(e) => { e.stopPropagation(); setActiveMenuId(activeMenuId === t.id ? null : t.id); }}
+                                                                onMouseDown={(e) => e.stopPropagation()}
+                                                                onTouchStart={(e) => e.stopPropagation()}
                                                                 className="p-1.5 text-muted-foreground hover:bg-accent active:bg-accent rounded-lg transition"
                                                             >
                                                                 <MoreVertical size={16} />
@@ -1150,18 +1467,24 @@ export default function Reports() {
                                                             {activeMenuId === t.id && (
                                                                 <div
                                                                     role="menu"
-                                                                    className="absolute right-0 top-full mt-1 w-36 bg-card dark:bg-zinc-900 border border-border rounded-xl shadow-2xl z-[200] overflow-hidden animate-in fade-in zoom-in-95 ring-1 ring-black/5 pointer-events-auto"
+                                                                    className="absolute right-0 top-full mt-1 w-36 bg-card dark:bg-zinc-900 border border-border rounded-xl shadow-2xl z-[200] overflow-visible animate-in fade-in zoom-in-95 ring-1 ring-black/5"
                                                                     onClick={(e) => e.stopPropagation()}
+                                                                    onMouseDown={(e) => e.stopPropagation()}
+                                                                    onTouchStart={(e) => e.stopPropagation()}
                                                                 >
                                                                     <div className="flex flex-col p-1">
                                                                         <button
                                                                             onClick={(e) => { e.stopPropagation(); setActiveMenuId(null); startEdit(t); }}
+                                                                            onMouseDown={(e) => e.stopPropagation()}
+                                                                            onTouchStart={(e) => e.stopPropagation()}
                                                                             className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-foreground hover:bg-accent active:bg-accent rounded-lg text-left"
                                                                         >
                                                                             <Edit2 size={14} /> Edit
                                                                         </button>
                                                                         <button
                                                                             onClick={(e) => { e.stopPropagation(); setActiveMenuId(null); deleteTransaction(t.id, t.customers?.name, t.products?.name); }}
+                                                                            onMouseDown={(e) => e.stopPropagation()}
+                                                                            onTouchStart={(e) => e.stopPropagation()}
                                                                             className="flex items-center gap-2 px-3 py-2.5 text-sm font-bold text-rose-500 hover:bg-rose-500/10 active:bg-rose-500/10 rounded-lg text-left"
                                                                         >
                                                                             <Trash2 size={14} /> Delete
@@ -1174,6 +1497,8 @@ export default function Reports() {
                                                                                 toggleSelectionMode();
                                                                                 toggleTransactionSelection(t.id);
                                                                             }}
+                                                                            onMouseDown={(e) => e.stopPropagation()}
+                                                                            onTouchStart={(e) => e.stopPropagation()}
                                                                             className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-foreground hover:bg-accent active:bg-accent rounded-lg text-left"
                                                                         >
                                                                             <CheckCircle2 size={14} /> Select
