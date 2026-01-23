@@ -568,7 +568,7 @@ export default function BusinessInsights() {
     return (
         <div className="min-h-screen bg-background pb-6 w-full md:max-w-2xl md:mx-auto px-3 md:px-4">
             {/* Header */}
-            <div className="fixed top-0 left-0 right-0 z-40 bg-white dark:bg-gray-900 border-b border-border shadow-sm">
+            <div id="business-insights" className="fixed top-0 left-0 right-0 z-40 bg-white dark:bg-gray-900 border-b border-border shadow-sm">
                 <div className="w-full px-3 md:px-4 py-3">
                     <div className="flex flex-col gap-3">
                         <div className="flex items-center justify-between">
@@ -717,7 +717,7 @@ export default function BusinessInsights() {
                 </div>
             </div>
 
-            <div className="h-36 md:h-40" /> {/* Spacer for fixed header */}
+            <div className="h-40 md:h-44" /> {/* Spacer for fixed header */}
 
             {error && (
                 <div className="mb-4 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-xl p-3 flex items-center gap-3 animate-in slide-in-from-top-2">
@@ -734,7 +734,7 @@ export default function BusinessInsights() {
                     <div className="h-28 bg-muted rounded-2xl" />
                 </div>
             ) : (
-                <div className="space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="pt-4 space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     {/* === SUMMARY TAB === */}
                     {activeTab === 'summary' && (
                         <div className="space-y-4">
@@ -878,14 +878,6 @@ export default function BusinessInsights() {
                                     <div className={cn("p-3 rounded-xl flex flex-col items-center justify-center text-center gap-1", summaryStats.avgDailyProfit >= 0 ? "bg-emerald-500/10" : "bg-rose-500/10")}>
                                         <span className={cn("text-xs font-semibold", summaryStats.avgDailyProfit >= 0 ? "text-emerald-500" : "text-rose-500")}>Avg Profit/Day</span>
                                         <span className={cn("text-2xl font-black", summaryStats.avgDailyProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>₹{Math.abs(summaryStats.avgDailyProfit).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-                                    </div>
-                                    <div className="p-3 bg-rose-500/10 rounded-xl flex flex-col items-center justify-center text-center gap-1">
-                                        <span className="text-xs font-semibold text-rose-500">Goods Cost</span>
-                                        <span className="text-lg font-black text-rose-600 dark:text-rose-400">₹{summaryStats.totalGoodsCost.toLocaleString()}</span>
-                                    </div>
-                                    <div className="p-3 bg-rose-500/10 rounded-xl flex flex-col items-center justify-center text-center gap-1">
-                                        <span className="text-xs font-semibold text-rose-500">Other Exp</span>
-                                        <span className="text-lg font-black text-rose-600 dark:text-rose-400">₹{summaryStats.otherExpenses.toLocaleString()}</span>
                                     </div>
                                 </div>
                             </div>

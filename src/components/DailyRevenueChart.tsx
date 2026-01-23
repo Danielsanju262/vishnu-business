@@ -13,6 +13,18 @@ interface DailyRevenueChartProps {
 
 export function DailyRevenueChart({ chartData, selectedChartDay, setSelectedChartDay, aggregation = 'day' }: DailyRevenueChartProps) {
     const [chartMetric, setChartMetric] = useState<'revenue' | 'profit' | 'margin'>('revenue');
+    const [isTransitioning, setIsTransitioning] = useState(false);
+    const prevMetricRef = useRef(chartMetric);
+
+    // Smooth transition when metric changes
+    useEffect(() => {
+        if (prevMetricRef.current !== chartMetric) {
+            setIsTransitioning(true);
+            const timer = setTimeout(() => setIsTransitioning(false), 350);
+            prevMetricRef.current = chartMetric;
+            return () => clearTimeout(timer);
+        }
+    }, [chartMetric]);
 
     const maxDataValue = Math.max(...chartData.map((d: any) => {
         if (chartMetric === 'margin') {
@@ -145,7 +157,13 @@ export function DailyRevenueChart({ chartData, selectedChartDay, setSelectedChar
 
             <div className="flex h-[180px] w-full gap-2">
                 {/* Y-Axis Labels (Fixed Left Column) */}
-                <div className="flex flex-col justify-between h-full w-[45px] flex-shrink-0 pb-[32px] text-[9px] font-bold text-muted-foreground pt-1">
+                <div
+                    className={cn(
+                        "flex flex-col justify-between h-full w-[45px] flex-shrink-0 pb-[32px] text-[9px] font-bold text-muted-foreground pt-1",
+                        "transition-opacity duration-300 ease-in-out",
+                        isTransitioning ? "opacity-40" : "opacity-100"
+                    )}
+                >
                     {chartMetric === 'margin' ? (
                         <>
                             <div className="relative h-0 w-full text-right"><span className="absolute -top-2 right-0">{Math.round(chartMax)}%</span></div>
@@ -176,7 +194,11 @@ export function DailyRevenueChart({ chartData, selectedChartDay, setSelectedChar
                     {/* Scrollable Bars */}
                     <div
                         ref={scrollContainerRef}
-                        className="absolute inset-0 overflow-x-auto no-scrollbar z-10"
+                        className={cn(
+                            "absolute inset-0 overflow-x-auto no-scrollbar z-10",
+                            "transition-opacity duration-300 ease-in-out",
+                            isTransitioning ? "opacity-60" : "opacity-100"
+                        )}
                     >
                         <div className="flex items-end gap-2 h-full pb-[32px] px-2 min-w-full w-max">
                             {chartData.map((day: any) => {

@@ -25,7 +25,7 @@ import Suppliers from "./pages/Suppliers";
 import SupplierPaymentDetail from "./pages/SupplierPaymentDetail";
 
 import ScrollToTop from "./components/ScrollToTop";
-import GlobalAIWidget from "./components/AI/GlobalAIWidget";
+import GoalBubbleWidget from "./components/Goals/GoalBubbleWidget";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import LockScreen from "./components/LockScreen";
 // Notifications disabled per user request
@@ -109,8 +109,8 @@ function AppContent() {
       <DeepLinkBackHandler />
       <ScrollToTop />
       {isLocked && <LockScreen />}
-      {/* Global AI Widget - appears on all pages */}
-      {!isLocked && <GlobalAIWidget />}
+      {/* Global Goal Widget - appears on all pages */}
+      {!isLocked && <GoalBubbleWidget />}
       <Routes>
         <Route path="/" element={<Layout />}>
           <Route index element={<Dashboard />} />

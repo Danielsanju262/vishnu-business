@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../lib/supabase";
-import { Plus, Minus, TrendingUp, Users, Package, FileText, ChevronRight, Edit3, Check, LogOut, Truck, Calendar, ChevronDown, Sparkles } from "lucide-react";
+import { Plus, Minus, TrendingUp, Users, Package, FileText, ChevronRight, Edit3, Check, LogOut, Truck, Calendar, ChevronDown } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 import { Link } from "react-router-dom";
@@ -8,6 +8,8 @@ import { cn } from "../lib/utils";
 import { useRealtimeTables } from "../hooks/useRealtimeSync";
 import { Modal } from "../components/ui/Modal";
 import { useHistorySyncedState } from "../hooks/useHistorySyncedState";
+import { DailyRevenueLineGraph } from "../components/DailyRevenueLineGraph";
+import { eachDayOfInterval } from "date-fns";
 
 
 export default function Dashboard() {
@@ -22,6 +24,12 @@ export default function Dashboard() {
     const [isLoadingStats, setIsLoadingStats] = useState(true);
     const [statsError, setStatsError] = useState<string | null>(null);
 
+
+    // Chart State
+    const [selectedChartDay, setSelectedChartDay] = useState<string | null>(null);
+    const [chartData, setChartData] = useState<any[]>([]);
+    const chartRef = useRef<HTMLDivElement>(null);
+
     // Date Filter State
     const [dateFilter, setDateFilter] = useState("thisMonth"); // 'today', 'yesterday', 'thisWeek', 'thisMonth', 'custom'
     const [customDateRange, setCustomDateRange] = useState({
@@ -29,11 +37,13 @@ export default function Dashboard() {
         end: format(new Date(), 'yyyy-MM-dd')
     });
 
+
+
+
     // Modal states - synced with browser history for proper back navigation
     const [showFilterDropdown, setShowFilterDropdown] = useHistorySyncedState(false, 'dashboardFilter');
     const [showCustomDateModal, setShowCustomDateModal] = useHistorySyncedState(false, 'dashboardCustomDate');
     const [isEditingName, setIsEditingName] = useHistorySyncedState(false, 'dashboardEditName');
-
 
     const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -50,6 +60,8 @@ export default function Dashboard() {
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
+
+
 
     const calculateProfit = (transactions: any[], expenses: any[]) => {
         let revenue = 0;
@@ -107,17 +119,38 @@ export default function Dashboard() {
         }
     }, [dateFilter, customDateRange]);
 
-    const fetchStats = useCallback(async () => {
+    // Trigger loading on date filter change
+    useEffect(() => {
+        setIsLoadingStats(true);
+    }, [dateFilter, customDateRange]);
+
+
+
+    // Generate Chart Data based on current filter/data
+    // Note: We need the raw transactions/expenses for the graph. 
+    // Ideally fetchStats should store them or we fetch them separately.
+    // Let's modify fetchStats to set chart data as well.
+    // Or better, a separate effect or part of fetchStats for clarity.
+    // Re-implementing fetchStats to include chart data generation is best.
+
+    // Updated fetchStats with chart data logic
+    const fetchStatsAndChart = useCallback(async () => {
         try {
-            setIsLoadingStats(true);
             setStatsError(null);
 
             const { start, end } = getDateRange();
 
-            let tQuery = supabase.from('transactions').select('*').is('deleted_at', null);
-            let eQuery = supabase.from('expenses').select('*').is('deleted_at', null);
+            // Adjust start date for chart context if needed? 
+            // The user said "whichever date is filtered... the line chart will use the same thing".
+            // So detailed graph strictly follows the filter range.
+
+            let tQuery = supabase.from('transactions').select('date, quantity, sell_price, buy_price').is('deleted_at', null);
+            let eQuery = supabase.from('expenses').select('date, amount, is_ghee_ingredient').is('deleted_at', null);
 
             if (start === end) {
+                // For single day, we might want to show previous days for context?
+                // But user said "same thing". A line graph of 1 point is a dot.
+                // Let's stick to strict filter. 
                 tQuery = tQuery.eq('date', start);
                 eQuery = eQuery.eq('date', start);
             } else {
@@ -125,29 +158,71 @@ export default function Dashboard() {
                 eQuery = eQuery.gte('date', start).lte('date', end);
             }
 
-            const { data: transactions, error: tError } = await tQuery;
-            const { data: expenses, error: eError } = await eQuery;
+            const [tRes, eRes] = await Promise.all([tQuery, eQuery]);
 
-            if (tError || eError) {
-                throw new Error('Failed to fetch data');
-            }
+            if (tRes.error) throw tRes.error;
+            if (eRes.error) throw eRes.error;
 
-            const { revenue, netProfit } = calculateProfit(transactions || [], expenses || []);
+            const transactions = tRes.data || [];
+            const expenses = eRes.data || [];
 
-            setStats({
-                revenue,
-                profit: netProfit,
+            // Calculate Totals
+            const { revenue, netProfit } = calculateProfit(transactions, expenses);
+            setStats({ revenue, profit: netProfit });
+
+            // Generate Chart Data Points - Always daily
+            const days = eachDayOfInterval({ start: new Date(start), end: new Date(end) });
+
+            // Pre-process sales for performance
+            const salesByDay: Record<string, { revenue: number; cost: number }> = {};
+            transactions.forEach((t: any) => {
+                const d = t.date;
+                if (!salesByDay[d]) salesByDay[d] = { revenue: 0, cost: 0 };
+                salesByDay[d].revenue += (t.quantity * t.sell_price);
+                salesByDay[d].cost += (t.quantity * t.buy_price);
             });
+            expenses.filter((e: any) => e.is_ghee_ingredient).forEach((e: any) => {
+                const d = e.date;
+                if (salesByDay[d]) salesByDay[d].cost += e.amount;
+            });
+
+            const expensesByDay: Record<string, number> = {};
+            expenses.filter((e: any) => !e.is_ghee_ingredient).forEach((e: any) => {
+                const d = e.date;
+                expensesByDay[d] = (expensesByDay[d] || 0) + e.amount;
+            });
+
+
+            const generatedChartData = days.map(day => {
+                const dateStr = format(day, 'yyyy-MM-dd');
+                const daySales = salesByDay[dateStr];
+                const dayOpEx = expensesByDay[dateStr] || 0;
+
+                const dayRevenue = daySales ? daySales.revenue : 0;
+                const dayCOGS = daySales ? daySales.cost : 0;
+                const dayGross = dayRevenue - dayCOGS;
+                const dayNet = dayGross - dayOpEx;
+
+                return {
+                    date: dateStr,
+                    label: format(day, 'd MMM'),
+                    revenue: dayRevenue,
+                    profit: dayNet
+                };
+            });
+
+            setChartData(generatedChartData);
+
         } catch (error) {
             console.error('Failed to fetch stats:', error);
-            setStatsError('Failed to load statistics. Please try again.');
+            setStatsError('Failed to load statistics.');
         } finally {
             setIsLoadingStats(false);
         }
     }, [getDateRange]);
 
     // Real-time sync for transactions and expenses
-    useRealtimeTables(['transactions', 'expenses'], fetchStats, [fetchStats]);
+    useRealtimeTables(['transactions', 'expenses'], fetchStatsAndChart, [fetchStatsAndChart]);
 
     // Grayscale palette for dark mode icons
     const menuItems = [
@@ -241,29 +316,7 @@ export default function Dashboard() {
 
             </div>
 
-            {/* Daily Brief Card */}
-            <Link
-                to="/brief"
-                className="relative overflow-hidden block mb-2 p-5 bg-gradient-to-r from-violet-600 to-indigo-600 rounded-2xl shadow-lg shadow-indigo-900/20 group active:scale-[0.98] transition-transform"
-            >
-                <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
-                <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-white/10 rounded-full blur-2xl" />
 
-                <div className="flex items-center justify-between relative z-10">
-                    <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-sm border border-white/20">
-                            <Sparkles className="text-white" size={24} strokeWidth={2} />
-                        </div>
-                        <div>
-                            <h3 className="text-white font-bold text-lg tracking-tight">Daily Brief</h3>
-                            <p className="text-indigo-100 text-xs font-medium opacity-90">Overview of tasks, payments & goals</p>
-                        </div>
-                    </div>
-                    <div className="bg-white/20 p-2 rounded-full backdrop-blur-sm group-hover:bg-white/30 transition-colors">
-                        <ChevronRight className="text-white" size={20} strokeWidth={2.5} />
-                    </div>
-                </div>
-            </Link>
 
 
             {/* Date Filter and Stats Card - Grouped with tighter spacing */}
@@ -354,7 +407,7 @@ export default function Dashboard() {
                             <div className="space-y-4 text-center py-4">
                                 <div className="text-rose-400 text-sm font-medium">{statsError}</div>
                                 <button
-                                    onClick={fetchStats}
+                                    onClick={fetchStatsAndChart}
                                     className="px-4 py-2 bg-white/10 hover:bg-white/15 active:bg-white/20 active:scale-[0.98] text-white text-sm font-semibold rounded-lg transition-all duration-200"
                                 >
                                     Retry
@@ -395,11 +448,30 @@ export default function Dashboard() {
                                 <Link
                                     to="/reports"
                                     state={{ defaultFilter: 'month' }}
-                                    className="group flex items-center justify-center w-full py-4 md:py-3.5 bg-white/10 hover:bg-white/15 active:bg-white/20 active:scale-[0.98] backdrop-blur-sm border border-white/10 hover:border-white/20 text-white rounded-xl text-xs font-semibold tracking-wide transition-all duration-200 focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                                    className="group flex items-center justify-center gap-2 w-full py-2.5 bg-white/5 hover:bg-white/10 active:bg-white/15 active:scale-[0.98] backdrop-blur-sm border border-white/5 hover:border-white/10 text-white/70 hover:text-white rounded-lg text-xs font-medium tracking-wide transition-all duration-200 focus-visible:ring-2 focus-visible:ring-white/20 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                                 >
                                     View Detailed Report
-                                    <ChevronRight className="ml-1.5 opacity-60 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all duration-200" size={14} strokeWidth={2.5} />
+                                    <ChevronRight className="opacity-50 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all duration-200" size={14} strokeWidth={2.5} />
                                 </Link>
+
+                                {/* Line Graph Section */}
+                                <div className="pt-2 border-t border-white/10" ref={chartRef}>
+                                    <DailyRevenueLineGraph
+                                        chartData={chartData}
+                                        selectedChartDay={selectedChartDay}
+                                        setSelectedChartDay={setSelectedChartDay}
+                                    />
+
+                                    {/* View Insights Button */}
+                                    <Link
+                                        to="/insights/business"
+                                        className="group flex items-center justify-center gap-2 w-full mt-4 py-2.5 bg-white/5 hover:bg-white/10 active:bg-white/15 active:scale-[0.98] backdrop-blur-sm border border-white/5 hover:border-white/10 text-white/70 hover:text-white rounded-lg text-xs font-medium tracking-wide transition-all duration-200 focus-visible:ring-2 focus-visible:ring-white/20 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        View Insights
+                                        <ChevronRight className="opacity-50 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all duration-200" size={14} strokeWidth={2.5} />
+                                    </Link>
+                                </div>
                             </>
                         )}
                     </div>

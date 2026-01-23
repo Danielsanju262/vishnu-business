@@ -739,6 +739,12 @@ export default function CustomerPaymentDetail() {
     const handleEditTransaction = async (viewIndex: number, newAmount: number) => {
         if (reminders.length === 0 || isNaN(newAmount)) return;
 
+        // If new amount is 0, treat as delete instead of edit
+        if (newAmount <= 0) {
+            await performSingleDelete(viewIndex);
+            return;
+        }
+
         // 1. Parse all transactions from ALL reminders
         const allParsed: { reminderId: string; lineIndex: number; data: TransactionLog }[] = [];
         const currentYear = new Date().getFullYear();

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { format } from "date-fns";
 import {
     Lightbulb,
@@ -194,6 +194,31 @@ export default function Insights() {
                 </div>
             ) : (
                 <div className="p-4 space-y-4">
+                    {/* Section B: Business Insights - Clickable Card */}
+                    {/* Daily Brief Card - Moved from Dashboard */}
+                    <Link
+                        to="/brief"
+                        className="relative overflow-hidden block p-4 bg-gradient-to-r from-violet-600 to-indigo-600 rounded-2xl shadow-lg shadow-indigo-900/20 group active:scale-[0.98] transition-transform border border-indigo-500/20"
+                    >
+                        <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-white/10 rounded-full blur-2xl" />
+
+                        <div className="flex items-center justify-between relative z-10">
+                            <div className="flex items-center gap-3">
+                                <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-sm border border-white/20">
+                                    <Sparkles className="text-white" size={24} strokeWidth={2} />
+                                </div>
+                                <div>
+                                    <h3 className="text-white font-bold text-lg tracking-tight">Daily Brief</h3>
+                                    <p className="text-indigo-100 text-xs font-medium opacity-90">Overview of tasks, payments & goals</p>
+                                </div>
+                            </div>
+                            <div className="bg-white/20 p-2 rounded-full backdrop-blur-sm group-hover:bg-white/30 transition-colors">
+                                <ChevronRight className="text-white" size={20} strokeWidth={2.5} />
+                            </div>
+                        </div>
+                    </Link>
+
                     {/* Section B: Business Insights - Clickable Card */}
                     <button
                         onClick={() => navigate('/insights/business')}

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import Papa from "papaparse";
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
-import { ArrowLeft, Database, Shield, Lock, Check, Fingerprint, KeyRound, Loader2, Smartphone, Trash2, AlertTriangle, ShieldCheck, Clock, Mail, Download, Upload, ChevronDown, Cloud, Timer, Sparkles } from "lucide-react";
+import { ArrowLeft, Database, Shield, Lock, Check, Fingerprint, KeyRound, Loader2, Smartphone, Trash2, AlertTriangle, ShieldCheck, Clock, Mail, Download, Upload, ChevronDown, Cloud, Timer, Target } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { cn } from "../lib/utils";
 import { Button } from "../components/ui/Button";
@@ -146,9 +146,9 @@ export default function Settings() {
     const [isImporting, setIsImporting] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // AI Widget Visibility State - for instant UI updates
-    const [isAIWidgetVisible, setIsAIWidgetVisible] = useState(() =>
-        localStorage.getItem('ai_widget_visible') !== 'false'
+    // Goal Widget Visibility State - for instant UI updates
+    const [isGoalWidgetVisible, setIsGoalWidgetVisible] = useState(() =>
+        localStorage.getItem('goal_widget_visible') !== 'false'
     );
 
     // useEffect(() => {
@@ -549,7 +549,7 @@ export default function Settings() {
                     <div className="space-y-0">
                         <div className="flex justify-between items-center py-3 border-b border-neutral-100 dark:border-neutral-800">
                             <span className="text-sm text-neutral-500 dark:text-neutral-400 font-medium">Version</span>
-                            <span className="text-sm font-semibold text-neutral-900 dark:text-white bg-neutral-100 dark:bg-neutral-800 px-2.5 py-1 rounded-md">v8.5.0</span>
+                            <span className="text-sm font-semibold text-neutral-900 dark:text-white bg-neutral-100 dark:bg-neutral-800 px-2.5 py-1 rounded-md">v9.0.0</span>
                         </div>
 
 
@@ -560,15 +560,15 @@ export default function Settings() {
                     </div>
                 </div>
 
-                {/* AI Assistant Settings Card */}
+                {/* Goal Tracker Settings Card */}
                 <div className="bg-gradient-to-br from-purple-500/10 to-violet-500/10 border border-purple-500/20 rounded-2xl p-4 md:p-5 shadow-sm">
                     <div className="flex items-center gap-3 mb-4">
                         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center shadow-lg shadow-purple-500/30">
-                            <Sparkles size={20} className="text-white" />
+                            <Target size={20} className="text-white" />
                         </div>
                         <div>
-                            <h2 className="font-bold text-neutral-900 dark:text-white text-base">AI Assistant</h2>
-                            <p className="text-sm text-neutral-500 dark:text-neutral-400">Your personal business helper</p>
+                            <h2 className="font-bold text-neutral-900 dark:text-white text-base">Goal Tracker</h2>
+                            <p className="text-sm text-neutral-500 dark:text-neutral-400">Track your business goals</p>
                         </div>
                     </div>
 
@@ -576,14 +576,14 @@ export default function Settings() {
                     <div className="space-y-3">
                         <div
                             onClick={() => {
-                                const newValue = !isAIWidgetVisible;
-                                setIsAIWidgetVisible(newValue); // Instant UI update
-                                localStorage.setItem('ai_widget_visible', newValue ? 'true' : 'false');
-                                window.dispatchEvent(new Event('ai-widget-visibility-changed'));
+                                const newValue = !isGoalWidgetVisible;
+                                setIsGoalWidgetVisible(newValue); // Instant UI update
+                                localStorage.setItem('goal_widget_visible', newValue ? 'true' : 'false');
+                                window.dispatchEvent(new Event('goal-widget-visibility-changed'));
                             }}
                             className={cn(
                                 "flex items-center justify-between p-3 rounded-xl cursor-pointer active:scale-[0.98] transition-all border",
-                                isAIWidgetVisible
+                                isGoalWidgetVisible
                                     ? "bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800"
                                     : "bg-neutral-50 dark:bg-neutral-800/50 border-neutral-100 dark:border-neutral-800"
                             )}
@@ -591,18 +591,18 @@ export default function Settings() {
                             <div className="flex items-center gap-3">
                                 <div className={cn(
                                     "p-2 rounded-lg",
-                                    isAIWidgetVisible
+                                    isGoalWidgetVisible
                                         ? "bg-purple-100 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400"
                                         : "bg-neutral-200 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-400"
                                 )}>
-                                    <Sparkles size={18} />
+                                    <Target size={18} />
                                 </div>
                                 <div>
                                     <p className="text-sm font-semibold text-neutral-900 dark:text-white">Show floating bubble</p>
                                     <p className="text-[10px] text-neutral-500 dark:text-neutral-400">
-                                        {isAIWidgetVisible
-                                            ? "AI chat bubble is visible"
-                                            : "Enable to show AI bubble on screen"
+                                        {isGoalWidgetVisible
+                                            ? "Goal tracker bubble is visible"
+                                            : "Enable to show goal bubble on screen"
                                         }
                                     </p>
                                 </div>
@@ -610,29 +610,17 @@ export default function Settings() {
                             <div
                                 className={cn(
                                     "w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all",
-                                    isAIWidgetVisible
+                                    isGoalWidgetVisible
                                         ? "border-purple-500 bg-purple-500"
                                         : "border-neutral-300 dark:border-neutral-600 bg-transparent"
                                 )}
                             >
-                                {isAIWidgetVisible && <div className="w-2.5 h-2.5 rounded-full bg-white animate-in zoom-in-50" />}
+                                {isGoalWidgetVisible && <div className="w-2.5 h-2.5 rounded-full bg-white animate-in zoom-in-50" />}
                             </div>
                         </div>
-
-                        <Link
-                            to="/settings/ai-memory"
-                            className="flex items-center justify-between p-3 bg-white/5 dark:bg-white/5 hover:bg-white/10 dark:hover:bg-white/10 rounded-xl transition-colors group"
-                        >
-                            <div>
-                                <span className="text-sm font-medium text-neutral-900 dark:text-white">Memory & Personalization</span>
-                                <p className="text-xs text-neutral-500 dark:text-neutral-400">Manage what AI knows about you</p>
-                            </div>
-                            <ArrowLeft size={18} className="text-purple-400 group-hover:translate-x-1 transition-transform rotate-180" />
-                        </Link>
                     </div>
                 </div>
 
-                {/* Security Section - Enhanced with improved contrast and hierarchy */}
                 {/* Security Section - Enhanced with improved contrast and hierarchy */}
                 <CollapsibleSection
                     title="Security"

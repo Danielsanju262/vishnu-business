@@ -272,34 +272,71 @@ export default function Reports() {
             if (pendingReminder && pendingReminder.amount > 0) {
                 const newAmount = Math.max(0, pendingReminder.amount - creditAmount);
 
-                // Update the note: find the LAST "Credit Sale: ₹X. Balance: ₹Y" and update BOTH values
-                // When deleting, set credit to 0 and update the running balance
-                let newNote = pendingReminder.note || '';
+                // Instead of setting to ₹0, REMOVE the last Credit Sale line entirely and recalculate balances
+                let noteLines = (pendingReminder.note || '').split('\n');
 
-                // Pattern to find the last "Credit Sale: ₹X. Balance: ₹Y" entry
-                const creditSalePattern = /Credit Sale: ₹[\d,]+(?:\.\d+)?\.?\s*Balance: ₹[\d,]+(?:\.\d+)?(?![\s\S]*Credit Sale:)/;
-
-                if (creditSalePattern.test(newNote)) {
-                    // Set credit to 0 (deleted) and update balance
-                    newNote = newNote.replace(creditSalePattern,
-                        `Credit Sale: ₹0. Balance: ₹${newAmount.toLocaleString()}`);
-                } else {
-                    // Fallback: just update balance
-                    const balancePattern = /Balance: ₹[\d,]+(?:\.\d+)?(?![\s\S]*Balance: ₹)/;
-                    if (balancePattern.test(newNote)) {
-                        newNote = newNote.replace(balancePattern, `Balance: ₹${newAmount.toLocaleString()}`);
+                // Find the last Credit Sale line and remove it
+                let lastCreditSaleIndex = -1;
+                for (let i = noteLines.length - 1; i >= 0; i--) {
+                    if (noteLines[i].includes('Credit Sale:')) {
+                        lastCreditSaleIndex = i;
+                        break;
                     }
                 }
+
+                if (lastCreditSaleIndex !== -1) {
+                    // Remove the line
+                    noteLines.splice(lastCreditSaleIndex, 1);
+
+                    // Recalculate running balances for remaining lines
+                    let runningBalance = 0;
+                    noteLines = noteLines.map((line: string) => {
+                        const trimmed = line.trim();
+                        if (!trimmed || !trimmed.startsWith('[')) return line;
+
+                        const isCreditSale = line.includes('Credit Sale:');
+                        const isDueAdded = line.includes('New Due Added:');
+                        const isPayment = line.includes('Received:');
+
+                        if (!isCreditSale && !isDueAdded && !isPayment) return line;
+
+                        let amount = 0;
+                        let amountMatch;
+                        if (isCreditSale) amountMatch = line.match(/Credit Sale: ₹([\d,]+)/);
+                        else if (isDueAdded) amountMatch = line.match(/New Due Added: ₹([\d,]+)/);
+                        else amountMatch = line.match(/Received: ₹([\d,]+)/);
+
+                        if (amountMatch) {
+                            amount = parseFloat(amountMatch[1].replace(/,/g, ''));
+                        }
+
+                        if (isCreditSale || isDueAdded) {
+                            runningBalance += amount;
+                        } else {
+                            runningBalance -= amount;
+                        }
+
+                        // Reconstruct line with updated balance
+                        const dateMatch = line.match(/\[(.*?)\]/);
+                        if (dateMatch) {
+                            let typeStr = isCreditSale ? 'Credit Sale' : (isDueAdded ? 'New Due Added' : 'Received');
+                            return `[${dateMatch[1]}] ${typeStr}: ₹${amount.toLocaleString()}. Balance: ₹${Math.max(0, runningBalance).toLocaleString()}`;
+                        }
+                        return line;
+                    });
+                }
+
+                const newNote = noteLines.join('\n').trim();
 
                 if (newAmount <= 0) {
                     await supabase
                         .from('payment_reminders')
-                        .update({ amount: 0, status: 'paid', note: newNote.trim() })
+                        .update({ amount: 0, status: 'paid', note: newNote })
                         .eq('id', pendingReminder.id);
                 } else {
                     await supabase
                         .from('payment_reminders')
-                        .update({ amount: newAmount, note: newNote.trim() })
+                        .update({ amount: newAmount, note: newNote })
                         .eq('id', pendingReminder.id);
                 }
                 updatedReminder = true;
