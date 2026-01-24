@@ -1117,7 +1117,7 @@ export default function SupplierPaymentDetail() {
                                     );
                                 }
 
-                                return visibleTransactions.slice().reverse().map((txn, _idx) => {
+                                return visibleTransactions.slice().reverse().map((txn) => {
                                     // Important: Get the original index from the main transactions array
                                     // Note: txn object reference should be stable from the state
                                     const actualIndex = transactions.indexOf(txn);
