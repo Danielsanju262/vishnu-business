@@ -87,6 +87,9 @@ export default function CustomerPaymentDetail() {
     const [receiveAmount, setReceiveAmount] = useState("");
     const [newDueDate, setNewDueDate] = useState("");
 
+    // Filter State
+    const [filterType, setFilterType] = useState<'all' | 'credit_sale' | 'payment_received' | 'due_added'>('all');
+
     // Side effects for state changes
     useEffect(() => {
         if (!isSelectionMode) {
@@ -267,39 +270,10 @@ export default function CustomerPaymentDetail() {
             });
         }
 
-        // 2. Identify indices to remove
-        // viewIndices are relative to transactions.slice(-20)
-        // We need to map selectedIndices (view indices) to real allParsed indices.
-        const offset = Math.max(0, allParsed.length - 20);
-
         const realIndicesToRemove = new Set<number>();
         selectedIndices.forEach(viewIdx => {
-            // viewIdx is index in the displayed list (reversed?)
-            // transactions.slice().reverse().map((txn, idx) => ... idx is Loop Index
-            // actualIndex = transactions.length - 1 - idx; 
-            // setEditingIndex(actualIndex) -> The handlers expect actualIndex relative to 'transactions' array (0..19)
-
-            // Wait, visual list is REVERSED. 
-            // The visual item at index 0 (top) corresponds to `transactions[transactions.length - 1]`.
-            // `selectedIndices` stores `idx` from the map loop?
-            // If we use the visual index directly, we need to convert.
-            // But let's check how we will bind the click.
-            // onClick={() => toggleSelection(idx)} where idx is the Loop Index (0 = Top/Newest).
-
-            // So if I select top item (idx 0), it is `topIndex`.
-            // transactions array is [Oldest ... Newest].
-            // transactions.length = 20.
-            // Top Item = transactions[19].
-            // actualIndex = 20 - 1 - 0 = 19.
-
-            // So `viewIdx` stored in `selectedIndices` should be `actualIndex` to be consistent?
-            // OR `viewIdx` is visual index?
-            // It is simpler to store `actualIndex` (relative to transactions array) because that's what we pass to delete handlers usually.
-
-            // Let's ensure the UI passes `actualIndex`.
-
-            const realIdxInAllParsed = offset + viewIdx;
-            realIndicesToRemove.add(realIdxInAllParsed);
+            // viewIdx is now the original index in the full list
+            realIndicesToRemove.add(viewIdx);
         });
 
         // 3. Process removals per reminder
@@ -644,8 +618,8 @@ export default function CustomerPaymentDetail() {
             }
         }
 
-        // Show only last 20 transactions
-        setTransactions(parsed.slice(-20));
+        // Store all transactions
+        setTransactions(parsed);
     };
 
     const handleAddDue = async () => {
@@ -725,6 +699,15 @@ export default function CustomerPaymentDetail() {
         if (error) {
             toast("Failed to record payment", "error");
         } else {
+            // Log to credit_collections for tracking earned amount
+            await supabase.from('credit_collections').insert({
+                customer_id: customerId,
+                payment_reminder_id: primaryReminder.id,
+                amount: received,
+                collected_at: new Date().toISOString(),
+                note: `Received from ${customer?.name || 'customer'}`
+            });
+
             toast(newBalance <= 0 ? "Fully paid!" : `Received ₹${received.toLocaleString()}`, "success");
             setShowReceivePayment(false);
             setReceiveAmount("");
@@ -818,8 +801,7 @@ export default function CustomerPaymentDetail() {
         }
 
         // 2. Map viewIndex to real index
-        const offset = Math.max(0, allParsed.length - 20);
-        const realIndex = offset + viewIndex;
+        const realIndex = viewIndex;
 
         if (!allParsed[realIndex]) {
             toast("Error finding transaction", "error");
@@ -876,6 +858,20 @@ export default function CustomerPaymentDetail() {
         if (error) {
             toast("Failed to update transaction", "error");
         } else {
+            // If edited transaction was a payment_received, update credit_collections
+            if (targetTxn.data.type === 'payment_received') {
+                // Find and update the matching credit_collection entry
+                // We match by reminder_id and the OLD amount (before edit)
+                const oldAmount = transactions[viewIndex]?.amount;
+                if (oldAmount && oldAmount !== newAmount) {
+                    await supabase
+                        .from('credit_collections')
+                        .update({ amount: newAmount })
+                        .eq('payment_reminder_id', targetReminder.id)
+                        .eq('amount', oldAmount);
+                }
+            }
+
             toast("Transaction updated", "success");
             setEditingIndex(null);
             loadData();
@@ -988,9 +984,7 @@ export default function CustomerPaymentDetail() {
         }
 
         // 2. Map viewIndex to the actual transaction
-        // The transactions state shows last 20, so we need to find which one
-        const offset = Math.max(0, allParsed.length - 20);
-        const realIndex = offset + viewIndex;
+        const realIndex = viewIndex;
 
         if (!allParsed[realIndex]) {
             toast("Error finding transaction", "error");
@@ -1053,6 +1047,15 @@ export default function CustomerPaymentDetail() {
         if (error) {
             toast("Failed to delete transaction", "error");
         } else {
+            // If deleted transaction was a payment_received, also delete from credit_collections
+            if (targetTxn.data.type === 'payment_received') {
+                await supabase
+                    .from('credit_collections')
+                    .delete()
+                    .eq('payment_reminder_id', targetReminder.id)
+                    .eq('amount', targetTxn.data.amount);
+            }
+
             toast("Transaction deleted", "success");
             loadData();
         }
@@ -1275,8 +1278,59 @@ export default function CustomerPaymentDetail() {
                 {/* Transaction History */}
                 <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
                     <div className="px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border-b border-zinc-200 dark:border-zinc-700">
-                        <h2 className="font-bold text-sm text-zinc-900 dark:text-white">Transaction History</h2>
-                        <p className="text-xs text-zinc-500">Last {transactions.length} transactions</p>
+                        <div className="flex items-center justify-between mb-2">
+                            <div>
+                                <h2 className="font-bold text-sm text-zinc-900 dark:text-white">Transaction History</h2>
+                            </div>
+                        </div>
+
+                        {/* Filter Tabs */}
+                        <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+                            <button
+                                onClick={() => setFilterType('all')}
+                                className={cn(
+                                    "px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors",
+                                    filterType === 'all'
+                                        ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900"
+                                        : "bg-white dark:bg-zinc-700 border border-zinc-200 dark:border-zinc-600 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-600"
+                                )}
+                            >
+                                All
+                            </button>
+                            <button
+                                onClick={() => setFilterType('payment_received')}
+                                className={cn(
+                                    "px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors",
+                                    filterType === 'payment_received'
+                                        ? "bg-emerald-500 text-white"
+                                        : "bg-white dark:bg-zinc-700 border border-zinc-200 dark:border-zinc-600 text-zinc-600 dark:text-zinc-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 hover:text-emerald-600 dark:hover:text-emerald-400"
+                                )}
+                            >
+                                Received
+                            </button>
+                            <button
+                                onClick={() => setFilterType('credit_sale')}
+                                className={cn(
+                                    "px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors",
+                                    filterType === 'credit_sale'
+                                        ? "bg-blue-500 text-white"
+                                        : "bg-white dark:bg-zinc-700 border border-zinc-200 dark:border-zinc-600 text-zinc-600 dark:text-zinc-300 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 dark:hover:text-blue-400"
+                                )}
+                            >
+                                Credit Sale
+                            </button>
+                            <button
+                                onClick={() => setFilterType('due_added')}
+                                className={cn(
+                                    "px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors",
+                                    filterType === 'due_added'
+                                        ? "bg-orange-500 text-white"
+                                        : "bg-white dark:bg-zinc-700 border border-zinc-200 dark:border-zinc-600 text-zinc-600 dark:text-zinc-300 hover:bg-orange-50 dark:hover:bg-orange-900/30 hover:text-orange-600 dark:hover:text-orange-400"
+                                )}
+                            >
+                                Due Added
+                            </button>
+                        </div>
                     </div>
 
                     {transactions.length === 0 ? (
@@ -1309,95 +1363,115 @@ export default function CustomerPaymentDetail() {
                         </div>
                     ) : (
                         <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
-                            {transactions.slice().reverse().map((txn, idx) => {
-                                const actualIndex = transactions.length - 1 - idx;
-                                const isEditable = actualIndex >= transactions.length - 1;
+                            {(() => {
+                                let visibleTransactions = transactions;
+                                if (filterType !== 'all') {
+                                    visibleTransactions = transactions.filter(t => t.type === filterType);
+                                } else {
+                                    // Only slice if showing 'all' default view
+                                    visibleTransactions = transactions.slice(-20);
+                                }
 
-                                return (
-                                    <div
-                                        key={idx}
-                                        className={cn(
-                                            "p-4 transition-all duration-200",
-                                            isSelectionMode && selectedIndices.has(actualIndex)
-                                                ? "bg-emerald-50/80 dark:bg-emerald-900/20"
-                                                : "hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
-                                        )}
-                                        onClick={(e) => {
-                                            if (isSelectionMode) {
-                                                e.preventDefault();
-                                                toggleSelection(actualIndex);
-                                            }
-                                        }}
-                                        onTouchStart={() => handleTouchStart(actualIndex)}
-                                        onTouchEnd={handleTouchEnd}
-                                        onTouchCancel={handleTouchEnd}
-                                        onTouchMove={handleTouchMove}
-                                        onContextMenu={() => {
-                                            // Optional: prevent default menu on long press contexts if needed
-                                        }}
-                                    >
-                                        <div className="flex items-start gap-4">
-                                            {isSelectionMode && (
-                                                <div className="flex items-center justify-center w-10 h-10 pt-1">
-                                                    {selectedIndices.has(actualIndex) ? (
-                                                        <CheckCircle2 className="text-emerald-500 fill-emerald-100 dark:fill-emerald-900" size={24} strokeWidth={2.5} />
-                                                    ) : (
-                                                        <Circle className="text-zinc-300 dark:text-zinc-600" size={24} strokeWidth={2} />
-                                                    )}
-                                                </div>
+                                if (visibleTransactions.length === 0 && filterType !== 'all') {
+                                    return (
+                                        <div className="p-8 text-center text-zinc-500">
+                                            No {filterType.replace('_', ' ')} transactions found.
+                                        </div>
+                                    );
+                                }
+
+                                return visibleTransactions.slice().reverse().map((txn, idx) => {
+                                    // Important: Get the original index from the main transactions array
+                                    // Note: txn object reference should be stable from the state
+                                    const actualIndex = transactions.indexOf(txn);
+                                    const isEditable = actualIndex >= transactions.length - 1;
+
+                                    return (
+                                        <div
+                                            key={actualIndex}
+                                            className={cn(
+                                                "p-4 transition-all duration-200",
+                                                isSelectionMode && selectedIndices.has(actualIndex)
+                                                    ? "bg-emerald-50/80 dark:bg-emerald-900/20"
+                                                    : "hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
                                             )}
-                                            <div className="flex-1">
-                                                <div className="flex items-center justify-between mb-0">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className={cn(
-                                                            "text-base md:text-lg font-bold",
-                                                            txn.type === 'payment_received' ? "text-emerald-600 dark:text-emerald-400" :
-                                                                txn.type === 'credit_sale' ? "text-blue-600 dark:text-blue-400" :
-                                                                    "text-orange-600 dark:text-orange-400"
-                                                        )}>
-                                                            {txn.type === 'payment_received' ? 'Payment Received' :
-                                                                txn.type === 'credit_sale' ? 'Credit Sale' :
-                                                                    'Due Added'}
-                                                        </span>
-                                                        {!isSelectionMode && (
-                                                            <div className="flex items-center gap-0">
-                                                                {isEditable && (
-                                                                    <button
-                                                                        onClick={(e) => { e.stopPropagation(); setEditingIndex(actualIndex); }}
-                                                                        className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-1"
-                                                                        aria-label="Edit transaction"
-                                                                    >
-                                                                        <Edit2 size={14} className="text-zinc-400" strokeWidth={2.5} />
-                                                                    </button>
-                                                                )}
-                                                                <button
-                                                                    onClick={(e) => { e.stopPropagation(); handleDeleteTransaction(actualIndex); }}
-                                                                    className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-1"
-                                                                    aria-label="Delete transaction"
-                                                                >
-                                                                    <Trash2 size={14} className="text-zinc-400 hover:text-red-500" strokeWidth={2.5} />
-                                                                </button>
-                                                            </div>
+                                            onClick={(e) => {
+                                                if (isSelectionMode) {
+                                                    e.preventDefault();
+                                                    toggleSelection(actualIndex);
+                                                }
+                                            }}
+                                            onTouchStart={() => handleTouchStart(actualIndex)}
+                                            onTouchEnd={handleTouchEnd}
+                                            onTouchCancel={handleTouchEnd}
+                                            onTouchMove={handleTouchMove}
+                                            onContextMenu={() => {
+                                                // Optional: prevent default menu on long press contexts if needed
+                                            }}
+                                        >
+                                            <div className="flex items-start gap-4">
+                                                {isSelectionMode && (
+                                                    <div className="flex items-center justify-center w-10 h-10 pt-1">
+                                                        {selectedIndices.has(actualIndex) ? (
+                                                            <CheckCircle2 className="text-emerald-500 fill-emerald-100 dark:fill-emerald-900" size={24} strokeWidth={2.5} />
+                                                        ) : (
+                                                            <Circle className="text-zinc-300 dark:text-zinc-600" size={24} strokeWidth={2} />
                                                         )}
                                                     </div>
-                                                    <div className="text-right">
-                                                        <p className={cn(
-                                                            "text-base md:text-lg font-bold",
-                                                            txn.type === 'payment_received' ? "text-emerald-600 dark:text-emerald-400" :
-                                                                txn.type === 'credit_sale' ? "text-blue-600 dark:text-blue-400" :
-                                                                    "text-orange-600 dark:text-orange-400"
-                                                        )}>
-                                                            {txn.type === 'payment_received' ? '-' : '+'}₹{txn.amount.toLocaleString()}
-                                                        </p>
-                                                        <p className="text-xs text-zinc-500">Balance: ₹{txn.balance.toLocaleString()}</p>
+                                                )}
+                                                <div className="flex-1">
+                                                    <div className="flex items-center justify-between mb-0">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className={cn(
+                                                                "text-base md:text-lg font-bold",
+                                                                txn.type === 'payment_received' ? "text-emerald-600 dark:text-emerald-400" :
+                                                                    txn.type === 'credit_sale' ? "text-blue-600 dark:text-blue-400" :
+                                                                        "text-orange-600 dark:text-orange-400"
+                                                            )}>
+                                                                {txn.type === 'payment_received' ? 'Payment Received' :
+                                                                    txn.type === 'credit_sale' ? 'Credit Sale' :
+                                                                        'Due Added'}
+                                                            </span>
+                                                            {!isSelectionMode && (
+                                                                <div className="flex items-center gap-0">
+                                                                    {isEditable && (
+                                                                        <button
+                                                                            onClick={(e) => { e.stopPropagation(); setEditingIndex(actualIndex); }}
+                                                                            className="p-1.5 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-1"
+                                                                            aria-label="Edit transaction"
+                                                                        >
+                                                                            <Edit2 size={14} className="text-zinc-400" strokeWidth={2.5} />
+                                                                        </button>
+                                                                    )}
+                                                                    <button
+                                                                        onClick={(e) => { e.stopPropagation(); handleDeleteTransaction(actualIndex); }}
+                                                                        className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-1"
+                                                                        aria-label="Delete transaction"
+                                                                    >
+                                                                        <Trash2 size={14} className="text-zinc-400 hover:text-red-500" strokeWidth={2.5} />
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <p className={cn(
+                                                                "text-base md:text-lg font-bold",
+                                                                txn.type === 'payment_received' ? "text-emerald-600 dark:text-emerald-400" :
+                                                                    txn.type === 'credit_sale' ? "text-blue-600 dark:text-blue-400" :
+                                                                        "text-orange-600 dark:text-orange-400"
+                                                            )}>
+                                                                {txn.type === 'payment_received' ? '-' : '+'}₹{txn.amount.toLocaleString()}
+                                                            </p>
+                                                            <p className="text-xs text-zinc-500">Balance: ₹{txn.balance.toLocaleString()}</p>
+                                                        </div>
                                                     </div>
+                                                    <p className="text-xs text-zinc-500 font-medium">{formatDateWithOrdinal(txn.date)}{txn.time ? ` • ${txn.time}` : ''}</p>
                                                 </div>
-                                                <p className="text-xs text-zinc-500 font-medium">{formatDateWithOrdinal(txn.date)}{txn.time ? ` • ${txn.time}` : ''}</p>
                                             </div>
                                         </div>
-                                    </div>
-                                );
-                            })}
+                                    );
+                                });
+                            })()}
                         </div>
                     )}
                 </div>

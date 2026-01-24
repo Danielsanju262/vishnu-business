@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { Button } from "../components/ui/Button";
-import { ArrowLeft, Plus, Wallet, IndianRupee, Calendar, WifiOff, Edit2 } from "lucide-react";
+import { ArrowLeft, Plus, Wallet, IndianRupee, Calendar, WifiOff, Edit2, ChevronDown, SlidersHorizontal } from "lucide-react";
 import { useToast } from "../components/toast-provider";
 import { cn } from "../lib/utils";
 import { Link } from "react-router-dom";
@@ -71,6 +71,11 @@ export default function AccountsPayable() {
     const [isEditDateOpen, setIsEditDateOpen] = useHistorySyncedState(false, 'payableEditDate');
     const [editDateValue, setEditDateValue] = useState("");
     const [pendingNewSupplierName, setPendingNewSupplierName] = useState<string | null>(null);
+
+    // Sort State for supplier cards
+    const [sortBy, setSortBy] = useState<'dueDateAsc' | 'dueDateDesc' | 'amountAsc' | 'amountDesc'>('dueDateAsc');
+    const [showSortDropdown, setShowSortDropdown] = useHistorySyncedState(false, 'payableSortFilter');
+    const sortDropdownRef = useRef<HTMLDivElement>(null);
 
     // Sync data state with history state visibility
     useEffect(() => {
@@ -388,9 +393,27 @@ export default function AccountsPayable() {
         c.name.toLowerCase().includes(newPayableSupplierSearch.toLowerCase())
     );
 
-    const filteredGroupedSuppliers = groupedSuppliers.filter(s =>
-        s.supplierName.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const filteredGroupedSuppliers = useMemo(() => {
+        let filtered = groupedSuppliers.filter(s =>
+            s.supplierName.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+
+        // Apply sorting
+        return filtered.sort((a, b) => {
+            switch (sortBy) {
+                case 'dueDateAsc':
+                    return new Date(a.earliestDueDate).getTime() - new Date(b.earliestDueDate).getTime();
+                case 'dueDateDesc':
+                    return new Date(b.earliestDueDate).getTime() - new Date(a.earliestDueDate).getTime();
+                case 'amountAsc':
+                    return a.totalBalance - b.totalBalance;
+                case 'amountDesc':
+                    return b.totalBalance - a.totalBalance;
+                default:
+                    return 0;
+            }
+        });
+    }, [groupedSuppliers, searchQuery, sortBy]);
 
     const getDueStatus = (dateStr: string) => {
         const today = new Date();
@@ -496,7 +519,7 @@ export default function AccountsPayable() {
 
                 {/* Search Bar */}
                 {!loading && groupedSuppliers.length > 0 && (
-                    <div className="relative mb-4">
+                    <div className="relative mb-3">
                         <input
                             type="text"
                             placeholder="Search suppliers..."
@@ -504,6 +527,52 @@ export default function AccountsPayable() {
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                         />
+                    </div>
+                )}
+
+                {/* Sort Filter */}
+                {!loading && groupedSuppliers.length > 0 && (
+                    <div className="flex items-center gap-2 mb-4">
+                        <div className="relative" ref={sortDropdownRef}>
+                            <button
+                                onClick={() => setShowSortDropdown(!showSortDropdown)}
+                                className="flex items-center gap-1.5 px-3 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-lg text-xs font-bold text-zinc-600 dark:text-zinc-300 transition-all border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:ring-2 focus:ring-orange-500/50"
+                            >
+                                <SlidersHorizontal size={14} className="opacity-70" />
+                                <span>
+                                    {sortBy === 'dueDateAsc' && 'Due Date ↑'}
+                                    {sortBy === 'dueDateDesc' && 'Due Date ↓'}
+                                    {sortBy === 'amountAsc' && 'Amount ↑'}
+                                    {sortBy === 'amountDesc' && 'Amount ↓'}
+                                </span>
+                                <ChevronDown size={12} className={`opacity-70 transition-transform duration-200 ${showSortDropdown ? 'rotate-180' : ''}`} />
+                            </button>
+
+                            {showSortDropdown && (
+                                <div className="absolute left-0 top-full mt-2 w-48 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-xl overflow-hidden py-1.5 z-50 animate-in fade-in zoom-in-95 duration-200">
+                                    {[
+                                        { value: 'dueDateAsc', label: 'Due Date: Earliest First' },
+                                        { value: 'dueDateDesc', label: 'Due Date: Latest First' },
+                                        { value: 'amountAsc', label: 'Amount: Lowest First' },
+                                        { value: 'amountDesc', label: 'Amount: Highest First' }
+                                    ].map((option) => (
+                                        <button
+                                            key={option.value}
+                                            onClick={() => {
+                                                setSortBy(option.value as any);
+                                                setShowSortDropdown(false);
+                                            }}
+                                            className={cn(
+                                                "w-full text-left px-4 py-2.5 text-xs font-bold transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800",
+                                                sortBy === option.value ? "text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-500/10" : "text-zinc-600 dark:text-zinc-400"
+                                            )}
+                                        >
+                                            {option.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 )}
 
