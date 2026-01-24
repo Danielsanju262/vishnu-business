@@ -1179,8 +1179,8 @@ export default function CustomerPaymentDetail() {
                                 >
                                     <ArrowLeft size={18} strokeWidth={2.5} />
                                 </button>
-                                <div className="flex-1">
-                                    <h1 className="text-lg md:text-xl font-black text-zinc-900 dark:text-white">{customer.name}</h1>
+                                <div className="flex-1 min-w-0">
+                                    <h1 className="text-lg md:text-xl font-black text-zinc-900 dark:text-white truncate">{customer.name}</h1>
                                     <p className="text-xs text-zinc-500">Payment History</p>
                                 </div>
                                 <div className="relative">

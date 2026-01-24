@@ -587,9 +587,11 @@ export default function NewSale() {
 
         // Calculate total credit amount (if any)
         let totalCredit = 0;
+        let totalPaidNow = totalSaleValue;  // Default: full cash sale
         if (addToOutstanding && totalSaleValue > 0) {
             const paid = parseFloat(paidNowAmount) || 0;
             totalCredit = Math.max(0, totalSaleValue - paid);
+            totalPaidNow = paid;
         }
 
         // Calculate total linked payable amount (if any)
@@ -610,8 +612,9 @@ export default function NewSale() {
                 sell_price: item.sellPrice,
                 buy_price: item.buyPrice,
                 date: date,
-                // Tracking Fields (for delete/edit sync)
+                // Tracking Fields (for delete/edit sync and CIH calculation)
                 credit_amount: totalCredit * ratio,
+                paid_amount: totalPaidNow * ratio,  // Cash received at sale time
                 linked_supplier_id: (isLinkedPayable && payableSelectedSupplierId) ? payableSelectedSupplierId : null,
                 linked_supplier_amount: totalLinkedPayable * ratio
             };

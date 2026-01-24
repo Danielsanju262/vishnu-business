@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { Button } from "../components/ui/Button";
-import { ArrowLeft, Plus, Receipt, IndianRupee, Calendar, WifiOff, Edit2, ChevronDown, ChevronUp, SlidersHorizontal } from "lucide-react";
+import { ArrowLeft, Plus, Receipt, IndianRupee, Calendar, WifiOff, Edit2, ChevronDown, ChevronUp, SlidersHorizontal, Trash2, RefreshCw, Clock, Repeat, ToggleLeft, ToggleRight } from "lucide-react";
 import { useToast } from "../components/toast-provider";
 import { cn } from "../lib/utils";
 import { Link } from "react-router-dom";
@@ -26,6 +26,19 @@ type PaymentReminder = {
     note?: string;
     status: 'pending' | 'paid';
     recorded_at: string;
+};
+
+type RecurringConfig = {
+    id: string;
+    customer_id: string;
+    amount: number;
+    frequency: 'daily' | 'weekly' | 'monthly';
+    day_of_week?: number;
+    day_of_month?: number;
+    time_of_day: string;
+    next_run_at: string;
+    is_active: boolean;
+    note?: string;
 };
 
 // Grouped customer data for display
@@ -94,6 +107,22 @@ export default function PaymentReminders() {
     const [editDateValue, setEditDateValue] = useState("");
     const [pendingNewCustomerName, setPendingNewCustomerName] = useState<string | null>(null);
 
+    // Recurring Reminders State
+    const [activeTab, setActiveTab] = useState<'reminders' | 'recurring'>('reminders');
+    const [recurringConfigs, setRecurringConfigs] = useState<RecurringConfig[]>([]);
+    const [showNewRecurring, setShowNewRecurring] = useHistorySyncedState(false, 'paymentNewRecurring');
+
+
+    // New Recurring Form
+    const [newRecurringFrequency, setNewRecurringFrequency] = useState<'daily' | 'weekly' | 'monthly'>('daily');
+    const [newRecurringTime, setNewRecurringTime] = useState('09:00');
+    const [newRecurringDayOfWeek, setNewRecurringDayOfWeek] = useState(1); // 1 = Mon
+    const [newRecurringDayOfMonth, setNewRecurringDayOfMonth] = useState(1);
+    const [newRecurringAmount, setNewRecurringAmount] = useState('');
+    const [newRecurringCustomer, setNewRecurringCustomer] = useState('');
+    const [newRecurringCustomerSearch, setNewRecurringCustomerSearch] = useState('');
+    const [showRecurringCustomerList, setShowRecurringCustomerList] = useState(false);
+
     // Sync data state with history state visibility
     useEffect(() => {
         if (!isQuickActionOpen) {
@@ -112,7 +141,9 @@ export default function PaymentReminders() {
 
     // Close dropdowns on ESC or click outside
     const listRef = useRef<HTMLDivElement>(null);
+    const recurringListRef = useRef<HTMLDivElement>(null);
     useDropdownClose(showCustomerList, () => setShowCustomerList(false), listRef);
+    useDropdownClose(showRecurringCustomerList, () => setShowRecurringCustomerList(false), recurringListRef);
     useDropdownClose(showFilterDropdown, () => setShowFilterDropdown(false), filterDropdownRef);
 
     // Get date range based on filter
@@ -235,7 +266,35 @@ export default function PaymentReminders() {
 
         setLoading(false);
         isFirstLoad.current = false;
+
+        // Load recurring configs in background
+        loadRecurrings();
     }, []);
+
+    const loadRecurrings = async () => {
+
+        const { data, error } = await supabase
+            .from('recurring_reminder_configs')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error("Error loading recurring configs:", error);
+        } else if (data) {
+            setRecurringConfigs(data);
+        }
+
+    };
+
+    // Listen for auto-generation events
+    useEffect(() => {
+        const handleUpdate = () => {
+            loadData();
+            loadRecurrings(); // Refresh next run times
+        };
+        window.addEventListener('payment-reminders-updated', handleUpdate);
+        return () => window.removeEventListener('payment-reminders-updated', handleUpdate);
+    }, [loadData]);
 
     useRealtimeTable('payment_reminders', loadData, []);
 
@@ -562,6 +621,109 @@ export default function PaymentReminders() {
         };
     };
 
+
+
+    const toggleDescRecurring = async (config: RecurringConfig) => {
+        const { error } = await supabase
+            .from('recurring_reminder_configs')
+            .update({ is_active: !config.is_active })
+            .eq('id', config.id);
+
+        if (error) {
+            toast("Failed to update status", "error");
+        } else {
+            loadRecurrings();
+            toast(config.is_active ? "Rule Paused" : "Rule Activated", "success");
+        }
+    };
+
+    const deleteRecur = async (id: string) => {
+        if (!await confirm("Are you sure you want to delete this recurring rule?", { confirmText: "Delete", variant: 'danger' })) return;
+
+        const { error } = await supabase
+            .from('recurring_reminder_configs')
+            .delete()
+            .eq('id', id);
+
+        if (error) {
+            toast("Failed to delete rule", "error");
+        } else {
+            toast("Rule deleted", "success");
+            loadRecurrings();
+        }
+    };
+
+    const handleCreateRecurring = async () => {
+        if (!newRecurringCustomer) {
+            toast("Please select a customer", "warning");
+            return;
+        }
+        if (!newRecurringAmount) {
+            toast("Please enter an amount", "warning");
+            return;
+        }
+
+        // Calculate next run
+        const now = new Date();
+        let nextRun = new Date();
+        const [hours, mins] = newRecurringTime.split(':').map(Number);
+        nextRun.setHours(hours, mins, 0, 0);
+
+        // Adjust date based on frequency
+        if (newRecurringFrequency === 'daily') {
+            if (nextRun <= now) {
+                nextRun.setDate(nextRun.getDate() + 1);
+            }
+        } else if (newRecurringFrequency === 'weekly') {
+            const targetDay = newRecurringDayOfWeek === 7 ? 0 : newRecurringDayOfWeek;
+            const currentDay = nextRun.getDay();
+
+            let daysUntil = targetDay - currentDay;
+            if (daysUntil <= 0) daysUntil += 7; // Move to next week
+
+            // If today is the day, check time
+            if (currentDay === targetDay && nextRun > now) {
+                daysUntil = 0;
+            } else if (currentDay === targetDay && nextRun <= now) {
+                daysUntil = 7;
+            }
+
+            nextRun.setDate(nextRun.getDate() + daysUntil);
+        } else if (newRecurringFrequency === 'monthly') {
+            nextRun.setDate(newRecurringDayOfMonth);
+            // If date is in past (e.g. earlier today or passed days), move to next month
+            // Also check if we are sticking to specific day
+            if (nextRun <= now) {
+                nextRun.setMonth(nextRun.getMonth() + 1);
+            }
+        }
+
+        const { error } = await supabase.from('recurring_reminder_configs').insert({
+            customer_id: newRecurringCustomer,
+            amount: parseFloat(newRecurringAmount),
+            frequency: newRecurringFrequency,
+            day_of_week: newRecurringFrequency === 'weekly' ? newRecurringDayOfWeek : null,
+            day_of_month: newRecurringFrequency === 'monthly' ? newRecurringDayOfMonth : null,
+            time_of_day: newRecurringTime,
+            next_run_at: nextRun.toISOString(),
+            is_active: true
+        });
+
+        if (error) {
+            console.error(error);
+            toast("Failed to create rule", "error");
+        } else {
+            toast("Recurring rule created!", "success");
+            setShowNewRecurring(false);
+            setNewRecurringCustomer("");
+            setNewRecurringCustomerSearch("");
+            setNewRecurringAmount("");
+            loadRecurrings();
+        }
+    };
+
+    const { confirm } = useToast();
+
     if (setupRequired) {
         return (
             <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center animate-in fade-in">
@@ -617,16 +779,27 @@ export default function PaymentReminders() {
                         </div>
                     </div>
                     <button
-                        onClick={() => setShowNewReminder(true)}
+                        onClick={() => {
+                            if (activeTab === 'recurring') {
+                                setShowNewRecurring(true);
+                            } else {
+                                setShowNewRecurring(true); // Wait, this logic is shared?
+                                // Actually, we have 2 modals.
+                                // showNewReminder -> Existing manual
+                                // showNewRecurring -> Status
+                                // We need to check active tab
+                            }
+                        }}
                         onKeyDown={(e) => {
                             if (e.key === "Enter" || e.key === " ") {
                                 e.preventDefault();
-                                setShowNewReminder(true);
+                                if (activeTab === 'recurring') setShowNewRecurring(true);
+                                else setShowNewReminder(true);
                             }
                         }}
                         tabIndex={0}
                         className="p-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white transition-all duration-150 active:scale-95 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                        aria-label="Add new payment reminder"
+                        aria-label="Add new"
                     >
                         <Plus size={20} strokeWidth={2.5} />
                     </button>
@@ -637,317 +810,442 @@ export default function PaymentReminders() {
 
                 <div className="h-23.5 md:h-28" />
 
-                {/* Search Bar */}
-                {!loading && groupedCustomers.length > 0 && (
-                    <div className="relative mb-3">
-                        <input
-                            type="text"
-                            placeholder="Search customers..."
-                            className="w-full px-4 h-12 rounded-xl bg-zinc-100 dark:bg-zinc-800/50 border-2 border-zinc-200 dark:border-zinc-700 focus:border-emerald-500 focus:bg-background outline-none transition-all placeholder:text-zinc-400 font-bold text-zinc-900 dark:text-white"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                        />
-                    </div>
-                )}
+                {/* Tabs */}
+                <div className="flex bg-zinc-100 dark:bg-zinc-800/50 p-1 rounded-xl mb-4">
+                    <button
+                        onClick={() => setActiveTab('reminders')}
+                        className={cn(
+                            "flex-1 py-2 text-sm font-bold rounded-lg transition-all",
+                            activeTab === 'reminders'
+                                ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-sm"
+                                : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-300"
+                        )}
+                    >
+                        Pending Reminders
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('recurring')}
+                        className={cn(
+                            "flex-1 py-2 text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-1.5",
+                            activeTab === 'recurring'
+                                ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-sm"
+                                : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-300"
+                        )}
+                    >
+                        <Repeat size={14} className={activeTab === 'recurring' ? 'text-emerald-500' : ''} />
+                        Recurring Rules
+                    </button>
+                </div>
 
-                {/* Date Filter and Sort */}
-                {!loading && (
-                    <div className="flex items-center gap-2 mb-4">
-                        {/* Date Filter */}
-                        <div className="relative" ref={filterDropdownRef}>
-                            <button
-                                onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-                                className="flex items-center gap-1.5 px-3 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-lg text-xs font-bold text-zinc-600 dark:text-zinc-300 transition-all border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
-                            >
-                                <Calendar size={14} className="opacity-70" />
-                                <span>
-                                    {dateFilter === 'today' && 'Today'}
-                                    {dateFilter === 'yesterday' && 'Yesterday'}
-                                    {dateFilter === 'thisWeek' && 'This Week'}
-                                    {dateFilter === 'thisMonth' && 'This Month'}
-                                    {dateFilter === 'lastMonth' && 'Last Month'}
-                                    {dateFilter === 'custom' && 'Custom'}
-                                </span>
-                                <ChevronDown size={12} className={`opacity-70 transition-transform duration-200 ${showFilterDropdown ? 'rotate-180' : ''}`} />
-                            </button>
-
-                            {showFilterDropdown && (
-                                <div className="absolute left-0 top-full mt-2 w-44 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-xl overflow-hidden py-1.5 z-50 animate-in fade-in zoom-in-95 duration-200">
-                                    {['today', 'yesterday', 'thisWeek', 'thisMonth', 'lastMonth', 'custom'].map((filter) => (
-                                        <button
-                                            key={filter}
-                                            onClick={() => {
-                                                if (filter === 'custom') {
-                                                    setShowFilterDropdown(false);
-                                                    setTimeout(() => {
-                                                        setShowCustomDateModal(true);
-                                                    }, 100);
-                                                } else {
-                                                    setDateFilter(filter);
-                                                    setShowFilterDropdown(false);
-                                                }
-                                            }}
-                                            className={cn(
-                                                "w-full text-left px-4 py-2.5 text-xs font-bold transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800",
-                                                dateFilter === filter ? "text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10" : "text-zinc-600 dark:text-zinc-400"
-                                            )}
-                                        >
-                                            {filter === 'today' && 'Today'}
-                                            {filter === 'yesterday' && 'Yesterday'}
-                                            {filter === 'thisWeek' && 'This Week'}
-                                            {filter === 'thisMonth' && 'This Month'}
-                                            {filter === 'lastMonth' && 'Last Month'}
-                                            {filter === 'custom' && 'Custom Range...'}
-                                        </button>
-                                    ))}
+                {activeTab === 'recurring' ? (
+                    /* RECURRING RULES LIST */
+                    <div className="space-y-3">
+                        {recurringConfigs.length === 0 ? (
+                            <div className="text-center py-12 px-4">
+                                <div className="w-16 h-16 bg-zinc-100 dark:bg-zinc-800 text-zinc-400 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <Repeat size={32} />
                                 </div>
-                            )}
-                        </div>
-
-                        {/* Sort Filter */}
-                        <div className="relative" ref={sortDropdownRef}>
-                            <button
-                                onClick={() => setShowSortDropdown(!showSortDropdown)}
-                                className="flex items-center gap-1.5 px-3 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-lg text-xs font-bold text-zinc-600 dark:text-zinc-300 transition-all border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
-                            >
-                                <SlidersHorizontal size={14} className="opacity-70" />
-                                <span>
-                                    {sortBy === 'dueDateAsc' && 'Due Date ↑'}
-                                    {sortBy === 'dueDateDesc' && 'Due Date ↓'}
-                                    {sortBy === 'amountAsc' && 'Amount ↑'}
-                                    {sortBy === 'amountDesc' && 'Amount ↓'}
-                                </span>
-                                <ChevronDown size={12} className={`opacity-70 transition-transform duration-200 ${showSortDropdown ? 'rotate-180' : ''}`} />
-                            </button>
-
-                            {showSortDropdown && (
-                                <div className="absolute left-0 top-full mt-2 w-48 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-xl overflow-hidden py-1.5 z-50 animate-in fade-in zoom-in-95 duration-200">
-                                    {[
-                                        { value: 'dueDateAsc', label: 'Due Date: Earliest First' },
-                                        { value: 'dueDateDesc', label: 'Due Date: Latest First' },
-                                        { value: 'amountAsc', label: 'Amount: Lowest First' },
-                                        { value: 'amountDesc', label: 'Amount: Highest First' }
-                                    ].map((option) => (
-                                        <button
-                                            key={option.value}
-                                            onClick={() => {
-                                                setSortBy(option.value as any);
-                                                setShowSortDropdown(false);
-                                            }}
-                                            className={cn(
-                                                "w-full text-left px-4 py-2.5 text-xs font-bold transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800",
-                                                sortBy === option.value ? "text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10" : "text-zinc-600 dark:text-zinc-400"
-                                            )}
-                                        >
-                                            {option.label}
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )}
-
-                {/* Total Stats Card */}
-                {!loading && groupedCustomers.length > 0 && (
-                    <div className="bg-zinc-100 dark:bg-zinc-800/50 rounded-2xl p-4 mb-6 border border-zinc-200 dark:border-zinc-800">
-                        {/* Total Outstanding Row */}
-                        <div className="flex items-center justify-between mb-3">
-                            <div>
-                                <p className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-0.5">Total to be Received</p>
-                                <p className="text-xs text-zinc-400 dark:text-zinc-500 font-medium">
-                                    {filteredGroupedCustomers.length} customer{filteredGroupedCustomers.length !== 1 ? 's' : ''} found
+                                <h3 className="text-lg font-bold text-zinc-900 dark:text-white mb-2">No Recurring Rules</h3>
+                                <p className="text-zinc-500 dark:text-zinc-400 text-sm max-w-xs mx-auto mb-6">
+                                    Set up automatic payment reminders for regular customers.
                                 </p>
+                                <Button onClick={() => setShowNewRecurring(true)}>
+                                    Create First Rule
+                                </Button>
                             </div>
-                            <div className="text-right">
-                                <p className="text-xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight">
-                                    ₹{filteredGroupedCustomers.reduce((sum, g) => sum + g.totalBalance, 0).toLocaleString()}
-                                </p>
-                            </div>
-                        </div>
+                        ) : (
+                            <div className="grid gap-3">
+                                {recurringConfigs.map((config) => {
+                                    const customerName = getCustomerName(config.customer_id);
+                                    let frequencyText = "";
+                                    let nextRunText = "";
 
-                        {/* Divider */}
-                        <div className="border-t border-zinc-200 dark:border-zinc-700 my-3" />
+                                    const timeDisplay = new Date(`2000-01-01T${config.time_of_day}`).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-                        {/* Earned Row - Expandable */}
-                        <div>
-                            <button
-                                onClick={() => setIsEarnedExpanded(!isEarnedExpanded)}
-                                className="w-full flex items-center justify-between hover:bg-zinc-200/50 dark:hover:bg-zinc-700/30 -mx-2 px-2 py-1 rounded-lg transition-colors"
-                            >
-                                <div className="text-left">
-                                    <p className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-0.5 flex items-center gap-1.5">
-                                        Earned
-                                        <span className="text-[10px] font-medium text-zinc-400 dark:text-zinc-500 normal-case">
-                                            ({dateFilter === 'today' ? 'Today' :
-                                                dateFilter === 'yesterday' ? 'Yesterday' :
-                                                    dateFilter === 'thisWeek' ? 'This Week' :
-                                                        dateFilter === 'thisMonth' ? 'This Month' :
-                                                            dateFilter === 'lastMonth' ? 'Last Month' :
-                                                                'Custom'})
-                                        </span>
-                                        {isEarnedExpanded ? (
-                                            <ChevronUp size={14} className="text-zinc-400" />
-                                        ) : (
-                                            <ChevronDown size={14} className="text-zinc-400" />
-                                        )}
-                                    </p>
-                                    <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-medium">
-                                        {earnedBreakdown.length} customer{earnedBreakdown.length !== 1 ? 's' : ''} • Tap to {isEarnedExpanded ? 'collapse' : 'expand'}
-                                    </p>
-                                </div>
-                                <div className="text-right">
-                                    {earnedLoading ? (
-                                        <div className="h-7 w-20 bg-zinc-300 dark:bg-zinc-700 rounded animate-pulse" />
-                                    ) : (
-                                        <p className="text-xl font-black text-blue-600 dark:text-blue-400 tracking-tight">
-                                            ₹{earnedAmount.toLocaleString()}
-                                        </p>
-                                    )}
-                                </div>
-                            </button>
+                                    if (config.frequency === 'daily') {
+                                        frequencyText = `Daily at ${timeDisplay}`;
+                                    } else if (config.frequency === 'weekly') {
+                                        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                                        // Adjust day index if needed based on JS Date
+                                        // In schema, we usually store 1=Mon, 7=Sun? Or 0=Sun. 
+                                        // Let's assume standard JS: 0=Sun, 1=Mon.
+                                        // If our UI uses 1=Mon, we map carefully.
+                                        // UI State uses 1=Mon.
+                                        // Let's ensure array mapping is correct.
+                                        // If stored 1=Mon.
+                                        const dayNames = [null, 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                                        frequencyText = `Weekly on ${dayNames[config.day_of_week || 1]} at ${timeDisplay}`;
+                                    } else if (config.frequency === 'monthly') {
+                                        frequencyText = `Monthly on ${config.day_of_month}${getOrdinal(config.day_of_month || 1)} at ${timeDisplay}`;
+                                    }
 
-                            {/* Expanded Breakdown */}
-                            {isEarnedExpanded && earnedBreakdown.length > 0 && (
-                                <div className="mt-3 space-y-2 border-t border-zinc-200 dark:border-zinc-700 pt-3">
-                                    {earnedBreakdown.map((item) => (
-                                        <div
-                                            key={item.customerId}
-                                            className="flex items-center justify-between py-2 px-3 bg-blue-50 dark:bg-blue-500/10 rounded-lg border border-blue-100 dark:border-blue-500/20"
-                                        >
-                                            <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 truncate flex-1 mr-3">
-                                                {item.customerName}
-                                            </p>
-                                            <p className="text-sm font-bold text-blue-600 dark:text-blue-400 whitespace-nowrap">
-                                                ₹{item.total.toLocaleString()}
-                                            </p>
+                                    try {
+                                        nextRunText = format(new Date(config.next_run_at), 'dd MMM yyyy, hh:mm a');
+                                    } catch (e) {
+                                        nextRunText = "Unknown";
+                                    }
+
+                                    return (
+                                        <div key={config.id} className={cn("bg-white dark:bg-zinc-900 border rounded-xl p-4 transition-all",
+                                            config.is_active ? "border-zinc-200 dark:border-zinc-800" : "border-zinc-100 dark:border-zinc-800/50 opacity-70")}>
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div>
+                                                    <h3 className="font-bold text-zinc-900 dark:text-white">{customerName}</h3>
+                                                    <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-bold text-sm mt-0.5">
+                                                        <IndianRupee size={12} strokeWidth={3} />
+                                                        {config.amount.toLocaleString()}
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-1">
+                                                    <button
+                                                        onClick={() => toggleDescRecurring(config)}
+                                                        className={cn("p-2 rounded-lg transition-colors",
+                                                            config.is_active ? "text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100" : "text-zinc-400 bg-zinc-100 dark:bg-zinc-800 hover:text-zinc-600")}
+                                                    >
+                                                        {config.is_active ? <ToggleRight size={20} /> : <ToggleLeft size={20} />}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => deleteRecur(config.id)}
+                                                        className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                                    >
+                                                        <Trash2 size={18} />
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400 mt-3 pt-3 border-t border-zinc-100 dark:border-zinc-800">
+                                                <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded-md">
+                                                    <RefreshCw size={10} />
+                                                    <span>{frequencyText}</span>
+                                                </div>
+                                                <div className="flex items-center gap-1 ml-auto">
+                                                    <Clock size={10} />
+                                                    <span>Next: {nextRunText}</span>
+                                                </div>
+                                            </div>
                                         </div>
-                                    ))}
-                                </div>
-                            )}
-
-                            {isEarnedExpanded && earnedBreakdown.length === 0 && !earnedLoading && (
-                                <div className="mt-3 py-4 text-center border-t border-zinc-200 dark:border-zinc-700">
-                                    <p className="text-sm text-zinc-400 dark:text-zinc-500">No collections in this period</p>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )}
-
-
-                {loading ? (
-                    <div className="space-y-4">
-                        {[1, 2, 3].map((i) => (
-                            <div key={i} className="h-32 bg-muted/50 rounded-3xl animate-pulse" />
-                        ))}
-                    </div>
-                ) : groupedCustomers.length === 0 ? (
-                    <div className="text-center py-16 px-6 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-3xl bg-zinc-50/50 dark:bg-zinc-900/30">
-                        <div className="bg-emerald-100 dark:bg-emerald-500/20 w-16 h-16 rounded-2xl flex items-center justify-center mb-5 mx-auto border border-emerald-200 dark:border-emerald-500/30">
-                            <IndianRupee size={26} className="text-emerald-600 dark:text-emerald-400" strokeWidth={1.5} />
-                        </div>
-                        <p className="font-bold text-zinc-800 dark:text-zinc-200 text-base">No pending payments</p>
-                        <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-2 max-w-xs mx-auto">All payments are up to date</p>
-                    </div>
-                ) : filteredGroupedCustomers.length === 0 ? (
-                    <div className="text-center py-12 px-6">
-                        <p className="text-zinc-500 font-medium">No results found for "{searchQuery}"</p>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
                 ) : (
-                    <div className="space-y-3">
-                        {filteredGroupedCustomers.map(customer => {
-                            const dueStatus = getDueStatus(customer.earliestDueDate);
+                    /* EXISTING REMINDER LIST */
+                    <>
 
-                            return (
-                                <div
-                                    key={customer.customerId}
-                                    onClick={() => navigate(`/payment-reminders/${customer.customerId}`)}
-                                    onKeyDown={(e) => {
-                                        if (e.key === "Enter" || e.key === " ") {
-                                            e.preventDefault();
-                                            navigate(`/payment-reminders/${customer.customerId}`);
-                                        }
-                                    }}
-                                    tabIndex={0}
-                                    role="button"
-                                    className="bg-white dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-lg transition-all cursor-pointer active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                                    aria-label={`View payment details for ${customer.customerName}`}
-                                >
-                                    {/* Customer Info */}
-                                    <div className="flex justify-between items-start mb-3">
-                                        <div className="flex-1 min-w-0">
-                                            <h3 className="font-bold text-base text-zinc-900 dark:text-white truncate mb-2">
-                                                {customer.customerName}
-                                            </h3>
-                                            <div className="flex items-center gap-2">
-                                                <span className={cn("inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-lg uppercase tracking-wider border", dueStatus.classes)}>
-                                                    <Calendar size={10} strokeWidth={2.5} /> {dueStatus.text}
+                        {/* Search Bar */}
+                        {!loading && groupedCustomers.length > 0 && activeTab === 'reminders' && (
+                            <div className="relative mb-3">
+                                <input
+                                    type="text"
+                                    placeholder="Search customers..."
+                                    className="w-full px-4 h-12 rounded-xl bg-zinc-100 dark:bg-zinc-800/50 border-2 border-zinc-200 dark:border-zinc-700 focus:border-emerald-500 focus:bg-background outline-none transition-all placeholder:text-zinc-400 font-bold text-zinc-900 dark:text-white"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                />
+                            </div>
+                        )}
+
+                        {/* Date Filter and Sort */}
+                        {!loading && (
+                            <div className="flex items-center gap-2 mb-4">
+                                {/* Date Filter */}
+                                <div className="relative" ref={filterDropdownRef}>
+                                    <button
+                                        onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                                        className="flex items-center gap-1.5 px-3 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-lg text-xs font-bold text-zinc-600 dark:text-zinc-300 transition-all border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                                    >
+                                        <Calendar size={14} className="opacity-70" />
+                                        <span>
+                                            {dateFilter === 'today' && 'Today'}
+                                            {dateFilter === 'yesterday' && 'Yesterday'}
+                                            {dateFilter === 'thisWeek' && 'This Week'}
+                                            {dateFilter === 'thisMonth' && 'This Month'}
+                                            {dateFilter === 'lastMonth' && 'Last Month'}
+                                            {dateFilter === 'custom' && 'Custom'}
+                                        </span>
+                                        <ChevronDown size={12} className={`opacity-70 transition-transform duration-200 ${showFilterDropdown ? 'rotate-180' : ''}`} />
+                                    </button>
+
+                                    {showFilterDropdown && (
+                                        <div className="absolute left-0 top-full mt-2 w-44 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-xl overflow-hidden py-1.5 z-50 animate-in fade-in zoom-in-95 duration-200">
+                                            {['today', 'yesterday', 'thisWeek', 'thisMonth', 'lastMonth', 'custom'].map((filter) => (
+                                                <button
+                                                    key={filter}
+                                                    onClick={() => {
+                                                        if (filter === 'custom') {
+                                                            setShowFilterDropdown(false);
+                                                            setTimeout(() => {
+                                                                setShowCustomDateModal(true);
+                                                            }, 100);
+                                                        } else {
+                                                            setDateFilter(filter);
+                                                            setShowFilterDropdown(false);
+                                                        }
+                                                    }}
+                                                    className={cn(
+                                                        "w-full text-left px-4 py-2.5 text-xs font-bold transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800",
+                                                        dateFilter === filter ? "text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10" : "text-zinc-600 dark:text-zinc-400"
+                                                    )}
+                                                >
+                                                    {filter === 'today' && 'Today'}
+                                                    {filter === 'yesterday' && 'Yesterday'}
+                                                    {filter === 'thisWeek' && 'This Week'}
+                                                    {filter === 'thisMonth' && 'This Month'}
+                                                    {filter === 'lastMonth' && 'Last Month'}
+                                                    {filter === 'custom' && 'Custom Range...'}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Sort Filter */}
+                                <div className="relative" ref={sortDropdownRef}>
+                                    <button
+                                        onClick={() => setShowSortDropdown(!showSortDropdown)}
+                                        className="flex items-center gap-1.5 px-3 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-lg text-xs font-bold text-zinc-600 dark:text-zinc-300 transition-all border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                                    >
+                                        <SlidersHorizontal size={14} className="opacity-70" />
+                                        <span>
+                                            {sortBy === 'dueDateAsc' && 'Due Date ↑'}
+                                            {sortBy === 'dueDateDesc' && 'Due Date ↓'}
+                                            {sortBy === 'amountAsc' && 'Amount ↑'}
+                                            {sortBy === 'amountDesc' && 'Amount ↓'}
+                                        </span>
+                                        <ChevronDown size={12} className={`opacity-70 transition-transform duration-200 ${showSortDropdown ? 'rotate-180' : ''}`} />
+                                    </button>
+
+                                    {showSortDropdown && (
+                                        <div className="absolute left-0 top-full mt-2 w-48 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-xl overflow-hidden py-1.5 z-50 animate-in fade-in zoom-in-95 duration-200">
+                                            {[
+                                                { value: 'dueDateAsc', label: 'Due Date: Earliest First' },
+                                                { value: 'dueDateDesc', label: 'Due Date: Latest First' },
+                                                { value: 'amountAsc', label: 'Amount: Lowest First' },
+                                                { value: 'amountDesc', label: 'Amount: Highest First' }
+                                            ].map((option) => (
+                                                <button
+                                                    key={option.value}
+                                                    onClick={() => {
+                                                        setSortBy(option.value as any);
+                                                        setShowSortDropdown(false);
+                                                    }}
+                                                    className={cn(
+                                                        "w-full text-left px-4 py-2.5 text-xs font-bold transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800",
+                                                        sortBy === option.value ? "text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10" : "text-zinc-600 dark:text-zinc-400"
+                                                    )}
+                                                >
+                                                    {option.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Total Stats Card */}
+                        {!loading && groupedCustomers.length > 0 && (
+                            <div className="bg-zinc-100 dark:bg-zinc-800/50 rounded-2xl p-4 mb-6 border border-zinc-200 dark:border-zinc-800">
+                                {/* Total Outstanding Row */}
+                                <div className="flex items-center justify-between mb-3">
+                                    <div>
+                                        <p className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-0.5">Total to be Received</p>
+                                        <p className="text-xs text-zinc-400 dark:text-zinc-500 font-medium">
+                                            {filteredGroupedCustomers.length} customer{filteredGroupedCustomers.length !== 1 ? 's' : ''} found
+                                        </p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight">
+                                            ₹{filteredGroupedCustomers.reduce((sum, g) => sum + g.totalBalance, 0).toLocaleString()}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Divider */}
+                                <div className="border-t border-zinc-200 dark:border-zinc-700 my-3" />
+
+                                {/* Earned Row - Expandable */}
+                                <div>
+                                    <button
+                                        onClick={() => setIsEarnedExpanded(!isEarnedExpanded)}
+                                        className="w-full flex items-center justify-between hover:bg-zinc-200/50 dark:hover:bg-zinc-700/30 -mx-2 px-2 py-1 rounded-lg transition-colors"
+                                    >
+                                        <div className="text-left">
+                                            <p className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-0.5 flex items-center gap-1.5">
+                                                Earned
+                                                <span className="text-[10px] font-medium text-zinc-400 dark:text-zinc-500 normal-case">
+                                                    ({dateFilter === 'today' ? 'Today' :
+                                                        dateFilter === 'yesterday' ? 'Yesterday' :
+                                                            dateFilter === 'thisWeek' ? 'This Week' :
+                                                                dateFilter === 'thisMonth' ? 'This Month' :
+                                                                    dateFilter === 'lastMonth' ? 'Last Month' :
+                                                                        'Custom'})
                                                 </span>
+                                                {isEarnedExpanded ? (
+                                                    <ChevronUp size={14} className="text-zinc-400" />
+                                                ) : (
+                                                    <ChevronDown size={14} className="text-zinc-400" />
+                                                )}
+                                            </p>
+                                            <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-medium">
+                                                {earnedBreakdown.length} customer{earnedBreakdown.length !== 1 ? 's' : ''} • Tap to {isEarnedExpanded ? 'collapse' : 'expand'}
+                                            </p>
+                                        </div>
+                                        <div className="text-right">
+                                            {earnedLoading ? (
+                                                <div className="h-7 w-20 bg-zinc-300 dark:bg-zinc-700 rounded animate-pulse" />
+                                            ) : (
+                                                <p className="text-xl font-black text-blue-600 dark:text-blue-400 tracking-tight">
+                                                    ₹{earnedAmount.toLocaleString()}
+                                                </p>
+                                            )}
+                                        </div>
+                                    </button>
+
+                                    {/* Expanded Breakdown */}
+                                    {isEarnedExpanded && earnedBreakdown.length > 0 && (
+                                        <div className="mt-3 space-y-2 border-t border-zinc-200 dark:border-zinc-700 pt-3">
+                                            {earnedBreakdown.map((item) => (
+                                                <div
+                                                    key={item.customerId}
+                                                    className="flex items-center justify-between py-2 px-3 bg-blue-50 dark:bg-blue-500/10 rounded-lg border border-blue-100 dark:border-blue-500/20"
+                                                >
+                                                    <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 truncate flex-1 mr-3">
+                                                        {item.customerName}
+                                                    </p>
+                                                    <p className="text-sm font-bold text-blue-600 dark:text-blue-400 whitespace-nowrap">
+                                                        ₹{item.total.toLocaleString()}
+                                                    </p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {isEarnedExpanded && earnedBreakdown.length === 0 && !earnedLoading && (
+                                        <div className="mt-3 py-4 text-center border-t border-zinc-200 dark:border-zinc-700">
+                                            <p className="text-sm text-zinc-400 dark:text-zinc-500">No collections in this period</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+
+                        {loading ? (
+                            <div className="space-y-4">
+                                {[1, 2, 3].map((i) => (
+                                    <div key={i} className="h-32 bg-muted/50 rounded-3xl animate-pulse" />
+                                ))}
+                            </div>
+                        ) : groupedCustomers.length === 0 ? (
+                            <div className="text-center py-16 px-6 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-3xl bg-zinc-50/50 dark:bg-zinc-900/30">
+                                <div className="bg-emerald-100 dark:bg-emerald-500/20 w-16 h-16 rounded-2xl flex items-center justify-center mb-5 mx-auto border border-emerald-200 dark:border-emerald-500/30">
+                                    <IndianRupee size={26} className="text-emerald-600 dark:text-emerald-400" strokeWidth={1.5} />
+                                </div>
+                                <p className="font-bold text-zinc-800 dark:text-zinc-200 text-base">No pending payments</p>
+                                <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-2 max-w-xs mx-auto">All payments are up to date</p>
+                            </div>
+                        ) : filteredGroupedCustomers.length === 0 ? (
+                            <div className="text-center py-12 px-6">
+                                <p className="text-zinc-500 font-medium">No results found for "{searchQuery}"</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                {filteredGroupedCustomers.map(customer => {
+                                    const dueStatus = getDueStatus(customer.earliestDueDate);
+
+                                    return (
+                                        <div
+                                            key={customer.customerId}
+                                            onClick={() => navigate(`/payment-reminders/${customer.customerId}`)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === "Enter" || e.key === " ") {
+                                                    e.preventDefault();
+                                                    navigate(`/payment-reminders/${customer.customerId}`);
+                                                }
+                                            }}
+                                            tabIndex={0}
+                                            role="button"
+                                            className="bg-white dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-lg transition-all cursor-pointer active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                                            aria-label={`View payment details for ${customer.customerName}`}
+                                        >
+                                            {/* Customer Info */}
+                                            <div className="flex justify-between items-start mb-3">
+                                                <div className="flex-1 min-w-0">
+                                                    <h3 className="font-bold text-base text-zinc-900 dark:text-white truncate mb-2">
+                                                        {customer.customerName}
+                                                    </h3>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={cn("inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-lg uppercase tracking-wider border", dueStatus.classes)}>
+                                                            <Calendar size={10} strokeWidth={2.5} /> {dueStatus.text}
+                                                        </span>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setEditDateCustomer({ id: customer.customerId, name: customer.customerName });
+                                                                setEditDateValue(customer.earliestDueDate);
+                                                                setIsEditDateOpen(true);
+                                                            }}
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === "Enter" || e.key === " ") {
+                                                                    e.preventDefault();
+                                                                    e.stopPropagation();
+                                                                    setEditDateCustomer({ id: customer.customerId, name: customer.customerName });
+                                                                    setEditDateValue(customer.earliestDueDate);
+                                                                }
+                                                            }}
+                                                            className="p-2.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-1"
+                                                            aria-label="Edit due date"
+                                                        >
+                                                            <Edit2 size={14} strokeWidth={2.5} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                <div className="text-right">
+                                                    <p className="text-2xl font-black text-zinc-900 dark:text-white tracking-tight">
+                                                        ₹{customer.totalBalance.toLocaleString()}
+                                                    </p>
+                                                    <p className="text-xs text-zinc-500 mt-1">
+                                                        {new Date(customer.earliestDueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            {/* Action Buttons */}
+                                            <div className="grid grid-cols-2 gap-2 pt-3 border-t border-zinc-100 dark:border-zinc-800">
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        setEditDateCustomer({ id: customer.customerId, name: customer.customerName });
-                                                        setEditDateValue(customer.earliestDueDate);
-                                                        setIsEditDateOpen(true);
+                                                        setQuickActionCustomer({ id: customer.customerId, name: customer.customerName, reminder: customer.primaryReminder, totalBalance: customer.totalBalance });
+                                                        setActionType('add');
+                                                        setIsQuickActionOpen(true);
                                                     }}
-                                                    onKeyDown={(e) => {
-                                                        if (e.key === "Enter" || e.key === " ") {
-                                                            e.preventDefault();
-                                                            e.stopPropagation();
-                                                            setEditDateCustomer({ id: customer.customerId, name: customer.customerName });
-                                                            setEditDateValue(customer.earliestDueDate);
-                                                        }
-                                                    }}
-                                                    className="p-2.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-1"
-                                                    aria-label="Edit due date"
+                                                    className="flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white py-3 px-3 rounded-xl text-xs font-bold transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-orange-300 focus-visible:ring-offset-1"
                                                 >
-                                                    <Edit2 size={14} strokeWidth={2.5} />
+                                                    <Plus size={14} strokeWidth={2.5} />
+                                                    Add Due
+                                                </button>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setQuickActionCustomer({ id: customer.customerId, name: customer.customerName, reminder: customer.primaryReminder, totalBalance: customer.totalBalance });
+                                                        setActionType('receive');
+                                                        setIsQuickActionOpen(true);
+                                                    }}
+                                                    className="flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white py-3 px-3 rounded-xl text-xs font-bold transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-1"
+                                                >
+                                                    <Receipt size={14} strokeWidth={2.5} />
+                                                    Received
                                                 </button>
                                             </div>
                                         </div>
-
-                                        <div className="text-right">
-                                            <p className="text-2xl font-black text-zinc-900 dark:text-white tracking-tight">
-                                                ₹{customer.totalBalance.toLocaleString()}
-                                            </p>
-                                            <p className="text-xs text-zinc-500 mt-1">
-                                                {new Date(customer.earliestDueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    {/* Action Buttons */}
-                                    <div className="grid grid-cols-2 gap-2 pt-3 border-t border-zinc-100 dark:border-zinc-800">
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setQuickActionCustomer({ id: customer.customerId, name: customer.customerName, reminder: customer.primaryReminder, totalBalance: customer.totalBalance });
-                                                setActionType('add');
-                                                setIsQuickActionOpen(true);
-                                            }}
-                                            className="flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white py-3 px-3 rounded-xl text-xs font-bold transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-orange-300 focus-visible:ring-offset-1"
-                                        >
-                                            <Plus size={14} strokeWidth={2.5} />
-                                            Add Due
-                                        </button>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setQuickActionCustomer({ id: customer.customerId, name: customer.customerName, reminder: customer.primaryReminder, totalBalance: customer.totalBalance });
-                                                setActionType('receive');
-                                                setIsQuickActionOpen(true);
-                                            }}
-                                            className="flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white py-3 px-3 rounded-xl text-xs font-bold transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-1"
-                                        >
-                                            <Receipt size={14} strokeWidth={2.5} />
-                                            Received
-                                        </button>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </>
                 )}
             </div>
 
@@ -1207,6 +1505,165 @@ export default function PaymentReminders() {
                     </button>
                 </div>
             </Modal>
+            {/* NEW RECURRING MODAL */}
+            <Modal
+                isOpen={showNewRecurring}
+                onClose={() => setShowNewRecurring(false)}
+                title="New Recurring Rule"
+            >
+                <div className="space-y-4 pt-2">
+                    {/* Customer Selection */}
+                    <div className="space-y-1.5 relative" ref={recurringListRef}>
+                        <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Customer</label>
+                        <input
+                            type="text"
+                            placeholder="Search or add customer..."
+                            className="w-full h-12 px-4 rounded-xl bg-zinc-50 dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-700 focus:border-emerald-500 focus:bg-white dark:focus:bg-zinc-900 outline-none transition-all font-bold"
+                            value={newRecurringCustomerSearch}
+                            onChange={(e) => {
+                                setNewRecurringCustomerSearch(e.target.value);
+                                setShowRecurringCustomerList(true);
+                                if (!e.target.value) setNewRecurringCustomer("");
+                            }}
+                            onFocus={() => setShowRecurringCustomerList(true)}
+                        />
+
+                        {showRecurringCustomerList && (
+                            <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-zinc-800 border-2 border-zinc-100 dark:border-zinc-700 rounded-xl shadow-xl max-h-48 overflow-y-auto z-50 animate-in fade-in zoom-in-95">
+                                {customers.filter(c => c.name.toLowerCase().includes(newRecurringCustomerSearch.toLowerCase())).map(customer => (
+                                    <button
+                                        key={customer.id}
+                                        onClick={() => {
+                                            setNewRecurringCustomer(customer.id);
+                                            setNewRecurringCustomerSearch(customer.name);
+                                            setShowRecurringCustomerList(false);
+                                        }}
+                                        className="w-full text-left px-4 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-700/50 font-medium text-sm border-b border-zinc-50 dark:border-zinc-700/50 last:border-0"
+                                    >
+                                        {customer.name}
+                                    </button>
+                                ))}
+                                {newRecurringCustomerSearch && !customers.some(c => c.name.toLowerCase() === newRecurringCustomerSearch.toLowerCase()) && (
+                                    <div className="px-4 py-3 text-sm text-zinc-400 italic">
+                                        Customer must be created first
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Amount */}
+                    <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Amount</label>
+                        <input
+                            type="number"
+                            inputMode="decimal"
+                            placeholder="0.00"
+                            className="w-full h-12 px-4 rounded-xl bg-zinc-50 dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-700 focus:border-emerald-500 focus:bg-white dark:focus:bg-zinc-900 outline-none transition-all font-bold text-lg"
+                            value={newRecurringAmount}
+                            onChange={(e) => setNewRecurringAmount(e.target.value)}
+                        />
+                    </div>
+
+                    {/* Frequency */}
+                    <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Frequency</label>
+                        <div className="grid grid-cols-3 gap-2">
+                            {['daily', 'weekly', 'monthly'].map((freq) => (
+                                <button
+                                    key={freq}
+                                    onClick={() => setNewRecurringFrequency(freq as any)}
+                                    className={cn(
+                                        "py-2.5 rounded-xl text-sm font-bold border-2 transition-all capitalize",
+                                        newRecurringFrequency === freq
+                                            ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                            : "border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 text-zinc-500"
+                                    )}
+                                >
+                                    {freq}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Time */}
+                    <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Time</label>
+                        <input
+                            type="time"
+                            className="w-full h-12 px-4 rounded-xl bg-zinc-50 dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-700 focus:border-emerald-500 outline-none transition-all font-bold"
+                            value={newRecurringTime}
+                            onChange={(e) => setNewRecurringTime(e.target.value)}
+                        />
+                    </div>
+
+                    {/* Conditionals */}
+                    {newRecurringFrequency === 'weekly' && (
+                        <div className="space-y-1.5 animate-in fade-in slide-in-from-top-2">
+                            <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Day of Week</label>
+                            <div className="grid grid-cols-7 gap-1">
+                                {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, i) => (
+                                    <button
+                                        key={i}
+                                        onClick={() => setNewRecurringDayOfWeek(i + 1)}
+                                        className={cn(
+                                            "aspect-square rounded-lg font-bold text-sm border-2 transition-all flex items-center justify-center",
+                                            newRecurringDayOfWeek === i + 1
+                                                ? "border-emerald-500 bg-emerald-500 text-white"
+                                                : "border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 text-zinc-500"
+                                        )}
+                                    >
+                                        {day}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {newRecurringFrequency === 'monthly' && (
+                        <div className="space-y-1.5 animate-in fade-in slide-in-from-top-2">
+                            <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Day of Month</label>
+                            <div className="grid grid-cols-7 gap-1">
+                                {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
+                                    <button
+                                        key={day}
+                                        onClick={() => setNewRecurringDayOfMonth(day)}
+                                        className={cn(
+                                            "aspect-square rounded-lg font-bold text-sm border-2 transition-all flex items-center justify-center",
+                                            newRecurringDayOfMonth === day
+                                                ? "border-emerald-500 bg-emerald-500 text-white"
+                                                : "border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 text-zinc-500 hover:border-emerald-200 dark:hover:border-emerald-800"
+                                        )}
+                                    >
+                                        {day}
+                                    </button>
+                                ))}
+                            </div>
+                            <p className="text-xs text-zinc-400 pt-1 text-center">
+                                Select the day of the month for this recurring payment
+                            </p>
+                        </div>
+                    )}
+
+                    <div className="pt-2">
+                        <Button
+                            className="w-full h-12 text-lg font-bold shadow-lg shadow-emerald-500/20"
+                            onClick={handleCreateRecurring}
+                        >
+                            Create Recurring Rule
+                        </Button>
+                    </div>
+                </div>
+            </Modal >
         </>
     );
 }
+
+// Helper for ordinals
+function getOrdinal(n: number) {
+    const s = ["th", "st", "nd", "rd"];
+    const v = n % 100;
+    return s[(v - 20) % 10] || s[v] || s[0];
+}
+
+

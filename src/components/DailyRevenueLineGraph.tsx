@@ -12,7 +12,7 @@ interface DailyRevenueLineGraphProps {
 
 
 export function DailyRevenueLineGraph({ chartData, selectedChartDay, setSelectedChartDay }: DailyRevenueLineGraphProps) {
-    const [chartMetric, setChartMetric] = useState<'revenue' | 'profit' | 'margin'>('profit');
+    const [chartMetric, setChartMetric] = useState<'revenue' | 'profit' | 'cashInHand' | 'margin'>('profit');
     const [isTransitioning, setIsTransitioning] = useState(false);
     const prevMetricRef = useRef(chartMetric);
 
@@ -30,6 +30,7 @@ export function DailyRevenueLineGraph({ chartData, selectedChartDay, setSelected
         if (chartMetric === 'margin') {
             return d.revenue > 0 ? (d.profit / d.revenue) * 100 : 0;
         }
+        if (chartMetric === 'cashInHand') return Math.abs(d.cashInHand);
         return chartMetric === 'revenue' ? d.revenue : Math.abs(d.profit);
     }), 1);
 
@@ -92,7 +93,7 @@ export function DailyRevenueLineGraph({ chartData, selectedChartDay, setSelected
 
 
     const titlePrefix = 'Daily';
-    const metricLabel = chartMetric === 'revenue' ? 'Revenue' : chartMetric === 'profit' ? 'Profit' : 'Margin';
+    const metricLabel = chartMetric === 'revenue' ? 'Revenue' : chartMetric === 'profit' ? 'Profit' : chartMetric === 'cashInHand' ? 'Cash In Hand' : 'Margin';
 
     // Filter out ONLY future dates. Keep past dates even if they have 0 data.
     const effectiveData = chartData.filter(d => {
@@ -118,7 +119,7 @@ export function DailyRevenueLineGraph({ chartData, selectedChartDay, setSelected
             if (chartMetric === 'margin') {
                 value = d.revenue > 0 ? (d.profit / d.revenue) * 100 : 0;
             } else {
-                value = chartMetric === 'revenue' ? d.revenue : d.profit;
+                value = chartMetric === 'revenue' ? d.revenue : chartMetric === 'profit' ? d.profit : d.cashInHand;
             }
             const normalizedValue = Math.max(0, Math.min(Math.abs(value), yMax)); // Clip to max
             const y = topPadding + (height - ((normalizedValue / yMax) * height));
@@ -157,13 +158,16 @@ export function DailyRevenueLineGraph({ chartData, selectedChartDay, setSelected
     const chartWidth = points.length > 0 ? points[points.length - 1].x + 60 : 100; // Increased padding for last point visibility
 
     // Colors
-    let strokeColor = "#3b82f6"; // Blue (Revenue)
-    let fillColor = "url(#blueGradient)";
+    let strokeColor = "#ffffff"; // White (Revenue/Sales)
+    let fillColor = "url(#whiteGradient)";
 
     if (chartMetric === 'profit') {
         const totalProfit = chartData.reduce((acc, d) => acc + d.profit, 0);
         strokeColor = totalProfit >= 0 ? "#10b981" : "#f43f5e"; // Emerald or Rose
         fillColor = totalProfit >= 0 ? "url(#emeraldGradient)" : "url(#roseGradient)";
+    } else if (chartMetric === 'cashInHand') {
+        strokeColor = "#0ea5e9"; // Sky-500
+        fillColor = "url(#skyGradient)";
     } else if (chartMetric === 'margin') {
         strokeColor = "#f59e0b"; // Amber
         fillColor = "url(#amberGradient)";
@@ -183,12 +187,12 @@ export function DailyRevenueLineGraph({ chartData, selectedChartDay, setSelected
                         <span className="text-xs font-semibold text-white/50 uppercase tracking-wider">{titlePrefix} {metricLabel}</span>
                     </div>
 
-                    <div className="flex bg-black/20 p-0.5 rounded-lg backdrop-blur-md border border-white/5">
+                    <div className="flex bg-black/20 p-1 rounded-lg backdrop-blur-md border border-white/5">
                         <button
                             onClick={(e) => { e.stopPropagation(); setChartMetric('revenue'); }}
                             className={cn(
-                                "px-2.5 py-1 text-[10px] font-bold rounded-md transition-all",
-                                chartMetric === 'revenue' ? "bg-blue-500/20 text-blue-200 shadow-sm ring-1 ring-blue-500/30" : "text-white/40 hover:text-white hover:bg-white/5"
+                                "px-3 py-1.5 text-[10px] font-bold rounded-md transition-all min-w-[48px]",
+                                chartMetric === 'revenue' ? "bg-white/90 text-zinc-900 shadow-sm" : "text-white/40 hover:text-white hover:bg-white/5"
                             )}
                         >
                             Sales
@@ -196,7 +200,7 @@ export function DailyRevenueLineGraph({ chartData, selectedChartDay, setSelected
                         <button
                             onClick={(e) => { e.stopPropagation(); setChartMetric('profit'); }}
                             className={cn(
-                                "px-2.5 py-1 text-[10px] font-bold rounded-md transition-all",
+                                "px-3 py-1.5 text-[10px] font-bold rounded-md transition-all min-w-[48px]",
                                 chartMetric === 'profit' ?
                                     (chartData.reduce((acc, d) => acc + d.profit, 0) >= 0 ? "bg-emerald-500/20 text-emerald-200 shadow-sm ring-1 ring-emerald-500/30" : "bg-rose-500/20 text-rose-200 shadow-sm ring-1 ring-rose-500/30")
                                     : "text-white/40 hover:text-white hover:bg-white/5"
@@ -205,9 +209,18 @@ export function DailyRevenueLineGraph({ chartData, selectedChartDay, setSelected
                             Profit
                         </button>
                         <button
+                            onClick={(e) => { e.stopPropagation(); setChartMetric('cashInHand'); }}
+                            className={cn(
+                                "px-3 py-1.5 text-[10px] font-bold rounded-md transition-all min-w-[48px]",
+                                chartMetric === 'cashInHand' ? "bg-sky-500/20 text-sky-200 shadow-sm ring-1 ring-sky-500/30" : "text-white/40 hover:text-white hover:bg-white/5"
+                            )}
+                        >
+                            CIH
+                        </button>
+                        <button
                             onClick={(e) => { e.stopPropagation(); setChartMetric('margin'); }}
                             className={cn(
-                                "px-2.5 py-1 text-[10px] font-bold rounded-md transition-all",
+                                "px-3 py-1.5 text-[10px] font-bold rounded-md transition-all min-w-[48px]",
                                 chartMetric === 'margin' ? "bg-amber-500/20 text-amber-200 shadow-sm ring-1 ring-amber-500/30" : "text-white/40 hover:text-white hover:bg-white/5"
                             )}
                         >
@@ -306,9 +319,9 @@ export function DailyRevenueLineGraph({ chartData, selectedChartDay, setSelected
                                 )}
                             >
                                 <defs>
-                                    <linearGradient id="blueGradient" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.3" />
-                                        <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
+                                    <linearGradient id="whiteGradient" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="0%" stopColor="#ffffff" stopOpacity="0.3" />
+                                        <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
                                     </linearGradient>
                                     <linearGradient id="emeraldGradient" x1="0" y1="0" x2="0" y2="1">
                                         <stop offset="0%" stopColor="#10b981" stopOpacity="0.3" />
@@ -317,6 +330,10 @@ export function DailyRevenueLineGraph({ chartData, selectedChartDay, setSelected
                                     <linearGradient id="roseGradient" x1="0" y1="0" x2="0" y2="1">
                                         <stop offset="0%" stopColor="#f43f5e" stopOpacity="0.3" />
                                         <stop offset="100%" stopColor="#f43f5e" stopOpacity="0" />
+                                    </linearGradient>
+                                    <linearGradient id="skyGradient" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="0%" stopColor="#0ea5e9" stopOpacity="0.3" />
+                                        <stop offset="100%" stopColor="#0ea5e9" stopOpacity="0" />
                                     </linearGradient>
                                     <linearGradient id="amberGradient" x1="0" y1="0" x2="0" y2="1">
                                         <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.3" />

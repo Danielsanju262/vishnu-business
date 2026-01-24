@@ -34,6 +34,7 @@ import LockScreen from "./components/LockScreen";
 
 import { useDeepLinkBackHandler } from "./hooks/useDeepLinkBackHandler";
 import { useAutoBackup } from "./hooks/useAutoBackup";
+import { useRecurringReminders } from "./hooks/useRecurringReminders";
 
 // Component to handle deep link back navigation (must be inside Router)
 function DeepLinkBackHandler() {
@@ -52,6 +53,8 @@ function AppContent() {
 
   // Initialize auto backup
   useAutoBackup();
+  // Initialize recurring reminders check
+  useRecurringReminders();
 
   useEffect(() => {
     checkDeviceAuth();

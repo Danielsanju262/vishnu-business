@@ -12,7 +12,7 @@ interface DailyRevenueChartProps {
 }
 
 export function DailyRevenueChart({ chartData, selectedChartDay, setSelectedChartDay, aggregation = 'day' }: DailyRevenueChartProps) {
-    const [chartMetric, setChartMetric] = useState<'revenue' | 'profit' | 'margin'>('revenue');
+    const [chartMetric, setChartMetric] = useState<'revenue' | 'profit' | 'cashInHand' | 'margin'>('profit');
     const [isTransitioning, setIsTransitioning] = useState(false);
     const prevMetricRef = useRef(chartMetric);
 
@@ -30,6 +30,7 @@ export function DailyRevenueChart({ chartData, selectedChartDay, setSelectedChar
         if (chartMetric === 'margin') {
             return d.revenue > 0 ? (d.profit / d.revenue) * 100 : 0;
         }
+        if (chartMetric === 'cashInHand') return Math.abs(d.cashInHand || 0);
         return chartMetric === 'revenue' ? d.revenue : Math.abs(d.profit);
     }), 1);
 
@@ -69,7 +70,7 @@ export function DailyRevenueChart({ chartData, selectedChartDay, setSelectedChar
     }, [chartData]);
 
     const titlePrefix = aggregation === 'week' ? 'Weekly' : aggregation === 'month' ? 'Monthly' : 'Daily';
-    const metricLabel = chartMetric === 'revenue' ? 'Revenue' : chartMetric === 'profit' ? 'Profit' : 'Margin';
+    const metricLabel = chartMetric === 'revenue' ? 'Revenue' : chartMetric === 'profit' ? 'Profit' : chartMetric === 'cashInHand' ? 'Cash In Hand' : 'Margin';
 
     return (
         <div
@@ -87,8 +88,8 @@ export function DailyRevenueChart({ chartData, selectedChartDay, setSelectedChar
                         <button
                             onClick={(e) => { e.stopPropagation(); setChartMetric('revenue'); }}
                             className={cn(
-                                "px-3 py-1 text-[10px] font-bold rounded-md transition-all",
-                                chartMetric === 'revenue' ? "bg-blue-500 text-white shadow-md" : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                                "px-3.5 py-1.5 text-[10px] font-bold rounded-md transition-all min-w-[52px]",
+                                chartMetric === 'revenue' ? "bg-white text-zinc-900 shadow-md" : "text-muted-foreground hover:text-foreground hover:bg-background/50"
                             )}
                         >
                             Sales
@@ -96,16 +97,25 @@ export function DailyRevenueChart({ chartData, selectedChartDay, setSelectedChar
                         <button
                             onClick={(e) => { e.stopPropagation(); setChartMetric('profit'); }}
                             className={cn(
-                                "px-3 py-1 text-[10px] font-bold rounded-md transition-all",
+                                "px-3.5 py-1.5 text-[10px] font-bold rounded-md transition-all min-w-[52px]",
                                 chartMetric === 'profit' ? "bg-emerald-500 text-white shadow-md" : "text-muted-foreground hover:text-foreground hover:bg-background/50"
                             )}
                         >
                             Profit
                         </button>
                         <button
+                            onClick={(e) => { e.stopPropagation(); setChartMetric('cashInHand'); }}
+                            className={cn(
+                                "px-3.5 py-1.5 text-[10px] font-bold rounded-md transition-all min-w-[52px]",
+                                chartMetric === 'cashInHand' ? "bg-sky-500 text-white shadow-md" : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+                            )}
+                        >
+                            CIH
+                        </button>
+                        <button
                             onClick={(e) => { e.stopPropagation(); setChartMetric('margin'); }}
                             className={cn(
-                                "px-3 py-1 text-[10px] font-bold rounded-md transition-all",
+                                "px-3.5 py-1.5 text-[10px] font-bold rounded-md transition-all min-w-[52px]",
                                 chartMetric === 'margin' ? "bg-amber-500 text-white shadow-md" : "text-muted-foreground hover:text-foreground hover:bg-background/50"
                             )}
                         >
@@ -134,6 +144,12 @@ export function DailyRevenueChart({ chartData, selectedChartDay, setSelectedChar
                                         <span className="text-[10px] uppercase font-bold text-muted-foreground">{selectedDayData.profit >= 0 ? 'Profit' : 'Loss'}</span>
                                         <span className={cn("text-xl font-black", selectedDayData.profit >= 0 ? "text-emerald-500" : "text-rose-500")}>
                                             ₹{Math.abs(selectedDayData.profit).toLocaleString()}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-baseline gap-1">
+                                        <span className="text-[10px] uppercase font-bold text-muted-foreground">CIH</span>
+                                        <span className="text-xl font-black text-sky-500">
+                                            ₹{(selectedDayData.cashInHand || 0).toLocaleString()}
                                         </span>
                                     </div>
                                     <div className="flex items-baseline gap-1">
@@ -205,6 +221,8 @@ export function DailyRevenueChart({ chartData, selectedChartDay, setSelectedChar
                                 let value;
                                 if (chartMetric === 'margin') {
                                     value = day.revenue > 0 ? (day.profit / day.revenue) * 100 : 0;
+                                } else if (chartMetric === 'cashInHand') {
+                                    value = day.cashInHand || 0;
                                 } else {
                                     value = chartMetric === 'revenue' ? day.revenue : day.profit;
                                 }
@@ -220,8 +238,8 @@ export function DailyRevenueChart({ chartData, selectedChartDay, setSelectedChar
                                 let selectedGradient = "ring-2"; // default
 
                                 if (chartMetric === 'revenue') {
-                                    if (value > 0) barGradient = "bg-gradient-to-t from-blue-600 to-blue-400";
-                                    selectedGradient = "from-blue-600 to-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.4)] ring-2 ring-blue-500/50";
+                                    if (value > 0) barGradient = "bg-gradient-to-t from-zinc-400 to-white";
+                                    selectedGradient = "from-zinc-400 to-white shadow-[0_0_15px_rgba(255,255,255,0.4)] ring-2 ring-white/50";
                                 } else if (chartMetric === 'profit') {
                                     if (value > 0) barGradient = "bg-gradient-to-t from-emerald-600 to-emerald-400";
                                     else if (value < 0) {
@@ -238,6 +256,13 @@ export function DailyRevenueChart({ chartData, selectedChartDay, setSelectedChar
                                     } else {
                                         selectedGradient = "from-amber-500 to-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.4)] ring-2 ring-amber-500/50";
                                     }
+                                } else if (chartMetric === 'cashInHand') {
+                                    if (value > 0) barGradient = "bg-gradient-to-t from-sky-500 to-sky-300";
+                                    else if (value < 0) {
+                                        barGradient = "bg-gradient-to-t from-rose-600 to-rose-400";
+                                        selectedGradient = "from-rose-600 to-rose-400 shadow-[0_0_15px_rgba(244,63,94,0.4)] ring-2 ring-rose-500/50";
+                                    }
+                                    if (value >= 0) selectedGradient = "from-sky-500 to-sky-300 shadow-[0_0_15px_rgba(14,165,233,0.4)] ring-2 ring-sky-500/50";
                                 }
 
                                 const marginHere = day.revenue > 0 ? ((day.profit / day.revenue) * 100) : 0;
@@ -264,6 +289,7 @@ export function DailyRevenueChart({ chartData, selectedChartDay, setSelectedChar
                                                 <p className="font-bold text-xs mb-0.5">{day.label}</p>
                                                 <p className="font-medium">Sales: <span className="text-blue-400">₹{day.revenue.toLocaleString()}</span></p>
                                                 <p className="font-medium">Profit: <span className={cn(day.profit >= 0 ? "text-emerald-400" : "text-rose-400")}>₹{day.profit.toLocaleString()}</span></p>
+                                                <p className="font-medium">CIH: <span className="text-sky-400">₹{(day.cashInHand || 0).toLocaleString()}</span></p>
                                                 <p className="font-medium">Margin: <span className={cn(marginHere >= 0 ? "text-amber-400" : "text-rose-400")}>{marginHere.toFixed(1)}%</span></p>
                                             </div>
                                             <div className="w-2.5 h-2.5 bg-zinc-900 dark:bg-zinc-800 rotate-45 -mt-1 border-r border-b border-white/10"></div>

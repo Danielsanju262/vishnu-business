@@ -20,6 +20,7 @@ interface InsightData {
     customers: any[];
     paymentReminders: any[];
     accountsPayable: any[];
+    creditCollections: any[];
     previousPeriodTransactions: any[];
 
 }
@@ -51,12 +52,15 @@ export default function BusinessInsights() {
         customers: [],
         paymentReminders: [],
         accountsPayable: [],
+        creditCollections: [],
         previousPeriodTransactions: [],
     });
     const [historicalData, setHistoricalData] = useState<{
         transactions: any[];
         expenses: any[];
-    }>({ transactions: [], expenses: [] });
+        paymentReminders: any[];
+        creditCollections: any[];
+    }>({ transactions: [], expenses: [], paymentReminders: [], creditCollections: [] });
     const [isLoading, setIsLoading] = useState(true);
     const [isHistoricalLoading, setIsHistoricalLoading] = useState(false);
 
@@ -99,17 +103,18 @@ export default function BusinessInsights() {
         const prevPeriod = getPreviousPeriodDates();
 
         try {
-            const [transactionsRes, expensesRes, customersRes, remindersRes, payablesRes, prevTransactionsRes] = await Promise.all([
+            const [transactionsRes, expensesRes, customersRes, remindersRes, payablesRes, collectionsRes, prevTransactionsRes] = await Promise.all([
                 supabase.from('transactions').select('*, customers(name, id), products(name, unit, category)').is('deleted_at', null).gte('date', start).lte('date', end).order('date', { ascending: false }),
                 supabase.from('expenses').select('*').is('deleted_at', null).gte('date', start).lte('date', end),
                 supabase.from('customers').select('*'),
                 supabase.from('payment_reminders').select('*, customers(name)').eq('status', 'pending'),
                 supabase.from('accounts_payable').select('*, suppliers(name)').eq('status', 'pending'),
+                supabase.from('credit_collections').select('collected_at, amount').gte('collected_at', start).lte('collected_at', end),
                 supabase.from('transactions').select('*, customers(name, id), products(name, unit, category)').is('deleted_at', null).gte('date', prevPeriod.start).lte('date', prevPeriod.end),
             ]);
 
             // Check for errors in results
-            const errors = [transactionsRes, expensesRes, customersRes, remindersRes, payablesRes, prevTransactionsRes].filter(r => r.error);
+            const errors = [transactionsRes, expensesRes, customersRes, remindersRes, payablesRes, collectionsRes, prevTransactionsRes].filter(r => r.error);
             if (errors.length > 0) throw errors[0].error;
 
             setData({
@@ -118,6 +123,7 @@ export default function BusinessInsights() {
                 customers: customersRes.data || [],
                 paymentReminders: remindersRes.data || [],
                 accountsPayable: payablesRes.data || [],
+                creditCollections: collectionsRes.data || [],
                 previousPeriodTransactions: prevTransactionsRes.data || [],
             });
         } catch (error) {
@@ -128,7 +134,7 @@ export default function BusinessInsights() {
         }
     }, [getDateFilter, getPreviousPeriodDates]);
 
-    useRealtimeTables(['transactions', 'expenses', 'payment_reminders', 'accounts_payable'], fetchData, [rangeType, startDate, endDate]);
+    useRealtimeTables(['transactions', 'expenses', 'payment_reminders', 'accounts_payable', 'credit_collections'], fetchData, [rangeType, startDate, endDate]);
 
     // Fetch Historical Data when Week/Month view is selected
     useEffect(() => {
@@ -140,17 +146,23 @@ export default function BusinessInsights() {
                     const end = format(new Date(), 'yyyy-MM-dd');
                     const start = format(subMonths(new Date(), 12), 'yyyy-MM-dd');
 
-                    const [transactionsRes, expensesRes] = await Promise.all([
-                        supabase.from('transactions').select('date, quantity, sell_price, buy_price, products(name)').is('deleted_at', null).gte('date', start).lte('date', end),
-                        supabase.from('expenses').select('date, amount, is_ghee_ingredient').is('deleted_at', null).gte('date', start).lte('date', end)
+                    const [transactionsRes, expensesRes, remindersRes, collectionsRes] = await Promise.all([
+                        supabase.from('transactions').select('date, quantity, sell_price, buy_price, credit_amount, customer_id, products(name)').is('deleted_at', null).gte('date', start).lte('date', end),
+                        supabase.from('expenses').select('date, amount, is_ghee_ingredient').is('deleted_at', null).gte('date', start).lte('date', end),
+                        supabase.from('payment_reminders').select('customer_id, recorded_at').gte('recorded_at', start).lte('recorded_at', end),
+                        supabase.from('credit_collections').select('collected_at, amount').gte('collected_at', start).lte('collected_at', end)
                     ]);
 
                     if (transactionsRes.error) throw transactionsRes.error;
                     if (expensesRes.error) throw expensesRes.error;
+                    if (remindersRes.error) throw remindersRes.error;
+                    if (collectionsRes.error) throw collectionsRes.error;
 
                     setHistoricalData({
                         transactions: transactionsRes.data || [],
-                        expenses: expensesRes.data || []
+                        expenses: expensesRes.data || [],
+                        paymentReminders: remindersRes.data || [],
+                        creditCollections: collectionsRes.data || []
                     });
                 } catch (err) {
                     console.error("Failed to fetch historical data", err);
@@ -255,7 +267,7 @@ export default function BusinessInsights() {
 
     // Chart Series Data
     const chartSeries = useMemo(() => {
-        const chartData: { date: string; revenue: number; profit: number; label: string; axisLabel?: string }[] = [];
+        const chartData: { date: string; revenue: number; profit: number; cashInHand: number; label: string; axisLabel?: string }[] = [];
         let canShowChart = false;
 
         // Determine source data and range based on aggregation
@@ -263,6 +275,8 @@ export default function BusinessInsights() {
         // Weekly/Monthly: Uses historical data (last ~12 months fixed)
         let sourceTransactions = data.transactions;
         let sourceExpenses = data.expenses;
+        let sourceCollections = data.creditCollections;
+        let sourceReminders = data.paymentReminders;
         let start: Date;
         let end: Date;
 
@@ -276,6 +290,8 @@ export default function BusinessInsights() {
             // However, request says "other than that [daily], it should show me the data for last 31 weeks and 12 months" so we force this range.
             sourceTransactions = historicalData.transactions.length > 0 ? historicalData.transactions : data.transactions;
             sourceExpenses = historicalData.expenses.length > 0 ? historicalData.expenses : data.expenses;
+            sourceCollections = historicalData.creditCollections.length > 0 ? historicalData.creditCollections : data.creditCollections;
+            sourceReminders = historicalData.paymentReminders.length > 0 ? historicalData.paymentReminders : data.paymentReminders;
             end = new Date();
             start = subMonths(end, 12); // Ensuring we have coverage for the requested logic
         }
@@ -302,11 +318,50 @@ export default function BusinessInsights() {
                 days.forEach(day => {
                     const dateStr = format(day, 'yyyy-MM-dd');
                     const dayData = salesByDay[dateStr];
+
+                    // Sales/Cost
+                    const revenue = dayData ? dayData.revenue : 0;
+                    const cost = dayData ? dayData.cost : 0; // COGS + Ingredient
+                    const gross = revenue - cost;
+
+                    // OpEx (Manual)
+                    const opEx = sourceExpenses.filter(e => !e.is_ghee_ingredient && e.date === dateStr).reduce((acc, e) => acc + e.amount, 0);
+                    const net = gross - opEx;
+
+                    // Calculate CIH Transaction Contribution
+                    let dayContrib = 0;
+                    sourceTransactions.filter(t => t.date === dateStr).forEach((t: any) => {
+                        const saleVal = t.sell_price * t.quantity;
+                        const productCost = t.buy_price * t.quantity;
+                        const profit = saleVal - productCost;
+
+                        if (dateStr >= '2026-01-22') {
+                            const creditAmt = t.credit_amount || 0;
+                            const paidAmt = saleVal - creditAmt;
+                            if (paidAmt === saleVal) dayContrib += profit;
+                            else if (paidAmt === 0) dayContrib += 0;
+                            else dayContrib += paidAmt;
+                        } else {
+                            const wasCredit = sourceReminders.some((r: any) =>
+                                r.customer_id === t.customer_id && (r.recorded_at === dateStr || r.recorded_at?.startsWith(dateStr))
+                            );
+                            if (wasCredit) dayContrib += 0;
+                            else dayContrib += profit;
+                        }
+                    });
+
+                    // Collections
+                    const collected = sourceCollections.filter(c => (c.collected_at?.startsWith(dateStr))).reduce((acc, c: any) => acc + c.amount, 0);
+
+                    // CIH = Contributions + Collections
+                    const dayCIH = dayContrib + collected;
+
                     chartData.push({
                         date: dateStr,
                         label: format(day, 'd MMM'),
-                        revenue: dayData ? dayData.revenue : 0,
-                        profit: dayData ? (dayData.revenue - dayData.cost) : 0
+                        revenue: revenue,
+                        profit: net, // Using Net Profit for consistency
+                        cashInHand: dayCIH
                     });
                 });
                 canShowChart = true;
@@ -350,12 +405,55 @@ export default function BusinessInsights() {
                         })
                         .reduce((acc: number, e: any) => acc + e.amount, 0);
 
+                const weekOpEx = sourceExpenses
+                    .filter((e: any) => {
+                        const d = new Date(e.date);
+                        return !e.is_ghee_ingredient && d >= weekStart && d <= weekEnd;
+                    })
+                    .reduce((acc: number, e: any) => acc + e.amount, 0);
+
+                const weekNet = weekRevenue - weekCost - weekOpEx;
+
+                // Calculate CIH Transaction Contribution for Week
+                let weekContrib = 0;
+                sourceTransactions.filter((t: any) => {
+                    const d = new Date(t.date);
+                    return d >= weekStart && d <= weekEnd;
+                }).forEach((t: any) => {
+                    const dStr = t.date;
+                    const saleVal = t.sell_price * t.quantity;
+                    const productCost = t.buy_price * t.quantity;
+                    const profit = saleVal - productCost;
+
+                    if (dStr >= '2026-01-22') {
+                        const creditAmt = t.credit_amount || 0;
+                        const paidAmt = saleVal - creditAmt;
+                        if (paidAmt === saleVal) weekContrib += profit;
+                        else if (paidAmt === 0) weekContrib += 0;
+                        else weekContrib += paidAmt;
+                    } else {
+                        const wasCredit = sourceReminders.some((r: any) =>
+                            r.customer_id === t.customer_id && (r.recorded_at === dStr || r.recorded_at?.startsWith(dStr))
+                        );
+                        if (wasCredit) weekContrib += 0;
+                        else weekContrib += profit;
+                    }
+                });
+
+                const weekCollected = sourceCollections
+                    .filter((c: any) => {
+                        const d = new Date(c.collected_at);
+                        return d >= weekStart && d <= weekEnd;
+                    })
+                    .reduce((acc: number, c: any) => acc + c.amount, 0);
+
                 chartData.push({
                     date: weekKey,
                     label: `Week of ${format(weekStart, 'd MMM')}`,
                     axisLabel: format(weekStart, 'd MMM'),
                     revenue: weekRevenue,
-                    profit: weekRevenue - weekCost
+                    profit: weekNet,
+                    cashInHand: weekContrib + weekCollected
                 });
             });
             canShowChart = true;
@@ -388,12 +486,55 @@ export default function BusinessInsights() {
                         })
                         .reduce((acc: number, e: any) => acc + e.amount, 0);
 
+                const monthOpEx = sourceExpenses
+                    .filter((e: any) => {
+                        const d = new Date(e.date);
+                        return !e.is_ghee_ingredient && d >= monthStart && d <= monthEnd;
+                    })
+                    .reduce((acc: number, e: any) => acc + e.amount, 0);
+
+                const monthNet = monthRevenue - monthCost - monthOpEx;
+
+                // Calculate CIH Transaction Contribution for Month
+                let monthContrib = 0;
+                sourceTransactions.filter((t: any) => {
+                    const d = new Date(t.date);
+                    return d >= monthStart && d <= monthEnd;
+                }).forEach((t: any) => {
+                    const dStr = t.date;
+                    const saleVal = t.sell_price * t.quantity;
+                    const productCost = t.buy_price * t.quantity;
+                    const profit = saleVal - productCost;
+
+                    if (dStr >= '2026-01-22') {
+                        const creditAmt = t.credit_amount || 0;
+                        const paidAmt = saleVal - creditAmt;
+                        if (paidAmt === saleVal) monthContrib += profit;
+                        else if (paidAmt === 0) monthContrib += 0;
+                        else monthContrib += paidAmt;
+                    } else {
+                        const wasCredit = sourceReminders.some((r: any) =>
+                            r.customer_id === t.customer_id && (r.recorded_at === dStr || r.recorded_at?.startsWith(dStr))
+                        );
+                        if (wasCredit) monthContrib += 0;
+                        else monthContrib += profit;
+                    }
+                });
+
+                const monthCollected = sourceCollections
+                    .filter((c: any) => {
+                        const d = new Date(c.collected_at);
+                        return d >= monthStart && d <= monthEnd;
+                    })
+                    .reduce((acc: number, c: any) => acc + c.amount, 0);
+
                 chartData.push({
                     date: monthKey,
                     label: format(monthStart, 'MMMM yyyy'),
                     axisLabel: format(monthStart, 'MMM'), // Jan, Feb...
                     revenue: monthRevenue,
-                    profit: monthRevenue - monthCost
+                    profit: monthNet,
+                    cashInHand: monthContrib + monthCollected
                 });
             });
             canShowChart = true;

@@ -83,7 +83,7 @@ export function Modal({ isOpen, onClose, children, title, className, showCloseBu
                 {showCloseButton && (
                     <button
                         onClick={onClose}
-                        className="absolute right-4 top-4 p-2 text-muted-foreground hover:bg-accent rounded-full transition z-10"
+                        className="absolute right-3 top-3 p-2 text-muted-foreground hover:bg-accent rounded-full transition z-20 flex-shrink-0"
                         aria-label="Close"
                     >
                         <X size={20} />
@@ -91,7 +91,7 @@ export function Modal({ isOpen, onClose, children, title, className, showCloseBu
                 )}
 
                 {title && (
-                    <div className="mb-6 text-center space-y-2">
+                    <div className="mb-6 text-center space-y-2 pr-10">
                         {title}
                     </div>
                 )}

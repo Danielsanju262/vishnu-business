@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../lib/supabase";
-import { Plus, Minus, TrendingUp, Users, Package, FileText, ChevronRight, Edit3, Check, LogOut, Truck, Calendar, ChevronDown } from "lucide-react";
+import { Plus, Minus, TrendingUp, Users, Package, FileText, ChevronRight, Edit3, Check, LogOut, Truck, Calendar, ChevronDown, Wallet } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 import { Link } from "react-router-dom";
@@ -18,6 +18,7 @@ export default function Dashboard() {
     const [stats, setStats] = useState({
         revenue: 0,
         profit: 0,
+        cashInHand: 0,
     });
 
     const [userName, setUserName] = useState("Vishnu");
@@ -140,35 +141,122 @@ export default function Dashboard() {
 
             const { start, end } = getDateRange();
 
-            // Adjust start date for chart context if needed? 
-            // The user said "whichever date is filtered... the line chart will use the same thing".
-            // So detailed graph strictly follows the filter range.
+            // 1. Transactions Query
+            let tQuery = supabase.from('transactions')
+                .select('date, quantity, sell_price, buy_price, credit_amount, customer_id')
+                .is('deleted_at', null);
 
-            let tQuery = supabase.from('transactions').select('date, quantity, sell_price, buy_price').is('deleted_at', null);
-            let eQuery = supabase.from('expenses').select('date, amount, is_ghee_ingredient').is('deleted_at', null);
+            // 2. Expenses Query
+            let eQuery = supabase.from('expenses')
+                .select('date, amount, is_ghee_ingredient')
+                .is('deleted_at', null);
+
+            // 3. Credit Collections Query (for Cash In Hand - Debt Repayment)
+            // Note: collected_at is date type based on usage patterns
+            let cQuery = supabase.from('credit_collections')
+                .select('amount, collected_at');
+
+            // 4. Payment Reminders (for Historical Cash In Hand Heuristic)
+            // We check if a reminder existed on the sale date to infer if it was a credit sale (pre-Jan 22, 2026)
+            let prQuery = supabase.from('payment_reminders')
+                .select('customer_id, recorded_at');
 
             if (start === end) {
-                // For single day, we might want to show previous days for context?
-                // But user said "same thing". A line graph of 1 point is a dot.
-                // Let's stick to strict filter. 
                 tQuery = tQuery.eq('date', start);
                 eQuery = eQuery.eq('date', start);
+                cQuery = cQuery.eq('collected_at', start);
+                // For reminders, we filter by recorded_at matching the day
+                // Assuming recorded_at is date or we rely on app creating it as date-like for this check
+                // If recorded_at is timestamp, 'eq' might be strict. But typically in this app 'date' cols are used.
+                // To be safe for heuristic matching, let's fetch a slightly wider range or just day? 
+                // Let's use same eq for consistency with other queries, optimizing for 'date' column type.
+                prQuery = prQuery.gte('recorded_at', start).lte('recorded_at', end);
             } else {
                 tQuery = tQuery.gte('date', start).lte('date', end);
                 eQuery = eQuery.gte('date', start).lte('date', end);
+                cQuery = cQuery.gte('collected_at', start).lte('collected_at', end);
+                prQuery = prQuery.gte('recorded_at', start).lte('recorded_at', end);
             }
 
-            const [tRes, eRes] = await Promise.all([tQuery, eQuery]);
+            const [tRes, eRes, cRes, prRes] = await Promise.all([tQuery, eQuery, cQuery, prQuery]);
 
             if (tRes.error) throw tRes.error;
             if (eRes.error) throw eRes.error;
+            if (cRes.error) throw cRes.error;
+            // prRes failure shouldn't block everything, but let's assume success
 
             const transactions = tRes.data || [];
             const expenses = eRes.data || [];
+            const collections = cRes.data || [];
+            const reminders = prRes.data || [];
 
             // Calculate Totals
             const { revenue, netProfit } = calculateProfit(transactions, expenses);
-            setStats({ revenue, profit: netProfit });
+
+            // ============================================================
+            // CASH IN HAND CALCULATION
+            // ============================================================
+            // Formula per transaction:
+            // - Full Cash Sale:    Net Profit (profit - 0)
+            // - Full Credit Sale:  Net Profit - Credit Amount (= -cost)
+            // - Partial Credit:    (Net Profit - Credit Amount) + Partial Paid
+            //
+            // Then add debt collections at the end
+            // ============================================================
+
+            // ============================================================
+            // CASH IN HAND CALCULATION - STRICT PER-SALE LOGIC
+            // ============================================================
+            // 1. Calculate Contribution from Sales
+            let totalCihContribution = 0;
+            const CUTOFF_DATE = '2026-01-22';
+
+            transactions.forEach((t: any) => {
+                const saleValue = t.sell_price * t.quantity;
+                const productCost = t.buy_price * t.quantity;
+                const profit = saleValue - productCost;
+                const d = t.date;
+
+                if (d >= CUTOFF_DATE) {
+                    const creditAmount = t.credit_amount || 0;
+                    const paidAmount = saleValue - creditAmount;
+
+                    if (paidAmount === saleValue) {
+                        // Full Cash: Profit
+                        totalCihContribution += profit;
+                    } else if (paidAmount === 0) {
+                        // Full Credit: 0
+                        totalCihContribution += 0;
+                    } else {
+                        // Partial: Paid Amount
+                        totalCihContribution += paidAmount;
+                    }
+                } else {
+                    // Historical heuristic
+                    const wasCredit = reminders.some((r: any) =>
+                        r.customer_id === t.customer_id &&
+                        (r.recorded_at === d || r.recorded_at?.startsWith(d))
+                    );
+
+                    if (wasCredit) {
+                        totalCihContribution += 0;
+                    } else {
+                        totalCihContribution += profit;
+                    }
+                }
+            });
+
+            // 2. Sum Collections
+            let totalCollections = 0;
+            collections.forEach((c: any) => {
+                totalCollections += c.amount;
+            });
+
+            // 3. Final CIH = Contribution + Collections (NO global expense deduction)
+            const cashInHand = totalCihContribution + totalCollections;
+
+
+            setStats({ revenue, profit: netProfit, cashInHand });
 
             // Generate Chart Data Points - Always daily
             const days = eachDayOfInterval({ start: new Date(start), end: new Date(end) });
@@ -193,6 +281,54 @@ export default function Dashboard() {
             });
 
 
+            // Pre-process CIH contribution by day using USER DEFINED STRICT LOGIC
+            const cihContributionByDay: Record<string, number> = {};
+
+            transactions.forEach((t: any) => {
+                const d = t.date;
+                const saleValue = t.sell_price * t.quantity;
+                const productCost = t.buy_price * t.quantity;
+                const profit = saleValue - productCost;
+
+                if (!cihContributionByDay[d]) cihContributionByDay[d] = 0;
+
+                if (d >= CUTOFF_DATE) {
+                    const creditAmount = t.credit_amount || 0;
+                    const paidAmount = saleValue - creditAmount;
+
+                    if (paidAmount === saleValue) {
+                        // Full Cash: Net Profit (Sale - Cost)
+                        // Note: OpEx is subtracted globally later to reach true "Net"
+                        cihContributionByDay[d] += profit;
+                    } else if (paidAmount === 0) {
+                        // Full Credit: 0
+                        cihContributionByDay[d] += 0;
+                    } else {
+                        // Partial: Partial Amount Paid
+                        cihContributionByDay[d] += paidAmount;
+                    }
+                } else {
+                    const wasCredit = reminders.some((r: any) =>
+                        r.customer_id === t.customer_id &&
+                        (r.recorded_at === d || r.recorded_at?.startsWith(d))
+                    );
+                    if (wasCredit) {
+                        // Full Credit: 0
+                        cihContributionByDay[d] += 0;
+                    } else {
+                        // Full Cash: Profit
+                        cihContributionByDay[d] += profit;
+                    }
+                }
+            });
+
+            const collectionsByDay: Record<string, number> = {};
+            collections.forEach((c: any) => {
+                // collected_at is likely YYYY-MM-DD based on query usage, but safe split
+                const d = c.collected_at ? c.collected_at.split('T')[0] : '';
+                if (d) collectionsByDay[d] = (collectionsByDay[d] || 0) + c.amount;
+            });
+
             const generatedChartData = days.map(day => {
                 const dateStr = format(day, 'yyyy-MM-dd');
                 const daySales = salesByDay[dateStr];
@@ -203,11 +339,21 @@ export default function Dashboard() {
                 const dayGross = dayRevenue - dayCOGS;
                 const dayNet = dayGross - dayOpEx;
 
+                // CIH = Sum of Daily Contributions + Collections
+                // User requirement: "CIH of each sale + any payment collected... nothing else"
+                const dayContribution = cihContributionByDay[dateStr] || 0;
+                const dayCollections = collectionsByDay[dateStr] || 0;
+
+
+
+                const dayCashInHand = dayContribution + dayCollections;
+
                 return {
                     date: dateStr,
                     label: format(day, 'd MMM'),
                     revenue: dayRevenue,
-                    profit: dayNet
+                    profit: dayNet,
+                    cashInHand: dayCashInHand
                 };
             });
 
@@ -221,8 +367,8 @@ export default function Dashboard() {
         }
     }, [getDateRange]);
 
-    // Real-time sync for transactions and expenses
-    useRealtimeTables(['transactions', 'expenses'], fetchStatsAndChart, [fetchStatsAndChart]);
+    // Real-time sync for transactions, expenses, collections, and reminders
+    useRealtimeTables(['transactions', 'expenses', 'credit_collections', 'payment_reminders'], fetchStatsAndChart, [fetchStatsAndChart]);
 
     // Grayscale palette for dark mode icons
     const menuItems = [
@@ -386,7 +532,7 @@ export default function Dashboard() {
                     </div>
 
 
-                    <div className="relative z-10 space-y-6  p-6 md:p-7">
+                    <div className="relative z-10 space-y-4 p-6 md:p-7">
                         {isLoadingStats ? (
                             // Loading Skeleton
                             <div className="space-y-5 animate-pulse">
@@ -425,9 +571,21 @@ export default function Dashboard() {
                                                         dateFilter === 'thisMonth' ? 'Revenue (This Month)' :
                                                             'Revenue (Custom)'}
                                         </p>
-                                        <h2 className="text-3xl font-bold text-white tracking-tight">
-                                            <span className="text-lg align-top opacity-50 font-normal">₹</span>
+                                        <h2 className="text-4xl font-bold text-white tracking-tight">
+                                            <span className="text-xl align-top opacity-50 font-normal">₹</span>
                                             {stats.revenue.toLocaleString()}
+                                        </h2>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-7 mt-4 pt-4 border-t border-white/10">
+                                    <div className="space-y-1 flex flex-col items-start">
+                                        <p className="text-white/50 font-medium text-[10px] uppercase tracking-wider text-left w-full whitespace-nowrap">Cash in Hand</p>
+                                        <h2 className="text-3xl font-bold text-sky-400 tracking-tight flex items-center gap-1">
+                                            <span>
+                                                <span className="text-lg align-top opacity-60 font-normal mr-0.5">₹</span>
+                                                {stats.cashInHand.toLocaleString()}
+                                            </span>
                                         </h2>
                                     </div>
                                     <div className="space-y-1 flex flex-col items-start">
@@ -436,7 +594,7 @@ export default function Dashboard() {
                                             "text-3xl font-bold tracking-tight flex items-center gap-1",
                                             stats.profit >= 0 ? "text-emerald-400" : "text-rose-400"
                                         )}>
-                                            {stats.profit >= 0 ? <Plus size={16} strokeWidth={2.5} /> : <Minus size={15} strokeWidth={2.5} />}
+                                            {stats.profit >= 0 ? <Plus size={20} strokeWidth={2.5} /> : <Minus size={18} strokeWidth={2.5} />}
                                             <span>
                                                 <span className="text-lg align-top opacity-60 font-normal mr-0.5">₹</span>
                                                 {Math.abs(stats.profit).toLocaleString()}
@@ -448,10 +606,10 @@ export default function Dashboard() {
                                 <Link
                                     to="/reports"
                                     state={{ defaultFilter: 'month' }}
-                                    className="group flex items-center justify-center gap-2 w-full py-2.5 bg-white/5 hover:bg-white/10 active:bg-white/15 active:scale-[0.98] backdrop-blur-sm border border-white/5 hover:border-white/10 text-white/70 hover:text-white rounded-lg text-xs font-medium tracking-wide transition-all duration-200 focus-visible:ring-2 focus-visible:ring-white/20 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                                    className="group flex items-center justify-center gap-2 w-full py-2.5 bg-white/5 hover:bg-white/10 active:bg-white/15 active:scale-[0.98] backdrop-blur-sm border border-white/10 hover:border-white/20 text-white hover:text-white rounded-lg text-xs font-medium tracking-wide transition-all duration-200 focus-visible:ring-2 focus-visible:ring-white/20 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                                 >
                                     View Detailed Report
-                                    <ChevronRight className="opacity-50 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all duration-200" size={14} strokeWidth={2.5} />
+                                    <ChevronRight className="opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all duration-200" size={14} strokeWidth={2.5} />
                                 </Link>
 
                                 {/* Line Graph Section */}
@@ -465,11 +623,11 @@ export default function Dashboard() {
                                     {/* View Insights Button */}
                                     <Link
                                         to="/insights/business"
-                                        className="group flex items-center justify-center gap-2 w-full mt-4 py-2.5 bg-white/5 hover:bg-white/10 active:bg-white/15 active:scale-[0.98] backdrop-blur-sm border border-white/5 hover:border-white/10 text-white/70 hover:text-white rounded-lg text-xs font-medium tracking-wide transition-all duration-200 focus-visible:ring-2 focus-visible:ring-white/20 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                                        className="group flex items-center justify-center gap-2 w-full mt-4 py-2.5 bg-white/5 hover:bg-white/10 active:bg-white/15 active:scale-[0.98] backdrop-blur-sm border border-white/10 hover:border-white/20 text-white hover:text-white rounded-lg text-xs font-medium tracking-wide transition-all duration-200 focus-visible:ring-2 focus-visible:ring-white/20 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                                         onClick={(e) => e.stopPropagation()}
                                     >
                                         View Insights
-                                        <ChevronRight className="opacity-50 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all duration-200" size={14} strokeWidth={2.5} />
+                                        <ChevronRight className="opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all duration-200" size={14} strokeWidth={2.5} />
                                     </Link>
                                 </div>
                             </>

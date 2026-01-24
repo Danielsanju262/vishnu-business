@@ -36,12 +36,12 @@ export default function Reports() {
     const [activeTab, setActiveTab] = useState<'profit' | 'customers' | 'activity'>('profit');
 
     // Data State
-    const [data, setData] = useState<{ transactions: any[], expenses: any[] }>({ transactions: [], expenses: [] });
+    const [data, setData] = useState<{ transactions: any[], expenses: any[], collections: any[], paymentReminders: any[] }>({ transactions: [], expenses: [], collections: [], paymentReminders: [] });
     const [combinedExpenses, setCombinedExpenses] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
     // Detail Modal State - synced with browser history
-    const [selectedDetail, setSelectedDetail] = useState<'sales' | 'goods' | 'expenses' | null>(null);
+    const [selectedDetail, setSelectedDetail] = useState<'sales' | 'goods' | 'expenses' | 'credit' | 'collections' | null>(null);
     const [selectedCustomer, setSelectedCustomer] = useState<string | null>(null);
 
     // Customer Report State
@@ -168,8 +168,25 @@ export default function Reports() {
 
             if (eError) throw eError;
 
-            if (transactions && expenses) {
-                setData({ transactions, expenses });
+            const { data: collections, error: cError } = await supabase
+                .from('credit_collections')
+                .select('*, customers(name)')
+                .gte('collected_at', start)
+                .lte('collected_at', end)
+                .order('collected_at', { ascending: false });
+
+            if (cError) throw cError;
+
+            const { data: reminders, error: rError } = await supabase
+                .from('payment_reminders')
+                .select('customer_id, recorded_at')
+                .gte('recorded_at', start)
+                .lte('recorded_at', end);
+
+            if (rError) throw rError;
+
+            if (transactions && expenses && collections && reminders) {
+                setData({ transactions, expenses, collections, paymentReminders: reminders });
 
                 // Combine for "Expenses View"
                 // 1. Manual Expenses (Other Expense)
@@ -206,7 +223,7 @@ export default function Reports() {
     }, [rangeType, startDate, endDate, toast]);
 
     // Real-time sync for transactions and expenses - auto-refreshes when data changes on any device
-    useRealtimeTables(['transactions', 'expenses'], fetchData, [rangeType, startDate, endDate]);
+    useRealtimeTables(['transactions', 'expenses', 'credit_collections', 'payment_reminders'], fetchData, [rangeType, startDate, endDate]);
 
     const deleteTransaction = async (id: string, customerName?: string, productName?: string) => {
         // 1. Fetch fresh transaction details from DB
@@ -823,6 +840,64 @@ export default function Reports() {
 
     const profitMargin = totalSales > 0 ? (netProfit / totalSales) * 100 : 0;
 
+    // ============================================================
+    // CASH IN HAND CALCULATION
+    // ============================================================
+    // Formula per transaction:
+    // - Full Cash Sale:    Net Profit (profit - 0)
+    // - Full Credit Sale:  Net Profit - Credit Amount (= -cost)
+    // - Partial Credit:    (Net Profit - Credit Amount) + Partial Paid
+    // Then add debt collections at the end
+    // ============================================================
+    const CUTOFF_DATE = '2026-01-22';
+
+    let totalCreditGiven = 0; // Keep for display in P&L breakdown
+    let cihTransactionContribution = 0;
+
+    data.transactions.forEach((t) => {
+        const saleValue = t.quantity * t.sell_price;
+        const productCost = t.quantity * t.buy_price;
+        const profit = saleValue - productCost;
+
+        if (t.date >= CUTOFF_DATE) {
+            const creditAmount = t.credit_amount || 0;
+            totalCreditGiven += creditAmount;
+
+            const paidAmount = saleValue - creditAmount;
+
+            if (paidAmount === saleValue) {
+                // Full Cash: Profit
+                cihTransactionContribution += profit;
+            } else if (paidAmount === 0) {
+                // Full Credit: 0
+                cihTransactionContribution += 0;
+            } else {
+                // Partial: Paid Amount
+                cihTransactionContribution += paidAmount;
+            }
+        } else {
+            // Historical heuristic (pre-cutoff): only full cash or full credit
+            const wasCredit = data.paymentReminders.some((r: any) =>
+                r.customer_id === t.customer_id && (r.recorded_at === t.date || r.recorded_at?.startsWith(t.date))
+            );
+
+            if (wasCredit) {
+                // FULL CREDIT
+                totalCreditGiven += saleValue;
+                cihTransactionContribution += 0;
+            } else {
+                // FULL CASH
+                cihTransactionContribution += profit;
+            }
+        }
+    });
+
+    // Add collections
+    const totalCollections = data.collections.reduce((acc, c) => acc + c.amount, 0);
+
+    // Final Cash in Hand = Transaction Contributions + Collections
+    const cashInHand = cihTransactionContribution + totalCollections;
+
     // 2. Customer Aggregation
     const customerStats = useMemo(() => {
         const stats: Record<string, { name: string, sales: number, count: number, transactions: any[] }> = {};
@@ -1169,15 +1244,55 @@ export default function Reports() {
                             </div>
                         </div>
 
+                        {/* CASH FLOW STATEMENT */}
+                        <div className="bg-card rounded-2xl border border-border/60 p-5 shadow-sm space-y-4">
+                            <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+                                <Wallet className="text-sky-500" size={20} />
+                                Cash Flow Statement
+                            </h3>
+                            <div className="space-y-3 pt-2">
+                                {/* 1. CIH from Sales */}
+                                <div className="flex justify-between items-center px-2.5 md:px-3 py-1 bg-muted/20 rounded-xl">
+                                    <div className="flex flex-col">
+                                        <span className="text-muted-foreground font-medium text-sm">CIH from Sales</span>
+                                        <span className="text-[10px] text-muted-foreground/50">Profit (Cash) + Paid Amount (Partial)</span>
+                                    </div>
+                                    <span className="font-bold text-sm text-emerald-600">
+                                        ₹{cihTransactionContribution.toLocaleString()}
+                                    </span>
+                                </div>
+
+                                {/* 2. Past Dues Collected */}
+                                <div className="flex justify-between items-center px-2.5 md:px-3 py-1 bg-muted/20 rounded-xl">
+                                    <div className="flex items-center gap-2">
+                                        <div className="p-1.5 bg-sky-500/10 rounded-lg text-sky-600">
+                                            <TrendingUp size={16} />
+                                        </div>
+                                        <span className="text-muted-foreground font-medium text-sm">Collections</span>
+                                    </div>
+                                    <span className="font-bold text-emerald-600 text-sm py-1.5">+ ₹{totalCollections.toLocaleString()}</span>
+                                </div>
+
+                                <div className="bg-sky-500/10 p-2.5 md:p-3 rounded-xl mt-4 flex justify-between items-center border border-sky-500/20">
+                                    <span className="text-sm font-black text-sky-700 dark:text-sky-400 uppercase tracking-wide">Cash in Hand</span>
+                                    <div className="text-right">
+                                        <span className="text-xl font-black text-sky-600 dark:text-sky-400">
+                                            ₹{cashInHand.toLocaleString()}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         {/* --- DETAIL MODAL --- */}
                         <Modal
-                            isOpen={!!selectedDetail}
+                            isOpen={!!selectedDetail && selectedDetail !== 'collections' && selectedDetail !== 'credit'} // Simplified: Disable modal for now for cash/collections
                             onClose={() => setSelectedDetail(null)}
                             className="bg-zinc-950 border-zinc-800 border max-w-lg p-0 overflow-hidden flex flex-col max-h-[85vh]"
                         >
                             {selectedDetail && (
                                 <>
-                                    <div className="p-5 border-b border-zinc-800 bg-zinc-950 shrink-0">
+                                    <div className="p-5 pr-12 border-b border-zinc-800 bg-zinc-950 shrink-0">
                                         <h3 className="font-black text-lg flex items-center gap-2 text-white">
                                             {selectedDetail === 'sales' && <><TrendingUp className="text-emerald-500" /> Gross Sales Breakdown</>}
                                             {selectedDetail === 'goods' && <><ShoppingBag className="text-orange-500" /> Goods Cost Breakdown</>}
@@ -1192,7 +1307,7 @@ export default function Reports() {
                                                 data.transactions.map((t: any) => (
                                                     <div key={t.id} className="flex justify-between items-center p-3 bg-zinc-900 border border-zinc-800 rounded-xl">
                                                         <div>
-                                                            <p className="font-bold text-sm text-zinc-200">{t.products?.name}</p>
+                                                            <p className="font-bold text-sm text-zinc-200 truncate pr-8">{t.products?.name}</p>
                                                             <p className="text-xs text-zinc-400">{t.quantity} {t.products?.unit} x ₹{t.sell_price}</p>
                                                         </div>
                                                         <div className="font-bold text-emerald-500">₹{(t.quantity * t.sell_price).toLocaleString()}</div>
@@ -1208,8 +1323,8 @@ export default function Reports() {
                                                     <div key={`cogs-${t.id}`} className="flex justify-between items-center p-3 bg-zinc-900 border border-zinc-800 rounded-xl">
                                                         <div>
                                                             <div className="flex items-center gap-2">
-                                                                <p className="font-bold text-sm text-zinc-200">{t.products?.name}</p>
-                                                                <span className="text-[10px] bg-orange-950 text-orange-400 px-1.5 py-0.5 rounded uppercase font-bold">Sold Item Cost</span>
+                                                                <p className="font-bold text-sm text-zinc-200 truncate max-w-[150px]">{t.products?.name}</p>
+                                                                <span className="text-[10px] bg-orange-950 text-orange-400 px-1.5 py-0.5 rounded uppercase font-bold shrink-0">Sold Item Cost</span>
                                                             </div>
                                                             <p className="text-xs text-zinc-400">{t.quantity} {t.products?.unit} x ₹{t.buy_price} (Buy Price)</p>
                                                         </div>
@@ -1222,8 +1337,8 @@ export default function Reports() {
                                                     <div key={e.id} className="flex justify-between items-center p-3 bg-zinc-900 border border-zinc-800 rounded-xl">
                                                         <div>
                                                             <div className="flex items-center gap-2">
-                                                                <p className="font-bold text-sm text-zinc-200">{e.title}</p>
-                                                                <span className="text-[10px] bg-orange-950 text-orange-400 px-1.5 py-0.5 rounded uppercase font-bold">Ingredient</span>
+                                                                <p className="font-bold text-sm text-zinc-200 truncate max-w-[150px]">{e.title}</p>
+                                                                <span className="text-[10px] bg-orange-950 text-orange-400 px-1.5 py-0.5 rounded uppercase font-bold shrink-0">Ingredient</span>
                                                             </div>
                                                             <p className="text-xs text-zinc-400">{new Date(e.date).toLocaleDateString()}</p>
                                                         </div>
@@ -1244,10 +1359,58 @@ export default function Reports() {
                                                 data.expenses.filter(e => !e.is_ghee_ingredient).map((e: any) => (
                                                     <div key={e.id} className="flex justify-between items-center p-3 bg-zinc-900 border border-zinc-800 rounded-xl">
                                                         <div>
-                                                            <p className="font-bold text-sm text-zinc-200">{e.title}</p>
+                                                            <p className="font-bold text-sm text-zinc-200 truncate pr-8">{e.title}</p>
                                                             <p className="text-xs text-zinc-400">{new Date(e.date).toLocaleDateString()}</p>
                                                         </div>
                                                         <div className="font-bold text-rose-500">-₹{e.amount.toLocaleString()}</div>
+                                                    </div>
+                                                ))
+                                        )}
+
+                                        {/* CREDIT GIVEN BREAKDOWN */}
+                                        {selectedDetail === 'credit' && (
+                                            (() => {
+                                                const creditSales = data.transactions.filter(t => {
+                                                    if (t.date >= CUTOFF_DATE) return (t.credit_amount || 0) > 0;
+                                                    // Heuristic
+                                                    return data.paymentReminders.some((r: any) =>
+                                                        r.customer_id === t.customer_id && (r.recorded_at === t.date || r.recorded_at?.startsWith(t.date))
+                                                    );
+                                                });
+
+                                                return creditSales.length === 0 ? <p className="text-center text-zinc-500 py-8">No credit sales found.</p> :
+                                                    creditSales.map((t: any) => {
+                                                        const isModern = t.date >= CUTOFF_DATE;
+                                                        const amount = isModern ? t.credit_amount : (t.quantity * t.sell_price);
+
+                                                        return (
+                                                            <div key={t.id} className="flex justify-between items-center p-3 bg-zinc-900 border border-zinc-800 rounded-xl">
+                                                                <div>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <p className="font-bold text-sm text-zinc-200 truncate max-w-[150px]">{t.customers?.name}</p>
+                                                                        <span className="text-[10px] bg-amber-950 text-amber-400 px-1.5 py-0.5 rounded uppercase font-bold shrink-0">Credit</span>
+                                                                    </div>
+                                                                    <p className="text-xs text-zinc-400 truncate pr-4">{t.products?.name} - {new Date(t.date).toLocaleDateString()}</p>
+                                                                </div>
+                                                                <div className="font-bold text-amber-500">₹{amount.toLocaleString()}</div>
+                                                            </div>
+                                                        );
+                                                    });
+                                            })()
+                                        )}
+
+                                        {/* COLLECTIONS BREAKDOWN */}
+                                        {selectedDetail === 'collections' && (
+                                            data.collections.length === 0 ? <p className="text-center text-zinc-500 py-8">No collections found.</p> :
+                                                data.collections.map((c: any) => (
+                                                    <div key={c.id} className="flex justify-between items-center p-3 bg-zinc-900 border border-zinc-800 rounded-xl">
+                                                        <div>
+                                                            <div className="flex items-center gap-2">
+                                                                <p className="font-bold text-sm text-zinc-200 truncate pr-8">{c.customers?.name}</p>
+                                                            </div>
+                                                            <p className="text-xs text-zinc-400">{new Date(c.collected_at).toLocaleDateString()}</p>
+                                                        </div>
+                                                        <div className="font-bold text-emerald-500">+₹{c.amount.toLocaleString()}</div>
                                                     </div>
                                                 ))
                                         )}
@@ -1259,6 +1422,8 @@ export default function Reports() {
                                                 {selectedDetail === 'sales' && `₹${totalSales.toLocaleString()}`}
                                                 {selectedDetail === 'goods' && `₹${totalGoodsCost.toLocaleString()}`}
                                                 {selectedDetail === 'expenses' && `₹${totalOtherExpenses.toLocaleString()}`}
+                                                {selectedDetail === 'credit' && `₹${totalCreditGiven.toLocaleString()}`}
+                                                {selectedDetail === 'collections' && `₹${totalCollections.toLocaleString()}`}
                                             </span>
                                         </div>
                                     </div>
