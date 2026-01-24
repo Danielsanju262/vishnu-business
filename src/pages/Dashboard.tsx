@@ -13,7 +13,7 @@ import { eachDayOfInterval } from "date-fns";
 
 
 export default function Dashboard() {
-    const { lockApp } = useAuth();
+    const { lockApp } = useAuth(); // Trigger rebuild
 
     const [stats, setStats] = useState({
         revenue: 0,
