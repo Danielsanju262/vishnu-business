@@ -865,7 +865,6 @@ export default function PaymentReminders() {
                                     if (config.frequency === 'daily') {
                                         frequencyText = `Daily at ${timeDisplay}`;
                                     } else if (config.frequency === 'weekly') {
-                                        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
                                         // Adjust day index if needed based on JS Date
                                         // In schema, we usually store 1=Mon, 7=Sun? Or 0=Sun. 
                                         // Let's assume standard JS: 0=Sun, 1=Mon.
