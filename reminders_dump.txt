@@ -1,0 +1,23 @@
+CID: f47a9f43-b0fb-4c7f-b1d3-e2d02ecd47bd
+NOTE:
+
+---
+CID: cf8474ab-4934-4f9f-81f6-af3cedd01232
+NOTE:
+[8 Jan 12:58 AM] Credit Sale: ₹330. Balance: ₹330
+[12 Jan 18:32] Credit Sale: ₹525. Balance: ₹855
+[22 Jan 15:58] Credit Sale: ₹435. Balance: ₹1,290
+---
+CID: f47a9f43-b0fb-4c7f-b1d3-e2d02ecd47bd
+NOTE:
+
+---
+CID: f47a9f43-b0fb-4c7f-b1d3-e2d02ecd47bd
+NOTE:
+
+---
+CID: 1e527e72-e6bd-49af-bfc9-8a6b29c864b5
+NOTE:
+[9 Jan 21:43] Credit Sale: ₹510. Balance: ₹510
+[20 Jan 11:50] Credit Sale: ₹10. Balance: ₹520
+---

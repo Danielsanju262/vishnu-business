@@ -1,0 +1,9 @@
+﻿Found 8 sales for V M BALAJI:
+Date: 2026-01-02, Qty: 5, Price: 90, Total: 450, Paid: 450, Credit: 0, ID: 63ba25ea-6db9-45be-b556-c4708e22cbc8
+Date: 2026-01-02, Qty: 10, Price: 190, Total: 1900, Paid: 1900, Credit: 0, ID: cfc03515-e400-483a-8494-087785da2126
+Date: 2026-01-08, Qty: 10, Price: 190, Total: 1900, Paid: 0, Credit: 1900, ID: 9e0c13d4-d399-4d6c-962e-837f3f823e7e
+Date: 2026-01-14, Qty: 10, Price: 190, Total: 1900, Paid: 1900, Credit: 0, ID: 3899f6fe-7b2b-45b0-9e21-f88b919e3d25
+Date: 2026-01-14, Qty: 10, Price: 90, Total: 900, Paid: 900, Credit: 0, ID: cafb9152-d6fd-4647-930f-3515712a09b2
+Date: 2026-01-21, Qty: 5, Price: 190, Total: 950, Paid: 950, Credit: 0, ID: 53445f39-63b4-4b15-8d9d-9f1bf0fe76d5
+Date: 2026-01-21, Qty: 4, Price: 90, Total: 360, Paid: 360, Credit: 0, ID: d9a1b44d-3bb7-428a-b932-6c579d71780f
+Date: 2026-01-22, Qty: 10, Price: 590, Total: 5900, Paid: 5900, Credit: 0, ID: a2868bb4-8399-4bd0-92de-ebe3c03a4c89

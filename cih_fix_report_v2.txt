@@ -1,0 +1,178 @@
+AUDIT REPORT - 2026-01-24T17:40:11.097Z
+Total Transactions: 187
+Matched with Credit Log: 6
+Proposed Updates: 171
+
+ID       | Date       | Customer        | Total    | Old Paid | Action           | Reason
+--------------------------------------------------------------------------------------------------------------
+d0c874cf | 2026-01-01 | PREM            |  5400.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+3cbaf41c | 2026-01-01 | PREM            |  5400.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+cd0eea12 | 2026-01-01 | TAJ HOTEL SIVAJ |   570.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+919f68d6 | 2026-01-01 | ARMANE BIRIYANI |   160.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+c1c817d8 | 2026-01-01 | MOHANA (CUST)   |   500.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+0794d25f | 2026-01-01 | TAJ HOTEL SIVAJ |   200.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+a258a8bd | 2026-01-01 | ARMANE BIRIYANI |   500.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+d025dfc1 | 2026-01-01 | TAJ HOTEL SIVAJ |   230.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+ab1ddf49 | 2026-01-01 | SREE VISHNU DUR |  1500.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+3a0e8bbd | 2026-01-01 | ARMANE BIRIYANI |    90.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+7c05f53b | 2026-01-01 | RADHA KRISHNAN  |  4000.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+f597901e | 2026-01-02 | KUKKOS RESTAURA |    90.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+0c4815f9 | 2026-01-02 | TAJ HOTEL SIVAJ |   570.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+8b6145e6 | 2026-01-02 | TAJ HOTEL SIVAJ |   200.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+fad540cd | 2026-01-02 | TAJ HOTEL SIVAJ |   230.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+21cc5ad0 | 2026-01-02 | TAJ HOTEL SIVAJ |  1140.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+63ba25ea | 2026-01-02 | V M BALAJI MILK |   450.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+cfc03515 | 2026-01-02 | V M BALAJI MILK |  1900.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+91dd0c0d | 2026-01-02 | KUKKOS RESTAURA |   240.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+0e09fa25 | 2026-01-02 | PROVISION STORE |   750.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+60258d64 | 2026-01-02 | TAJ HOTEL M M R |   850.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+6bfeaf97 | 2026-01-03 | TAJ HOTEL SIVAJ |   400.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+1c7155af | 2026-01-03 | TAJ HOTEL SIVAJ |   855.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+3719330d | 2026-01-03 | TAJ HOTEL SIVAJ |  2280.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+120ae92a | 2026-01-03 | TAJ HOTEL SIVAJ |   460.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+442bc4d9 | 2026-01-04 | TAJ HOTEL SIVAJ |   855.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+b3fd3c00 | 2026-01-04 | TAJ HOTEL SIVAJ |   400.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+199b0b21 | 2026-01-04 | TAJ HOTEL SIVAJ |   460.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+bd0e7314 | 2026-01-05 | TAJ HOTEL SIVAJ |   570.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+e7be3145 | 2026-01-05 | TAJ HOTEL SIVAJ |   200.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+7243b523 | 2026-01-05 | TAJ HOTEL SIVAJ |   230.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+163be397 | 2026-01-06 | ARMANE BIRIYANI |   250.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+a2b4ff09 | 2026-01-06 | ARMANE BIRIYANI |    90.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+1001753f | 2026-01-06 | ARMANE BIRIYANI |   160.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+77710f84 | 2026-01-06 | ARMANE BIRIYANI |    90.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+ecca1862 | 2026-01-06 | ARFA            |  2000.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+7daa43b4 | 2026-01-06 | ARFA            |   800.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+3eb8c07b | 2026-01-07 | RADHA KRISHNAN  |  4000.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+405827d8 | 2026-01-07 | TAJ HOTEL SIVAJ |   570.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+e95a8edb | 2026-01-07 | KABAB MAGIC JOH |   810.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+454ea6f3 | 2026-01-07 | KABAB MAGIC JOH |   250.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+bb466c78 | 2026-01-07 | KABAB MAGIC JOH |   400.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+04c8c4c7 | 2026-01-07 | KABAB MAGIC JOH |   160.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+d948de77 | 2026-01-07 | KABAB MAGIC JOH |   180.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+c20ea09d | 2026-01-07 | TAJ HOTEL SIVAJ |   230.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+78d98060 | 2026-01-07 | TAJ HOTEL SIVAJ |   200.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+34636a91 | 2026-01-07 | TAJ HOTEL SIVAJ |   230.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+4feca609 | 2026-01-07 | TAJ HOTEL SIVAJ |   200.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+3a0588cd | 2026-01-07 | TAJ HOTEL SIVAJ |   570.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+34a4f107 | 2026-01-08 | TAJ HOTEL SIVAJ |   570.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+6240a58a | 2026-01-08 | RS MARKETING    |  3560.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+ab19bc5c | 2026-01-08 | MOHANA (CUST)   |  1800.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+b72b594d | 2026-01-08 | PREM            |   950.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+8e70e5fa | 2026-01-08 | PREM            |  2700.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+c1b02be8 | 2026-01-08 | ARMANE BIRIYANI |    90.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+accbae31 | 2026-01-08 | ARMANE BIRIYANI |   160.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+ab7897bb | 2026-01-08 | ARFA            |  1000.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+3804e28f | 2026-01-08 | ARFA            |  1700.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+750aaeb4 | 2026-01-08 | TAJ HOTEL SIVAJ |   200.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+63e6e4cd | 2026-01-08 | ARFA            |   800.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+ac09fbeb | 2026-01-08 | TAJ HOTEL SIVAJ |   230.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+7f27c064 | 2026-01-09 | TAJ HOTEL SIVAJ |   200.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+db574c73 | 2026-01-09 | TAJ HOTEL SIVAJ |   230.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+88d79733 | 2026-01-09 | TAJ HOTEL SIVAJ |   570.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+0174efcc | 2026-01-10 | ARMANE BIRIYANI |    90.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+0c5be813 | 2026-01-10 | TAJ HOTEL SIVAJ |   460.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+64908381 | 2026-01-10 | TAJ HOTEL SIVAJ |  1140.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+2d743f64 | 2026-01-10 | TAJ HOTEL M M R |   850.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+231540a7 | 2026-01-10 | ARMANE BIRIYANI |   320.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+bab7946d | 2026-01-10 | ARMANE BIRIYANI |   250.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+0fdd1819 | 2026-01-10 | TAJ HOTEL SIVAJ |   855.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+4dda6fc2 | 2026-01-10 | TAJ HOTEL SIVAJ |   400.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+7a2d2a77 | 2026-01-11 | ARFA            |  1600.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+bddee4e6 | 2026-01-11 | TAJ HOTEL SIVAJ |   460.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+a7181458 | 2026-01-11 | TAJ HOTEL SIVAJ |   400.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+1d81e523 | 2026-01-11 | TAJ HOTEL SIVAJ |   855.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+16ef2385 | 2026-01-11 | ARFA            |  2000.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+383e0d6d | 2026-01-12 | KUKKOS RESTAURA |   240.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+d9e6f5ef | 2026-01-12 | TAJ HOTEL SIVAJ |   570.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+6ec10453 | 2026-01-12 | TAJ HOTEL SIVAJ |   200.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+3f94f01a | 2026-01-12 | TAJ HOTEL SIVAJ |   230.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+f19286c5 | 2026-01-12 | KUKKOS RESTAURA |    90.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+ac287263 | 2026-01-12 | KUKKOS RESTAURA |   195.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+f63e8f09 | 2026-01-13 | TAJ HOTEL SIVAJ |   200.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+d31d714b | 2026-01-13 | TAJ HOTEL SIVAJ |   230.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+b6fba0e4 | 2026-01-13 | TAJ HOTEL SIVAJ |   570.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+8b9873e3 | 2026-01-13 | ARMANE BIRIYANI |   160.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+f64c117e | 2026-01-13 | ARMANE BIRIYANI |   250.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+dba8aa57 | 2026-01-14 | ARFA            |   800.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+94fa4ac1 | 2026-01-14 | PREM            |  2700.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+aefccc14 | 2026-01-14 | PREM            |   950.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+23866e6a | 2026-01-14 | TAJ HOTEL SIVAJ |   230.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+232b9a1d | 2026-01-14 | TAJ HOTEL SIVAJ |   200.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+213f0b55 | 2026-01-14 | TAJ HOTEL SIVAJ |   570.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+16346aa7 | 2026-01-14 | ARFA            |  1000.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+95fbbb55 | 2026-01-14 | ARFA            |  2080.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+3899f6fe | 2026-01-14 | V M BALAJI MILK |  1900.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+cafb9152 | 2026-01-14 | V M BALAJI MILK |   900.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+26cfcb04 | 2026-01-15 | TAJ HOTEL SIVAJ |   230.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+ace5286c | 2026-01-15 | RADHA KRISHNAN  |  3000.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+ad8aa8fc | 2026-01-15 | TAJ HOTEL SIVAJ |   570.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+67b63844 | 2026-01-15 | TAJ HOTEL SIVAJ |   200.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+234afab4 | 2026-01-15 | TAJ HOTEL SIVAJ |   230.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+1c778008 | 2026-01-15 | TAJ HOTEL SIVAJ |   570.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+837d14ad | 2026-01-15 | TAJ HOTEL SIVAJ |   200.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+9083c7a7 | 2026-01-16 | TAJ HOTEL SIVAJ |   230.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+978fc112 | 2026-01-16 | TAJ HOTEL SIVAJ |   200.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+a5b32d62 | 2026-01-16 | TAJ HOTEL SIVAJ |   570.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+fef9a347 | 2026-01-17 | TAJ HOTEL SIVAJ |   855.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+c5b89f50 | 2026-01-17 | ARMANE BIRIYANI |    90.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+1653043c | 2026-01-17 | ARMANE BIRIYANI |   160.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+ec5355cd | 2026-01-17 | ARMANE BIRIYANI |    90.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+a82fb960 | 2026-01-17 | ARFA            |  2750.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+902670ef | 2026-01-17 | ARFA            |  2000.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+60ef8f95 | 2026-01-17 | TAJ HOTEL SIVAJ |   400.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+662da223 | 2026-01-17 | PREM            |  1425.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+0fd12481 | 2026-01-17 | PREM            |  2700.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+adbc0476 | 2026-01-17 | ARFA            |  1700.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+4061e9fb | 2026-01-17 | ARFA            |  2080.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+da9e2297 | 2026-01-17 | ARMANE BIRIYANI |   250.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+0486d8ab | 2026-01-18 | TAJ HOTEL SIVAJ |   400.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+16807943 | 2026-01-18 | TAJ HOTEL SIVAJ |  1140.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+a5000be3 | 2026-01-18 | TAJ HOTEL SIVAJ |   720.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+85ca4c08 | 2026-01-18 | ARFA            |  3000.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+69b95921 | 2026-01-18 | PROVISION STORE |   840.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+bc50af68 | 2026-01-18 | TAJ HOTEL SIVAJ |   460.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+6ee96c29 | 2026-01-18 | TAJ HOTEL SIVAJ |   855.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+0b9925a4 | 2026-01-19 | ARFA            |   800.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+33925537 | 2026-01-19 | ARFA            |  3000.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+7b902cd1 | 2026-01-19 | TAJ HOTEL M M R |   850.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+d8ee29cc | 2026-01-19 | TAJ HOTEL SIVAJ |   230.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+c29818e0 | 2026-01-19 | TAJ HOTEL SIVAJ |   200.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+946a49d3 | 2026-01-19 | BIRIYANI PARADI |   510.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+f11db4a2 | 2026-01-19 | TAJ HOTEL SIVAJ |   570.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+c9fc2c47 | 2026-01-19 | MOHANA (CUST)   |   600.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+790f48f5 | 2026-01-20 | TAJ HOTEL SIVAJ |   570.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+e9ea1065 | 2026-01-20 | TAJ HOTEL SIVAJ |  1140.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+c27c31f9 | 2026-01-20 | TAJ HOTEL SIVAJ |   200.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+0f93e4b1 | 2026-01-20 | TAJ HOTEL SIVAJ |   230.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+5f01699b | 2026-01-20 | ARMANE BIRIYANI |   250.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+97905a69 | 2026-01-20 | ARMANE BIRIYANI |    90.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+4b00cd67 | 2026-01-20 | ARMANE BIRIYANI |    90.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+1740261f | 2026-01-20 | ARMANE BIRIYANI |   160.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+deeffac9 | 2026-01-20 | ARMANE BIRIYANI |   250.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+78b41c59 | 2026-01-20 | ARMANE BIRIYANI |    90.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+f249a268 | 2026-01-20 | ARMANE BIRIYANI |    90.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+86eb19f6 | 2026-01-20 | ARMANE BIRIYANI |   160.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+80d8cb55 | 2026-01-21 | TAJ HOTEL SIVAJ |   230.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+5d0131d0 | 2026-01-21 | TAJ HOTEL SIVAJ |   200.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+c375df44 | 2026-01-21 | TAJ HOTEL SIVAJ |   720.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+6ada9f7d | 2026-01-21 | TAJ HOTEL SIVAJ |   570.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+108b719b | 2026-01-21 | TAJ HOTEL SIVAJ |   230.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+d9a1b44d | 2026-01-21 | V M BALAJI MILK |   360.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+ba266b79 | 2026-01-21 | RADHA KRISHNAN  |  2000.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+58e75acb | 2026-01-21 | KUKKOS RESTAURA |   240.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+505dab8b | 2026-01-21 | KUKKOS RESTAURA |   195.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+b479aa05 | 2026-01-21 | TAJ HOTEL SIVAJ |   200.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+a8b8e7de | 2026-01-21 | TAJ HOTEL M M R |   850.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+9016b81c | 2026-01-21 | TAJ HOTEL SIVAJ |   720.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+a35ff626 | 2026-01-21 | TAJ HOTEL M M R |   850.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+53445f39 | 2026-01-21 | V M BALAJI MILK |   950.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+40937c52 | 2026-01-21 | TAJ HOTEL SIVAJ |   570.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+98ea31d8 | 2026-01-23 | TAJ HOTEL SIVAJ |   570.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+8171485c | 2026-01-23 | TAJ HOTEL SIVAJ |   230.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+05285c05 | 2026-01-23 | TAJ HOTEL SIVAJ |   200.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+9341f485 | 2026-01-24 | TAJ HOTEL SIVAJ |   230.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+825107ca | 2026-01-24 | TAJ HOTEL SIVAJ |   855.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+7f238fa6 | 2026-01-24 | TAJ HOTEL SIVAJ |   400.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+f5a1a767 | 2026-01-24 | ARMANE BIRIYANI |   250.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+772fb9b9 | 2026-01-24 | ARMANE BIRIYANI |   320.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total
+8da2e8b3 | 2026-01-24 | ARMANE BIRIYANI |    90.00 |     0.00 | Paid=Total       | Not in Reminder Log -> Set Paid=Total

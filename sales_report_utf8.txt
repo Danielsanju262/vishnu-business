@@ -1,0 +1,195 @@
+Fetching sales from 2026-01-01 to 2026-01-24...
+Found 187 sales.
+
+ID       | Date       | Customer        | Product         |    Total |   Credit | Is Credit?
+------------------------------------------------------------------------------------------
+7c05f53b | 2026-01-01 | RADHA KRISHNAN  | Ghee (NP)       |  4000.00 |     0.00 | NO
+ab1ddf49 | 2026-01-01 | SREE VISHNU DUR | Butter Maska    |  1500.00 |     0.00 | NO
+a258a8bd | 2026-01-01 | ARMANE BIRIYANI | Paneer          |   500.00 |     0.00 | NO
+c1c817d8 | 2026-01-01 | MOHANA (CUST)   | Ghee (SPECIAL)  |   500.00 |     0.00 | NO
+d025dfc1 | 2026-01-01 | TAJ HOTEL SIVAJ | Paneer          |   230.00 |     0.00 | NO
+919f68d6 | 2026-01-01 | ARMANE BIRIYANI | Cream           |   160.00 |     0.00 | NO
+cd0eea12 | 2026-01-01 | TAJ HOTEL SIVAJ | Amul butter     |   570.00 |     0.00 | NO
+0794d25f | 2026-01-01 | TAJ HOTEL SIVAJ | Butter          |   200.00 |     0.00 | NO
+3a0e8bbd | 2026-01-01 | ARMANE BIRIYANI | Butter          |    90.00 |     0.00 | NO
+3cbaf41c | 2026-01-01 | PREM            | Ghee (TIN)      |  5400.00 |     0.00 | NO
+d0c874cf | 2026-01-01 | PREM            | Ghee (TIN)      |  5400.00 |     0.00 | NO
+21cc5ad0 | 2026-01-02 | TAJ HOTEL SIVAJ | MAYONNAISE      |  1140.00 |     0.00 | NO
+8b6145e6 | 2026-01-02 | TAJ HOTEL SIVAJ | Butter          |   200.00 |     0.00 | NO
+0c4815f9 | 2026-01-02 | TAJ HOTEL SIVAJ | Amul butter     |   570.00 |     0.00 | NO
+63ba25ea | 2026-01-02 | V M BALAJI MILK | GHEE (200ML)    |   450.00 |     0.00 | NO
+cfc03515 | 2026-01-02 | V M BALAJI MILK | Ghee (SPECIAL)  |  1900.00 |     0.00 | NO
+f597901e | 2026-01-02 | KUKKOS RESTAURA | Butter          |    90.00 |     0.00 | NO
+91dd0c0d | 2026-01-02 | KUKKOS RESTAURA | Paneer          |   240.00 |     0.00 | NO
+0e09fa25 | 2026-01-02 | PROVISION STORE | Ghee (SPECIAL)  |   750.00 |     0.00 | NO
+60258d64 | 2026-01-02 | TAJ HOTEL M M R | Butter          |   850.00 |     0.00 | NO
+fad540cd | 2026-01-02 | TAJ HOTEL SIVAJ | Paneer          |   230.00 |     0.00 | NO
+120ae92a | 2026-01-03 | TAJ HOTEL SIVAJ | Paneer          |   460.00 |     0.00 | NO
+1c7155af | 2026-01-03 | TAJ HOTEL SIVAJ | Amul butter     |   855.00 |     0.00 | NO
+6bfeaf97 | 2026-01-03 | TAJ HOTEL SIVAJ | Butter          |   400.00 |     0.00 | NO
+3719330d | 2026-01-03 | TAJ HOTEL SIVAJ | MAYONNAISE      |  2280.00 |     0.00 | NO
+b3fd3c00 | 2026-01-04 | TAJ HOTEL SIVAJ | Butter          |   400.00 |     0.00 | NO
+442bc4d9 | 2026-01-04 | TAJ HOTEL SIVAJ | Amul butter     |   855.00 |     0.00 | NO
+199b0b21 | 2026-01-04 | TAJ HOTEL SIVAJ | Paneer          |   460.00 |     0.00 | NO
+bd0e7314 | 2026-01-05 | TAJ HOTEL SIVAJ | Amul butter     |   570.00 |     0.00 | NO
+e7be3145 | 2026-01-05 | TAJ HOTEL SIVAJ | Butter          |   200.00 |     0.00 | NO
+7243b523 | 2026-01-05 | TAJ HOTEL SIVAJ | Paneer          |   230.00 |     0.00 | NO
+ecca1862 | 2026-01-06 | ARFA            | Paneer          |  2000.00 |     0.00 | NO
+7daa43b4 | 2026-01-06 | ARFA            | Nutralite Butte |   800.00 |     0.00 | NO
+1001753f | 2026-01-06 | ARMANE BIRIYANI | Cream           |   160.00 |     0.00 | NO
+77710f84 | 2026-01-06 | ARMANE BIRIYANI | Mushroom        |    90.00 |     0.00 | NO
+163be397 | 2026-01-06 | ARMANE BIRIYANI | Paneer          |   250.00 |     0.00 | NO
+a2b4ff09 | 2026-01-06 | ARMANE BIRIYANI | Butter          |    90.00 |     0.00 | NO
+3eb8c07b | 2026-01-07 | RADHA KRISHNAN  | Ghee (NP)       |  4000.00 |     0.00 | NO
+e95a8edb | 2026-01-07 | KABAB MAGIC JOH | Paneer          |   810.00 |     0.00 | NO
+04c8c4c7 | 2026-01-07 | KABAB MAGIC JOH | Cream           |   160.00 |     0.00 | NO
+bb466c78 | 2026-01-07 | KABAB MAGIC JOH | Butter          |   400.00 |     0.00 | NO
+78d98060 | 2026-01-07 | TAJ HOTEL SIVAJ | Butter          |   200.00 |     0.00 | NO
+3a0588cd | 2026-01-07 | TAJ HOTEL SIVAJ | Amul butter     |   570.00 |     0.00 | NO
+d948de77 | 2026-01-07 | KABAB MAGIC JOH | Mushroom        |   180.00 |     0.00 | NO
+4feca609 | 2026-01-07 | TAJ HOTEL SIVAJ | Butter          |   200.00 |     0.00 | NO
+454ea6f3 | 2026-01-07 | KABAB MAGIC JOH | Ghee (SPECIAL)  |   250.00 |     0.00 | NO
+34636a91 | 2026-01-07 | TAJ HOTEL SIVAJ | Paneer          |   230.00 |     0.00 | NO
+c20ea09d | 2026-01-07 | TAJ HOTEL SIVAJ | Paneer          |   230.00 |     0.00 | NO
+405827d8 | 2026-01-07 | TAJ HOTEL SIVAJ | Amul butter     |   570.00 |     0.00 | NO
+8e70e5fa | 2026-01-08 | PREM            | Ghee (TIN)      |  2700.00 |     0.00 | NO
+accbae31 | 2026-01-08 | ARMANE BIRIYANI | Cream           |   160.00 |     0.00 | NO
+ab7897bb | 2026-01-08 | ARFA            | Paneer          |  1000.00 |     0.00 | NO
+6240a58a | 2026-01-08 | RS MARKETING    | Ghee (NP)       |  3560.00 |     0.00 | NO
+c1b02be8 | 2026-01-08 | ARMANE BIRIYANI | Mushroom        |    90.00 |     0.00 | NO
+3804e28f | 2026-01-08 | ARFA            | Ghee (SPECIAL)  |  1700.00 |     0.00 | NO
+ac09fbeb | 2026-01-08 | TAJ HOTEL SIVAJ | Paneer          |   230.00 |     0.00 | NO
+34a4f107 | 2026-01-08 | TAJ HOTEL SIVAJ | Amul butter     |   570.00 |     0.00 | NO
+63e6e4cd | 2026-01-08 | ARFA            | Nutralite Butte |   800.00 |     0.00 | NO
+9e0c13d4 | 2026-01-08 | V M BALAJI MILK | Ghee (SPECIAL)  |  1900.00 |     0.00 | NO
+b72b594d | 2026-01-08 | PREM            | Ghee (NP)       |   950.00 |     0.00 | NO
+750aaeb4 | 2026-01-08 | TAJ HOTEL SIVAJ | Butter          |   200.00 |     0.00 | NO
+ab19bc5c | 2026-01-08 | MOHANA (CUST)   | SVG             |  1800.00 |     0.00 | NO
+db574c73 | 2026-01-09 | TAJ HOTEL SIVAJ | Paneer          |   230.00 |     0.00 | NO
+88d79733 | 2026-01-09 | TAJ HOTEL SIVAJ | Amul butter     |   570.00 |     0.00 | NO
+7f27c064 | 2026-01-09 | TAJ HOTEL SIVAJ | Butter          |   200.00 |     0.00 | NO
+5a453f67 | 2026-01-09 | BIRIYANI PARADI | Ghee (SPECIAL)  |   510.00 |     0.00 | NO
+4dda6fc2 | 2026-01-10 | TAJ HOTEL SIVAJ | Butter          |   400.00 |     0.00 | NO
+0174efcc | 2026-01-10 | ARMANE BIRIYANI | Butter          |    90.00 |     0.00 | NO
+bab7946d | 2026-01-10 | ARMANE BIRIYANI | Paneer          |   250.00 |     0.00 | NO
+64908381 | 2026-01-10 | TAJ HOTEL SIVAJ | MAYONNAISE      |  1140.00 |     0.00 | NO
+2d743f64 | 2026-01-10 | TAJ HOTEL M M R | Butter          |   850.00 |     0.00 | NO
+231540a7 | 2026-01-10 | ARMANE BIRIYANI | Cream           |   320.00 |     0.00 | NO
+0fdd1819 | 2026-01-10 | TAJ HOTEL SIVAJ | Amul butter     |   855.00 |     0.00 | NO
+0c5be813 | 2026-01-10 | TAJ HOTEL SIVAJ | Paneer          |   460.00 |     0.00 | NO
+16ef2385 | 2026-01-11 | ARFA            | Paneer          |  2000.00 |     0.00 | NO
+bddee4e6 | 2026-01-11 | TAJ HOTEL SIVAJ | Paneer          |   460.00 |     0.00 | NO
+7a2d2a77 | 2026-01-11 | ARFA            | Nutralite Butte |  1600.00 |     0.00 | NO
+1d81e523 | 2026-01-11 | TAJ HOTEL SIVAJ | Amul butter     |   855.00 |     0.00 | NO
+a7181458 | 2026-01-11 | TAJ HOTEL SIVAJ | Butter          |   400.00 |     0.00 | NO
+3f94f01a | 2026-01-12 | TAJ HOTEL SIVAJ | Paneer          |   230.00 |     0.00 | NO
+f19286c5 | 2026-01-12 | KUKKOS RESTAURA | Butter          |    90.00 |     0.00 | NO
+6ec10453 | 2026-01-12 | TAJ HOTEL SIVAJ | Butter          |   200.00 |     0.00 | NO
+d9e6f5ef | 2026-01-12 | TAJ HOTEL SIVAJ | Amul butter     |   570.00 |     0.00 | NO
+ac287263 | 2026-01-12 | KUKKOS RESTAURA | DOUBLE CREAM    |   195.00 |     0.00 | NO
+383e0d6d | 2026-01-12 | KUKKOS RESTAURA | Paneer          |   240.00 |     0.00 | NO
+4a9db837 | 2026-01-13 | TAJ HOTEL M M R | Butter          |   850.00 |     0.00 | NO
+d31d714b | 2026-01-13 | TAJ HOTEL SIVAJ | Paneer          |   230.00 |     0.00 | NO
+8b9873e3 | 2026-01-13 | ARMANE BIRIYANI | Cream           |   160.00 |     0.00 | NO
+f64c117e | 2026-01-13 | ARMANE BIRIYANI | Paneer          |   250.00 |     0.00 | NO
+b6fba0e4 | 2026-01-13 | TAJ HOTEL SIVAJ | Amul butter     |   570.00 |     0.00 | NO
+f63e8f09 | 2026-01-13 | TAJ HOTEL SIVAJ | Butter          |   200.00 |     0.00 | NO
+23866e6a | 2026-01-14 | TAJ HOTEL SIVAJ | Paneer          |   230.00 |     0.00 | NO
+aefccc14 | 2026-01-14 | PREM            | Ghee (NP)       |   950.00 |     0.00 | NO
+95fbbb55 | 2026-01-14 | ARFA            | Butter Maska    |  2080.00 |     0.00 | NO
+3899f6fe | 2026-01-14 | V M BALAJI MILK | Ghee (SPECIAL)  |  1900.00 |     0.00 | NO
+16346aa7 | 2026-01-14 | ARFA            | Paneer          |  1000.00 |     0.00 | NO
+213f0b55 | 2026-01-14 | TAJ HOTEL SIVAJ | Amul butter     |   570.00 |     0.00 | NO
+cafb9152 | 2026-01-14 | V M BALAJI MILK | GHEE (200ML)    |   900.00 |     0.00 | NO
+94fa4ac1 | 2026-01-14 | PREM            | Ghee (TIN)      |  2700.00 |     0.00 | NO
+dba8aa57 | 2026-01-14 | ARFA            | Nutralite Butte |   800.00 |     0.00 | NO
+232b9a1d | 2026-01-14 | TAJ HOTEL SIVAJ | Butter          |   200.00 |     0.00 | NO
+67b63844 | 2026-01-15 | TAJ HOTEL SIVAJ | Butter          |   200.00 |     0.00 | NO
+ad8aa8fc | 2026-01-15 | TAJ HOTEL SIVAJ | Amul butter     |   570.00 |     0.00 | NO
+26cfcb04 | 2026-01-15 | TAJ HOTEL SIVAJ | Paneer          |   230.00 |     0.00 | NO
+837d14ad | 2026-01-15 | TAJ HOTEL SIVAJ | Butter          |   200.00 |     0.00 | NO
+1c778008 | 2026-01-15 | TAJ HOTEL SIVAJ | Amul butter     |   570.00 |     0.00 | NO
+234afab4 | 2026-01-15 | TAJ HOTEL SIVAJ | Paneer          |   230.00 |     0.00 | NO
+ace5286c | 2026-01-15 | RADHA KRISHNAN  | Ghee (NP)       |  3000.00 |     0.00 | NO
+6add9a23 | 2026-01-16 | TAJ HOTEL M M R | Butter          |   935.00 |     0.00 | NO
+a5b32d62 | 2026-01-16 | TAJ HOTEL SIVAJ | Amul butter     |   570.00 |     0.00 | NO
+978fc112 | 2026-01-16 | TAJ HOTEL SIVAJ | Butter          |   200.00 |     0.00 | NO
+9083c7a7 | 2026-01-16 | TAJ HOTEL SIVAJ | Paneer          |   230.00 |     0.00 | NO
+662da223 | 2026-01-17 | PREM            | Ghee (NP)       |  1425.00 |     0.00 | NO
+5a9da826 | 2026-01-17 | MOHANA (CUST)   | Ghee (SPECIAL)  |  1000.00 |     0.00 | NO
+fef9a347 | 2026-01-17 | TAJ HOTEL SIVAJ | Amul butter     |   855.00 |     0.00 | NO
+c5b89f50 | 2026-01-17 | ARMANE BIRIYANI | Butter          |    90.00 |     0.00 | NO
+ec5355cd | 2026-01-17 | ARMANE BIRIYANI | Mushroom        |    90.00 |     0.00 | NO
+a82fb960 | 2026-01-17 | ARFA            | SVG             |  2750.00 |     0.00 | NO
+60ef8f95 | 2026-01-17 | TAJ HOTEL SIVAJ | Butter          |   400.00 |     0.00 | NO
+0fd12481 | 2026-01-17 | PREM            | Ghee (TIN)      |  2700.00 |     0.00 | NO
+da9e2297 | 2026-01-17 | ARMANE BIRIYANI | Paneer          |   250.00 |     0.00 | NO
+1653043c | 2026-01-17 | ARMANE BIRIYANI | Cream           |   160.00 |     0.00 | NO
+adbc0476 | 2026-01-17 | ARFA            | Ghee (SPECIAL)  |  1700.00 |     0.00 | NO
+4061e9fb | 2026-01-17 | ARFA            | Butter Maska    |  2080.00 |     0.00 | NO
+902670ef | 2026-01-17 | ARFA            | Paneer          |  2000.00 |     0.00 | NO
+85ca4c08 | 2026-01-18 | ARFA            | Paneer          |  3000.00 |     0.00 | NO
+a5000be3 | 2026-01-18 | TAJ HOTEL SIVAJ | Amul cheese tin |   720.00 |     0.00 | NO
+bc50af68 | 2026-01-18 | TAJ HOTEL SIVAJ | Paneer          |   460.00 |     0.00 | NO
+69b95921 | 2026-01-18 | PROVISION STORE | SVG             |   840.00 |     0.00 | NO
+0486d8ab | 2026-01-18 | TAJ HOTEL SIVAJ | Butter          |   400.00 |     0.00 | NO
+16807943 | 2026-01-18 | TAJ HOTEL SIVAJ | MAYONNAISE      |  1140.00 |     0.00 | NO
+6ee96c29 | 2026-01-18 | TAJ HOTEL SIVAJ | Amul butter     |   855.00 |     0.00 | NO
+d8ee29cc | 2026-01-19 | TAJ HOTEL SIVAJ | Paneer          |   230.00 |     0.00 | NO
+33925537 | 2026-01-19 | ARFA            | Paneer          |  3000.00 |     0.00 | NO
+c29818e0 | 2026-01-19 | TAJ HOTEL SIVAJ | Butter          |   200.00 |     0.00 | NO
+946a49d3 | 2026-01-19 | BIRIYANI PARADI | Ghee (SPECIAL)  |   510.00 |     0.00 | NO
+f11db4a2 | 2026-01-19 | TAJ HOTEL SIVAJ | Amul butter     |   570.00 |     0.00 | NO
+c9fc2c47 | 2026-01-19 | MOHANA (CUST)   | SVG             |   600.00 |     0.00 | NO
+7b902cd1 | 2026-01-19 | TAJ HOTEL M M R | Butter          |   850.00 |     0.00 | NO
+0b9925a4 | 2026-01-19 | ARFA            | Nutralite Butte |   800.00 |     0.00 | NO
+78b41c59 | 2026-01-20 | ARMANE BIRIYANI | Butter          |    90.00 |     0.00 | NO
+4b00cd67 | 2026-01-20 | ARMANE BIRIYANI | Mushroom        |    90.00 |     0.00 | NO
+1740261f | 2026-01-20 | ARMANE BIRIYANI | Cream           |   160.00 |     0.00 | NO
+5f01699b | 2026-01-20 | ARMANE BIRIYANI | Paneer          |   250.00 |     0.00 | NO
+0f93e4b1 | 2026-01-20 | TAJ HOTEL SIVAJ | Paneer          |   230.00 |     0.00 | NO
+c27c31f9 | 2026-01-20 | TAJ HOTEL SIVAJ | Butter          |   200.00 |     0.00 | NO
+e9ea1065 | 2026-01-20 | TAJ HOTEL SIVAJ | MAYONNAISE      |  1140.00 |     0.00 | NO
+790f48f5 | 2026-01-20 | TAJ HOTEL SIVAJ | Amul butter     |   570.00 |     0.00 | NO
+97905a69 | 2026-01-20 | ARMANE BIRIYANI | Butter          |    90.00 |     0.00 | NO
+86eb19f6 | 2026-01-20 | ARMANE BIRIYANI | Cream           |   160.00 |     0.00 | NO
+deeffac9 | 2026-01-20 | ARMANE BIRIYANI | Paneer          |   250.00 |     0.00 | NO
+f249a268 | 2026-01-20 | ARMANE BIRIYANI | Mushroom        |    90.00 |     0.00 | NO
+c375df44 | 2026-01-21 | TAJ HOTEL SIVAJ | Amul cheese tin |   720.00 |     0.00 | NO
+58e75acb | 2026-01-21 | KUKKOS RESTAURA | Paneer          |   240.00 |     0.00 | NO
+108b719b | 2026-01-21 | TAJ HOTEL SIVAJ | Paneer          |   230.00 |     0.00 | NO
+b479aa05 | 2026-01-21 | TAJ HOTEL SIVAJ | Butter          |   200.00 |     0.00 | NO
+d9a1b44d | 2026-01-21 | V M BALAJI MILK | GHEE (200ML)    |   360.00 |     0.00 | NO
+ba266b79 | 2026-01-21 | RADHA KRISHNAN  | Ghee (NP)       |  2000.00 |     0.00 | NO
+505dab8b | 2026-01-21 | KUKKOS RESTAURA | DOUBLE CREAM    |   195.00 |     0.00 | NO
+a8b8e7de | 2026-01-21 | TAJ HOTEL M M R | Butter          |   850.00 |     0.00 | NO
+9016b81c | 2026-01-21 | TAJ HOTEL SIVAJ | Amul cheese tin |   720.00 |     0.00 | NO
+a35ff626 | 2026-01-21 | TAJ HOTEL M M R | Butter          |   850.00 |     0.00 | NO
+6ada9f7d | 2026-01-21 | TAJ HOTEL SIVAJ | Amul butter     |   570.00 |     0.00 | NO
+40937c52 | 2026-01-21 | TAJ HOTEL SIVAJ | Amul butter     |   570.00 |     0.00 | NO
+53445f39 | 2026-01-21 | V M BALAJI MILK | Ghee (SPECIAL)  |   950.00 |     0.00 | NO
+80d8cb55 | 2026-01-21 | TAJ HOTEL SIVAJ | Paneer          |   230.00 |     0.00 | NO
+5d0131d0 | 2026-01-21 | TAJ HOTEL SIVAJ | Butter          |   200.00 |     0.00 | NO
+86f4173d | 2026-01-22 | ARMANE BIRIYANI | Cream           |   160.00 |     0.00 | NO
+7c19d8f3 | 2026-01-22 | RADHA KRISHNAN  | Ghee (NP)       |  3000.00 |     0.00 | NO
+279234b7 | 2026-01-22 | TAJ HOTEL SIVAJ | Amul butter     |   570.00 |     0.00 | NO
+e4e7402a | 2026-01-22 | TAJ HOTEL SIVAJ | Butter          |   200.00 |     0.00 | NO
+a4a9bca6 | 2026-01-22 | TAJ HOTEL SIVAJ | Paneer          |   230.00 |     0.00 | NO
+1dbf56f2 | 2026-01-22 | ARMANE BIRIYANI | Paneer          |   250.00 |     0.00 | NO
+05285c05 | 2026-01-23 | TAJ HOTEL SIVAJ | Butter          |   200.00 |     0.00 | NO
+f5a351cd | 2026-01-23 | PREM            | Ghee (TIN)      |  2700.00 |     0.00 | NO
+98ea31d8 | 2026-01-23 | TAJ HOTEL SIVAJ | Amul butter     |   570.00 |     0.00 | NO
+151d2802 | 2026-01-23 | RS MARKETING    | Ghee (NP)       |  7120.00 |     0.00 | NO
+8171485c | 2026-01-23 | TAJ HOTEL SIVAJ | Paneer          |   230.00 |     0.00 | NO
+9d55258d | 2026-01-24 | ARFA            | Paneer          |  2000.00 |     0.00 | NO
+825107ca | 2026-01-24 | TAJ HOTEL SIVAJ | Amul butter     |   855.00 |     0.00 | NO
+9341f485 | 2026-01-24 | TAJ HOTEL SIVAJ | Paneer          |   230.00 |     0.00 | NO
+f5a1a767 | 2026-01-24 | ARMANE BIRIYANI | Paneer          |   250.00 |     0.00 | NO
+772fb9b9 | 2026-01-24 | ARMANE BIRIYANI | Cream           |   320.00 |     0.00 | NO
+7f238fa6 | 2026-01-24 | TAJ HOTEL SIVAJ | Butter          |   400.00 |     0.00 | NO
+8da2e8b3 | 2026-01-24 | ARMANE BIRIYANI | Butter          |    90.00 |     0.00 | NO
+db4aad2c | 2026-01-24 | ARFA            | Nutralite Butte |   800.00 |     0.00 | NO
+d5893c92 | 2026-01-24 | ARFA            | Ghee (SPECIAL)  |  1700.00 |     0.00 | NO
+------------------------------------------------------------------------------------------
+Total Sales Value: 155525.00
+Total Credit Value: 0.00

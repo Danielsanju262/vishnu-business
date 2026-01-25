@@ -1,0 +1,26 @@
+Analyze Payment Received Data (2026-01-01 to 2026-01-24)
+================================================================================
+
+SOURCE 1: credit_collections Table (Structured)
+--------------------------------------------------------------------------------
+Date       | Customer        | Amount
+--------------------------------------------------
+2026-01-08 | TAJ HOTEL SIVAJ | ₹10990.00
+2026-01-08 | PREM            | ₹6000.00
+2026-01-08 | V M BALAJI MILK | ₹8000.00
+2026-01-12 | PREM            | ₹6000.00
+2026-01-15 | TAJ HOTEL SIVAJ | ₹9570.00
+2026-01-15 | ARMANE BIRIYANI | ₹2000.00
+2026-01-17 | PREM            | ₹8000.00
+2026-01-17 | ARMANE BIRIYANI | ₹2000.00
+2026-01-22 | TAJ HOTEL SIVAJ | ₹9570.00
+2026-01-22 | V M BALAJI MILK | ₹5690.00
+--------------------------------------------------
+Total Structured Collections: ₹67820.00
+
+
+SOURCE 2: payment_reminders Notes (Log Parsing)
+--------------------------------------------------------------------------------
+Date       | Customer        | Amount    | Raw Log Entry
+----------------------------------------------------------------------------------------------------
+No 'Received' logs found in payment_reminders notes for this period.

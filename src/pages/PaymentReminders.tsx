@@ -111,6 +111,7 @@ export default function PaymentReminders() {
     const [activeTab, setActiveTab] = useState<'reminders' | 'recurring'>('reminders');
     const [recurringConfigs, setRecurringConfigs] = useState<RecurringConfig[]>([]);
     const [showNewRecurring, setShowNewRecurring] = useHistorySyncedState(false, 'paymentNewRecurring');
+    const [editingRecurringId, setEditingRecurringId] = useState<string | null>(null);
 
 
     // New Recurring Form
@@ -653,6 +654,32 @@ export default function PaymentReminders() {
         }
     };
 
+    const handleOpenNewRecurring = () => {
+        setEditingRecurringId(null);
+        setNewRecurringCustomer("");
+        setNewRecurringCustomerSearch("");
+        setNewRecurringAmount("");
+        setNewRecurringFrequency('daily');
+        setNewRecurringTime('09:00');
+        setNewRecurringDayOfWeek(1);
+        setNewRecurringDayOfMonth(1);
+        setShowNewRecurring(true);
+    };
+
+    const handleEditRecurring = (config: RecurringConfig) => {
+        setEditingRecurringId(config.id);
+        setNewRecurringCustomer(config.customer_id);
+        const custName = getCustomerName(config.customer_id);
+        setNewRecurringCustomerSearch(custName);
+        setNewRecurringAmount(config.amount.toString());
+        setNewRecurringFrequency(config.frequency);
+        const timePart = config.time_of_day.split(':').slice(0, 2).join(':'); // Ensure HH:MM
+        setNewRecurringTime(timePart);
+        setNewRecurringDayOfWeek(config.day_of_week || 1);
+        setNewRecurringDayOfMonth(config.day_of_month || 1);
+        setShowNewRecurring(true);
+    };
+
     const handleCreateRecurring = async () => {
         if (!newRecurringCustomer) {
             toast("Please select a customer", "warning");
@@ -698,27 +725,52 @@ export default function PaymentReminders() {
             }
         }
 
-        const { error } = await supabase.from('recurring_reminder_configs').insert({
-            customer_id: newRecurringCustomer,
-            amount: parseFloat(newRecurringAmount),
-            frequency: newRecurringFrequency,
-            day_of_week: newRecurringFrequency === 'weekly' ? newRecurringDayOfWeek : null,
-            day_of_month: newRecurringFrequency === 'monthly' ? newRecurringDayOfMonth : null,
-            time_of_day: newRecurringTime,
-            next_run_at: nextRun.toISOString(),
-            is_active: true
-        });
+        if (editingRecurringId) {
+            // Update existing
+            const { error } = await supabase.from('recurring_reminder_configs')
+                .update({
+                    customer_id: newRecurringCustomer,
+                    amount: parseFloat(newRecurringAmount),
+                    frequency: newRecurringFrequency,
+                    day_of_week: newRecurringFrequency === 'weekly' ? newRecurringDayOfWeek : null,
+                    day_of_month: newRecurringFrequency === 'monthly' ? newRecurringDayOfMonth : null,
+                    time_of_day: newRecurringTime,
+                    next_run_at: nextRun.toISOString(),
+                })
+                .eq('id', editingRecurringId);
 
-        if (error) {
-            console.error(error);
-            toast("Failed to create rule", "error");
+            if (error) {
+                console.error(error);
+                toast("Failed to update rule", "error");
+            } else {
+                toast("Recurring rule updated!", "success");
+                setShowNewRecurring(false);
+                loadRecurrings();
+            }
         } else {
-            toast("Recurring rule created!", "success");
-            setShowNewRecurring(false);
-            setNewRecurringCustomer("");
-            setNewRecurringCustomerSearch("");
-            setNewRecurringAmount("");
-            loadRecurrings();
+            // Create new
+            const { error } = await supabase.from('recurring_reminder_configs').insert({
+                customer_id: newRecurringCustomer,
+                amount: parseFloat(newRecurringAmount),
+                frequency: newRecurringFrequency,
+                day_of_week: newRecurringFrequency === 'weekly' ? newRecurringDayOfWeek : null,
+                day_of_month: newRecurringFrequency === 'monthly' ? newRecurringDayOfMonth : null,
+                time_of_day: newRecurringTime,
+                next_run_at: nextRun.toISOString(),
+                is_active: true
+            });
+
+            if (error) {
+                console.error(error);
+                toast("Failed to create rule", "error");
+            } else {
+                toast("Recurring rule created!", "success");
+                setShowNewRecurring(false);
+                setNewRecurringCustomer("");
+                setNewRecurringCustomerSearch("");
+                setNewRecurringAmount("");
+                loadRecurrings();
+            }
         }
     };
 
@@ -781,19 +833,15 @@ export default function PaymentReminders() {
                     <button
                         onClick={() => {
                             if (activeTab === 'recurring') {
-                                setShowNewRecurring(true);
+                                handleOpenNewRecurring();
                             } else {
-                                setShowNewRecurring(true); // Wait, this logic is shared?
-                                // Actually, we have 2 modals.
-                                // showNewReminder -> Existing manual
-                                // showNewRecurring -> Status
-                                // We need to check active tab
+                                setShowNewReminder(true);
                             }
                         }}
                         onKeyDown={(e) => {
                             if (e.key === "Enter" || e.key === " ") {
                                 e.preventDefault();
-                                if (activeTab === 'recurring') setShowNewRecurring(true);
+                                if (activeTab === 'recurring') handleOpenNewRecurring();
                                 else setShowNewReminder(true);
                             }
                         }}
@@ -849,12 +897,20 @@ export default function PaymentReminders() {
                                 <p className="text-zinc-500 dark:text-zinc-400 text-sm max-w-xs mx-auto mb-6">
                                     Set up automatic payment reminders for regular customers.
                                 </p>
-                                <Button onClick={() => setShowNewRecurring(true)}>
+                                <Button onClick={handleOpenNewRecurring}>
                                     Create First Rule
                                 </Button>
                             </div>
                         ) : (
                             <div className="grid gap-3">
+                                {/* Add Button for non-empty list */}
+                                <button
+                                    onClick={handleOpenNewRecurring}
+                                    className="w-full py-3 border-2 border-dashed border-zinc-200 dark:border-zinc-800 hover:border-emerald-500/50 hover:bg-emerald-50/50 dark:hover:bg-emerald-500/10 rounded-xl text-zinc-400 hover:text-emerald-600 dark:hover:text-emerald-400 font-bold text-sm transition-all flex items-center justify-center gap-2"
+                                >
+                                    <Plus size={18} strokeWidth={2.5} />
+                                    Add New Recurring Rule
+                                </button>
                                 {recurringConfigs.map((config) => {
                                     const customerName = getCustomerName(config.customer_id);
                                     let frequencyText = "";
@@ -902,6 +958,12 @@ export default function PaymentReminders() {
                                                             config.is_active ? "text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100" : "text-zinc-400 bg-zinc-100 dark:bg-zinc-800 hover:text-zinc-600")}
                                                     >
                                                         {config.is_active ? <ToggleRight size={20} /> : <ToggleLeft size={20} />}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleEditRecurring(config)}
+                                                        className="p-2 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                                                    >
+                                                        <Edit2 size={18} />
                                                     </button>
                                                     <button
                                                         onClick={() => deleteRecur(config.id)}
@@ -1508,7 +1570,7 @@ export default function PaymentReminders() {
             <Modal
                 isOpen={showNewRecurring}
                 onClose={() => setShowNewRecurring(false)}
-                title="New Recurring Rule"
+                title={editingRecurringId ? "Edit Recurring Rule" : "New Recurring Rule"}
             >
                 <div className="space-y-4 pt-2">
                     {/* Customer Selection */}

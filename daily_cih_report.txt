@@ -1,0 +1,221 @@
+DAILY CASH IN HAND REPORT (2026-01-01 to 2026-01-24)
+Logic: Dashboard V2 (Profit for Cash Sales + Received Payments)
+Note: Deleted transactions are EXCLUDED.
+====================================================================================================
+
+DATE: 2026-01-01
+--------------------------------------------------
+  + Cash Sales Profit:   ₹5347.50
+  + Payments Received:   ₹0.00
+  = TOTAL CASH IN HAND:  ₹5347.50
+
+DATE: 2026-01-02
+--------------------------------------------------
+  + Cash Sales Profit:   ₹2414.50
+  + Payments Received:   ₹0.00
+  = TOTAL CASH IN HAND:  ₹2414.50
+
+DATE: 2026-01-03
+--------------------------------------------------
+  + Cash Sales Profit:   ₹0.00
+  + Payments Received:   ₹0.00
+  = TOTAL CASH IN HAND:  ₹0.00
+  Details:
+    - [CREDIT DETECTED] TAJ HOTEL SIVAJINAGAR: ₹400 (Butter)
+    - [CREDIT DETECTED] TAJ HOTEL SIVAJINAGAR: ₹855 (Amul butter)
+    - [CREDIT DETECTED] TAJ HOTEL SIVAJINAGAR: ₹2280 (MAYONNAISE )
+    - [CREDIT DETECTED] TAJ HOTEL SIVAJINAGAR: ₹460 (Paneer)
+
+DATE: 2026-01-04
+--------------------------------------------------
+  + Cash Sales Profit:   ₹0.00
+  + Payments Received:   ₹0.00
+  = TOTAL CASH IN HAND:  ₹0.00
+  Details:
+    - [CREDIT DETECTED] TAJ HOTEL SIVAJINAGAR: ₹855 (Amul butter)
+    - [CREDIT DETECTED] TAJ HOTEL SIVAJINAGAR: ₹400 (Butter)
+    - [CREDIT DETECTED] TAJ HOTEL SIVAJINAGAR: ₹460 (Paneer)
+
+DATE: 2026-01-05
+--------------------------------------------------
+  + Cash Sales Profit:   ₹0.00
+  + Payments Received:   ₹0.00
+  = TOTAL CASH IN HAND:  ₹0.00
+  Details:
+    - [CREDIT DETECTED] TAJ HOTEL SIVAJINAGAR: ₹570 (Amul butter)
+    - [CREDIT DETECTED] TAJ HOTEL SIVAJINAGAR: ₹200 (Butter)
+    - [CREDIT DETECTED] TAJ HOTEL SIVAJINAGAR: ₹230 (Paneer)
+
+DATE: 2026-01-06
+--------------------------------------------------
+  + Cash Sales Profit:   ₹0.00
+  + Payments Received:   ₹0.00
+  = TOTAL CASH IN HAND:  ₹0.00
+  Details:
+    - [CREDIT DETECTED] ARMANE BIRIYANI JUNCTION : ₹250 (Paneer)
+    - [CREDIT DETECTED] ARMANE BIRIYANI JUNCTION : ₹90 (Butter)
+    - [CREDIT DETECTED] ARMANE BIRIYANI JUNCTION : ₹160 (Cream)
+    - [CREDIT DETECTED] ARMANE BIRIYANI JUNCTION : ₹90 (Mushroom )
+    - [CREDIT DETECTED] ARFA: ₹2000 (Paneer)
+    - [CREDIT DETECTED] ARFA: ₹800 (Nutralite Butter)
+
+DATE: 2026-01-07
+--------------------------------------------------
+  + Cash Sales Profit:   ₹0.00
+  + Payments Received:   ₹0.00
+  = TOTAL CASH IN HAND:  ₹0.00
+  Details:
+    - [CREDIT DETECTED] TAJ HOTEL SIVAJINAGAR: ₹230 (Paneer)
+    - [CREDIT DETECTED] KABAB MAGIC JOHNSON MKT: ₹250 (Ghee (SPECIAL))
+    - [CREDIT DETECTED] KABAB MAGIC JOHNSON MKT: ₹810 (Paneer)
+    - [CREDIT DETECTED] KABAB MAGIC JOHNSON MKT: ₹400 (Butter)
+    - [CREDIT DETECTED] KABAB MAGIC JOHNSON MKT: ₹160 (Cream)
+    - [CREDIT DETECTED] KABAB MAGIC JOHNSON MKT: ₹180 (Mushroom)
+    - [CREDIT DETECTED] TAJ HOTEL SIVAJINAGAR: ₹200 (Butter)
+    - [CREDIT DETECTED] TAJ HOTEL SIVAJINAGAR: ₹570 (Amul butter)
+    - [CREDIT DETECTED] TAJ HOTEL SIVAJINAGAR: ₹230 (Paneer)
+    - [CREDIT DETECTED] TAJ HOTEL SIVAJINAGAR: ₹200 (Butter)
+    - [CREDIT DETECTED] TAJ HOTEL SIVAJINAGAR: ₹570 (Amul butter)
+    - [CREDIT DETECTED] RADHA KRISHNAN: ₹4000 (Ghee (NP))
+
+DATE: 2026-01-08
+--------------------------------------------------
+  + Cash Sales Profit:   ₹4240.70
+  + Payments Received:   ₹24990.00
+  = TOTAL CASH IN HAND:  ₹29230.70
+  Details:
+    - [CREDIT DETECTED] ARFA: ₹1700 (Ghee (SPECIAL))
+    - [CREDIT DETECTED] ARFA: ₹1000 (Paneer)
+    - [CREDIT DETECTED] ARFA: ₹800 (Nutralite Butter)
+    - [PAYMENT RCVD] V M BALAJI MILK KOVA DIARY : ₹8000
+    - [PAYMENT RCVD] TAJ HOTEL SIVAJINAGAR: ₹10990
+    - [PAYMENT RCVD] PREM: ₹6000
+
+DATE: 2026-01-09
+--------------------------------------------------
+  + Cash Sales Profit:   ₹127.00
+  + Payments Received:   ₹0.00
+  = TOTAL CASH IN HAND:  ₹127.00
+  Details:
+    - [CREDIT DETECTED] BIRIYANI PARADISE : ₹510 (Ghee (SPECIAL))
+
+DATE: 2026-01-10
+--------------------------------------------------
+  + Cash Sales Profit:   ₹762.50
+  + Payments Received:   ₹0.00
+  = TOTAL CASH IN HAND:  ₹762.50
+
+DATE: 2026-01-11
+--------------------------------------------------
+  + Cash Sales Profit:   ₹289.00
+  + Payments Received:   ₹0.00
+  = TOTAL CASH IN HAND:  ₹289.00
+
+DATE: 2026-01-12
+--------------------------------------------------
+  + Cash Sales Profit:   ₹215.50
+  + Payments Received:   ₹6000.00
+  = TOTAL CASH IN HAND:  ₹6215.50
+  Details:
+    - [PAYMENT RCVD] PREM: ₹6000
+
+DATE: 2026-01-13
+--------------------------------------------------
+  + Cash Sales Profit:   ₹357.00
+  + Payments Received:   ₹0.00
+  = TOTAL CASH IN HAND:  ₹357.00
+
+DATE: 2026-01-14
+--------------------------------------------------
+  + Cash Sales Profit:   ₹2835.50
+  + Payments Received:   ₹0.00
+  = TOTAL CASH IN HAND:  ₹2835.50
+  Details:
+    - [CREDIT DETECTED] ARFA: ₹1000 (Paneer)
+    - [CREDIT DETECTED] ARFA: ₹800 (Nutralite Butter)
+    - [CREDIT DETECTED] ARFA: ₹2080 (Butter Maska)
+
+DATE: 2026-01-15
+--------------------------------------------------
+  + Cash Sales Profit:   ₹1439.00
+  + Payments Received:   ₹11570.00
+  = TOTAL CASH IN HAND:  ₹13009.00
+  Details:
+    - [PAYMENT RCVD] ARMANE BIRIYANI JUNCTION : ₹2000
+    - [PAYMENT RCVD] TAJ HOTEL SIVAJINAGAR: ₹9570
+
+DATE: 2026-01-16
+--------------------------------------------------
+  + Cash Sales Profit:   ₹275.50
+  + Payments Received:   ₹0.00
+  = TOTAL CASH IN HAND:  ₹275.50
+
+DATE: 2026-01-17
+--------------------------------------------------
+  + Cash Sales Profit:   ₹1445.50
+  + Payments Received:   ₹10000.00
+  = TOTAL CASH IN HAND:  ₹11445.50
+  Details:
+    - [CREDIT DETECTED] ARFA: ₹1700 (Ghee (SPECIAL))
+    - [CREDIT DETECTED] ARFA: ₹2080 (Butter Maska)
+    - [CREDIT DETECTED] ARFA: ₹2750 (SVG)
+    - [CREDIT DETECTED] ARFA: ₹2000 (Paneer)
+    - [CREDIT DETECTED] MOHANA (CUST): ₹1000 (Ghee (SPECIAL))
+    - [PAYMENT RCVD] ARMANE BIRIYANI JUNCTION : ₹2000
+    - [PAYMENT RCVD] PREM: ₹8000
+
+DATE: 2026-01-18
+--------------------------------------------------
+  + Cash Sales Profit:   ₹845.80
+  + Payments Received:   ₹0.00
+  = TOTAL CASH IN HAND:  ₹845.80
+
+DATE: 2026-01-19
+--------------------------------------------------
+  + Cash Sales Profit:   ₹809.90
+  + Payments Received:   ₹0.00
+  = TOTAL CASH IN HAND:  ₹809.90
+  Details:
+    - [CREDIT DETECTED] ARFA: ₹3000 (Paneer)
+    - [CREDIT DETECTED] ARFA: ₹800 (Nutralite Butter)
+
+DATE: 2026-01-20
+--------------------------------------------------
+  + Cash Sales Profit:   ₹630.00
+  + Payments Received:   ₹0.00
+  = TOTAL CASH IN HAND:  ₹630.00
+
+DATE: 2026-01-21
+--------------------------------------------------
+  + Cash Sales Profit:   ₹2336.50
+  + Payments Received:   ₹0.00
+  = TOTAL CASH IN HAND:  ₹2336.50
+
+DATE: 2026-01-22
+--------------------------------------------------
+  + Cash Sales Profit:   ₹1407.00
+  + Payments Received:   ₹15260.00
+  = TOTAL CASH IN HAND:  ₹16667.00
+  Details:
+    - [PAYMENT RCVD] V M BALAJI MILK KOVA DIARY : ₹5690
+    - [PAYMENT RCVD] TAJ HOTEL SIVAJINAGAR: ₹9570
+
+DATE: 2026-01-23
+--------------------------------------------------
+  + Cash Sales Profit:   ₹2280.00
+  + Payments Received:   ₹0.00
+  = TOTAL CASH IN HAND:  ₹2280.00
+  Details:
+    - [CREDIT SALE] PREM: ₹2700 (Ghee (TIN))
+    - [CREDIT SALE] TAJ HOTEL SIVAJINAGAR: ₹230 (Paneer)
+    - [CREDIT SALE] TAJ HOTEL SIVAJINAGAR: ₹570 (Amul butter)
+    - [CREDIT SALE] TAJ HOTEL SIVAJINAGAR: ₹200 (Butter)
+
+DATE: 2026-01-24
+--------------------------------------------------
+  + Cash Sales Profit:   ₹0.00
+  + Payments Received:   ₹0.00
+  = TOTAL CASH IN HAND:  ₹0.00
+
+====================================================================================================
+GRAND TOTAL CIH (Jan 1 - Jan 24): ₹95878.40

@@ -1,0 +1,356 @@
+[
+  {
+    "id": "3899f6fe-7b2b-45b0-9e21-f88b919e3d25",
+    "paid_amount": 0,
+    "credit_amount": 1900,
+    "reason": "Nearby Date Match for 2026-01-15 ₹2800 (Set to Credit)"
+  },
+  {
+    "id": "cafb9152-d6fd-4647-930f-3515712a09b2",
+    "paid_amount": 0,
+    "credit_amount": 900,
+    "reason": "Nearby Date Match for 2026-01-15 ₹2800 (Set to Credit)"
+  },
+  {
+    "id": "0fd12481-8f8f-4f87-9a87-eeb15920422f",
+    "paid_amount": 0,
+    "credit_amount": 2700,
+    "reason": "Exact Date Match (2026-01-17) for ₹4125 (Set to Credit)"
+  },
+  {
+    "id": "662da223-b1da-4e4b-a0b9-965c671723b7",
+    "paid_amount": 0,
+    "credit_amount": 1425,
+    "reason": "Exact Date Match (2026-01-17) for ₹4125 (Set to Credit)"
+  },
+  {
+    "id": "94fa4ac1-6850-497d-be33-8602f342f4ed",
+    "paid_amount": 0,
+    "credit_amount": 2700,
+    "reason": "Nearby Date Match for 2026-01-15 ₹3650 (Set to Credit)"
+  },
+  {
+    "id": "aefccc14-8886-45b2-a044-3ffa0dbd5add",
+    "paid_amount": 0,
+    "credit_amount": 950,
+    "reason": "Nearby Date Match for 2026-01-15 ₹3650 (Set to Credit)"
+  },
+  {
+    "id": "8e70e5fa-995b-4e0d-a8ff-83a61223a84a",
+    "paid_amount": 0,
+    "credit_amount": 2700,
+    "reason": "Exact Date Match (2026-01-08) for ₹3650 (Set to Credit)"
+  },
+  {
+    "id": "b72b594d-2d8a-4686-9f13-fd19891c3f7a",
+    "paid_amount": 0,
+    "credit_amount": 950,
+    "reason": "Exact Date Match (2026-01-08) for ₹3650 (Set to Credit)"
+  },
+  {
+    "id": "772fb9b9-d1d4-4e84-888e-3e94b996dab0",
+    "paid_amount": 0,
+    "credit_amount": 320,
+    "reason": "Exact Date Match (2026-01-24) for ₹660 (Set to Credit)"
+  },
+  {
+    "id": "f5a1a767-a085-45b2-bdbc-da4190dcd54a",
+    "paid_amount": 0,
+    "credit_amount": 250,
+    "reason": "Exact Date Match (2026-01-24) for ₹660 (Set to Credit)"
+  },
+  {
+    "id": "8da2e8b3-a729-41c7-83e9-7443dce07fb3",
+    "paid_amount": 0,
+    "credit_amount": 90,
+    "reason": "Exact Date Match (2026-01-24) for ₹660 (Set to Credit)"
+  },
+  {
+    "id": "1dbf56f2-7d4c-4a42-9587-8b3bdfe56d4c",
+    "paid_amount": 0,
+    "credit_amount": 250,
+    "reason": "Exact Date Match (2026-01-22) for ₹410 (Set to Credit)"
+  },
+  {
+    "id": "86f4173d-799d-4f48-ba4e-13b3cc5ff225",
+    "paid_amount": 0,
+    "credit_amount": 160,
+    "reason": "Exact Date Match (2026-01-22) for ₹410 (Set to Credit)"
+  },
+  {
+    "id": "5f01699b-cc0e-45c5-9377-41174712e67a",
+    "paid_amount": 0,
+    "credit_amount": 250,
+    "reason": "Nearby Date Match for 2026-01-21 ₹590 (Set to Credit)"
+  },
+  {
+    "id": "deeffac9-de18-4bb1-8728-be7687cabcd9",
+    "paid_amount": 0,
+    "credit_amount": 250,
+    "reason": "Nearby Date Match for 2026-01-21 ₹590 (Set to Credit)"
+  },
+  {
+    "id": "4b00cd67-7cb4-484e-a375-d220e87d7058",
+    "paid_amount": 0,
+    "credit_amount": 90,
+    "reason": "Nearby Date Match for 2026-01-21 ₹590 (Set to Credit)"
+  },
+  {
+    "id": "1740261f-f8fa-462f-ac50-a2f4a3ab261b",
+    "paid_amount": 0,
+    "credit_amount": 160,
+    "reason": "Nearby Date Match for 2026-01-21 ₹590 (Set to Credit)"
+  },
+  {
+    "id": "86eb19f6-f6c9-4b85-802c-525c1ee6483b",
+    "paid_amount": 0,
+    "credit_amount": 160,
+    "reason": "Nearby Date Match for 2026-01-21 ₹590 (Set to Credit)"
+  },
+  {
+    "id": "f249a268-1418-485d-ac2c-d7ec7b2bd883",
+    "paid_amount": 0,
+    "credit_amount": 90,
+    "reason": "Nearby Date Match for 2026-01-21 ₹590 (Set to Credit)"
+  },
+  {
+    "id": "78b41c59-d4ec-4ba8-beaa-842285447134",
+    "paid_amount": 0,
+    "credit_amount": 90,
+    "reason": "Nearby Date Match for 2026-01-21 ₹590 (Set to Credit)"
+  },
+  {
+    "id": "97905a69-1d75-4044-85dc-3a010cc31958",
+    "paid_amount": 0,
+    "credit_amount": 90,
+    "reason": "Nearby Date Match for 2026-01-21 ₹590 (Set to Credit)"
+  },
+  {
+    "id": "da9e2297-7c55-4eff-a8b2-e86f8237617f",
+    "paid_amount": 0,
+    "credit_amount": 250,
+    "reason": "Exact Date Match (2026-01-17) for ₹590 (Set to Credit)"
+  },
+  {
+    "id": "1653043c-af90-47c3-b345-c5053eb60e33",
+    "paid_amount": 0,
+    "credit_amount": 160,
+    "reason": "Exact Date Match (2026-01-17) for ₹590 (Set to Credit)"
+  },
+  {
+    "id": "c5b89f50-b6f0-45a9-ad0b-e8b8fa9718ae",
+    "paid_amount": 0,
+    "credit_amount": 90,
+    "reason": "Exact Date Match (2026-01-17) for ₹590 (Set to Credit)"
+  },
+  {
+    "id": "ec5355cd-d686-4dc0-8c2d-2b0cc65b32eb",
+    "paid_amount": 0,
+    "credit_amount": 90,
+    "reason": "Exact Date Match (2026-01-17) for ₹590 (Set to Credit)"
+  },
+  {
+    "id": "f64c117e-ef40-4e50-bb22-544e1fef7002",
+    "paid_amount": 0,
+    "credit_amount": 250,
+    "reason": "Exact Date Match (2026-01-13) for ₹410 (Set to Credit)"
+  },
+  {
+    "id": "8b9873e3-413f-4242-86ad-b4ff9dddd944",
+    "paid_amount": 0,
+    "credit_amount": 160,
+    "reason": "Exact Date Match (2026-01-13) for ₹410 (Set to Credit)"
+  },
+  {
+    "id": "231540a7-942e-421f-ae78-21b5e03321af",
+    "paid_amount": 0,
+    "credit_amount": 320,
+    "reason": "Nearby Date Match for 2026-01-11 ₹660 (Set to Credit)"
+  },
+  {
+    "id": "bab7946d-ec81-4f91-8365-afe1f20f1710",
+    "paid_amount": 0,
+    "credit_amount": 250,
+    "reason": "Nearby Date Match for 2026-01-11 ₹660 (Set to Credit)"
+  },
+  {
+    "id": "c1b02be8-e9ba-4633-a464-e442bde2ac2c",
+    "paid_amount": 0,
+    "credit_amount": 90,
+    "reason": "Nearby Date Match for 2026-01-11 ₹660 (Set to Credit)"
+  },
+  {
+    "id": "163be397-a570-4446-af69-cedc2d6ba002",
+    "paid_amount": 0,
+    "credit_amount": 250,
+    "reason": "Nearby Date Match for 2026-01-08 ₹250 (Set to Credit)"
+  },
+  {
+    "id": "1001753f-d9df-45c8-8e3d-d1cbaeb92e56",
+    "paid_amount": 0,
+    "credit_amount": 160,
+    "reason": "Nearby Date Match for 2026-01-08 ₹590 (Set to Credit)"
+  },
+  {
+    "id": "accbae31-f347-46f7-a4ea-5d2c0c4c77f4",
+    "paid_amount": 0,
+    "credit_amount": 160,
+    "reason": "Nearby Date Match for 2026-01-08 ₹590 (Set to Credit)"
+  },
+  {
+    "id": "a2b4ff09-0c85-4a68-9cfe-6921afaa6e43",
+    "paid_amount": 0,
+    "credit_amount": 90,
+    "reason": "Nearby Date Match for 2026-01-08 ₹590 (Set to Credit)"
+  },
+  {
+    "id": "77710f84-c811-4415-8910-59216acaae8d",
+    "paid_amount": 0,
+    "credit_amount": 90,
+    "reason": "Nearby Date Match for 2026-01-08 ₹590 (Set to Credit)"
+  },
+  {
+    "id": "0174efcc-43c0-4b68-9780-b8a2ae14cfb9",
+    "paid_amount": 0,
+    "credit_amount": 90,
+    "reason": "Nearby Date Match for 2026-01-08 ₹590 (Set to Credit)"
+  },
+  {
+    "id": "88d79733-5985-4325-8ea5-7650cd4f33d0",
+    "paid_amount": 0,
+    "credit_amount": 570,
+    "reason": "Exact Date Match (2026-01-09) for ₹1000 (Set to Credit)"
+  },
+  {
+    "id": "db574c73-17d6-4b9a-948b-c72cdbaaf54c",
+    "paid_amount": 0,
+    "credit_amount": 230,
+    "reason": "Exact Date Match (2026-01-09) for ₹1000 (Set to Credit)"
+  },
+  {
+    "id": "7f27c064-b703-4e17-864d-5cb5ef198907",
+    "paid_amount": 0,
+    "credit_amount": 200,
+    "reason": "Exact Date Match (2026-01-09) for ₹1000 (Set to Credit)"
+  },
+  {
+    "id": "34a4f107-a5f1-4ccb-b36b-706c089fc8a8",
+    "paid_amount": 0,
+    "credit_amount": 570,
+    "reason": "Exact Date Match (2026-01-08) for ₹1000 (Set to Credit)"
+  },
+  {
+    "id": "ac09fbeb-1a8d-4e2a-8076-9fbba38cd8c9",
+    "paid_amount": 0,
+    "credit_amount": 230,
+    "reason": "Exact Date Match (2026-01-08) for ₹1000 (Set to Credit)"
+  },
+  {
+    "id": "750aaeb4-42a0-4484-9ccc-c23379213cb0",
+    "paid_amount": 0,
+    "credit_amount": 200,
+    "reason": "Exact Date Match (2026-01-08) for ₹1000 (Set to Credit)"
+  },
+  {
+    "id": "bd0e7314-c631-4ab8-9a96-e6d5f4934f67",
+    "paid_amount": 0,
+    "credit_amount": 570,
+    "reason": "Nearby Date Match for 2026-01-08 ₹1000 (Set to Credit)"
+  },
+  {
+    "id": "7243b523-9a96-4f97-b249-507017ff5d7a",
+    "paid_amount": 0,
+    "credit_amount": 230,
+    "reason": "Nearby Date Match for 2026-01-08 ₹1000 (Set to Credit)"
+  },
+  {
+    "id": "e7be3145-29c7-4a1a-8a5a-86c774b132fc",
+    "paid_amount": 0,
+    "credit_amount": 200,
+    "reason": "Nearby Date Match for 2026-01-08 ₹1000 (Set to Credit)"
+  },
+  {
+    "id": "3a0588cd-f6a8-450e-949a-476f2680ea2c",
+    "paid_amount": 0,
+    "credit_amount": 570,
+    "reason": "Nearby Date Match for 2026-01-08 ₹1000 (Set to Credit)"
+  },
+  {
+    "id": "c20ea09d-22df-41dd-90e6-ab315c802ff3",
+    "paid_amount": 0,
+    "credit_amount": 230,
+    "reason": "Nearby Date Match for 2026-01-08 ₹1000 (Set to Credit)"
+  },
+  {
+    "id": "78d98060-8ef1-4da4-a159-dec2cea3b7d1",
+    "paid_amount": 0,
+    "credit_amount": 200,
+    "reason": "Nearby Date Match for 2026-01-08 ₹1000 (Set to Credit)"
+  },
+  {
+    "id": "405827d8-b9a0-4f7e-8599-f26ac707a9b5",
+    "paid_amount": 0,
+    "credit_amount": 570,
+    "reason": "Nearby Date Match for 2026-01-08 ₹1000 (Set to Credit)"
+  },
+  {
+    "id": "34636a91-c4c0-4df5-a28f-dc42d712acb1",
+    "paid_amount": 0,
+    "credit_amount": 230,
+    "reason": "Nearby Date Match for 2026-01-08 ₹1000 (Set to Credit)"
+  },
+  {
+    "id": "4feca609-0e91-48fc-a9eb-0030ba8ae499",
+    "paid_amount": 0,
+    "credit_amount": 200,
+    "reason": "Nearby Date Match for 2026-01-08 ₹1000 (Set to Credit)"
+  },
+  {
+    "id": "1d81e523-4ee7-4ec5-a3e8-7dab81391b20",
+    "paid_amount": 0,
+    "credit_amount": 855,
+    "reason": "Nearby Date Match for 2026-01-08 ₹1715 (Set to Credit)"
+  },
+  {
+    "id": "0c5be813-91d7-4488-9865-fb8b931fc97b",
+    "paid_amount": 0,
+    "credit_amount": 460,
+    "reason": "Nearby Date Match for 2026-01-08 ₹1715 (Set to Credit)"
+  },
+  {
+    "id": "4dda6fc2-0242-4937-a7ae-d86c84d46c51",
+    "paid_amount": 0,
+    "credit_amount": 400,
+    "reason": "Nearby Date Match for 2026-01-08 ₹1715 (Set to Credit)"
+  },
+  {
+    "id": "58e75acb-c0f7-42fc-a095-b7cc786d2bad",
+    "paid_amount": 0,
+    "credit_amount": 240,
+    "reason": "Nearby Date Match for 2026-01-22 ₹435 (Set to Credit)"
+  },
+  {
+    "id": "505dab8b-864d-49fc-b589-5dae44dbc904",
+    "paid_amount": 0,
+    "credit_amount": 195,
+    "reason": "Nearby Date Match for 2026-01-22 ₹435 (Set to Credit)"
+  },
+  {
+    "id": "383e0d6d-ad43-49f7-ab32-cb2d4461209d",
+    "paid_amount": 0,
+    "credit_amount": 240,
+    "reason": "Exact Date Match (2026-01-12) for ₹525 (Set to Credit)"
+  },
+  {
+    "id": "ac287263-b512-464e-bfc2-0e700521f9f7",
+    "paid_amount": 0,
+    "credit_amount": 195,
+    "reason": "Exact Date Match (2026-01-12) for ₹525 (Set to Credit)"
+  },
+  {
+    "id": "f19286c5-f806-48e4-b181-9e63118bdd1d",
+    "paid_amount": 0,
+    "credit_amount": 90,
+    "reason": "Exact Date Match (2026-01-12) for ₹525 (Set to Credit)"
+  }
+]

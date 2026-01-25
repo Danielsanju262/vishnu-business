@@ -1,0 +1,14 @@
+﻿Found 13 sales for PREM:
+Date: 2026-01-01, Total: 5400, Paid: 5400, Credit: 0, ID: d0c874cf-c88e-4c95-992d-1917bc4bdc43
+Date: 2026-01-01, Total: 5400, Paid: 5400, Credit: 0, ID: 3cbaf41c-c92e-44cc-a102-8a384fc6e3ee
+Date: 2026-01-07, Total: 5400, Paid: 0, Credit: 0, ID: bada76b2-0a51-49ef-b80d-35cfc095fa6e
+Date: 2026-01-08, Total: 2700, Paid: 0, Credit: 2700, ID: 8e70e5fa-995b-4e0d-a8ff-83a61223a84a
+Date: 2026-01-08, Total: 950, Paid: 0, Credit: 950, ID: b72b594d-2d8a-4686-9f13-fd19891c3f7a
+Date: 2026-01-14, Total: 950, Paid: 0, Credit: 950, ID: aefccc14-8886-45b2-a044-3ffa0dbd5add
+Date: 2026-01-14, Total: 2700, Paid: 0, Credit: 2700, ID: 94fa4ac1-6850-497d-be33-8602f342f4ed
+Date: 2026-01-17, Total: 2700, Paid: 0, Credit: 0, ID: a6d8b70b-a431-43cd-a51f-77f59739ab61
+Date: 2026-01-17, Total: 1425, Paid: 0, Credit: 0, ID: a3b94d87-a83c-4cf7-9fac-61aa7ae54fa4
+Date: 2026-01-17, Total: 2700, Paid: 0, Credit: 2700, ID: 0fd12481-8f8f-4f87-9a87-eeb15920422f
+Date: 2026-01-17, Total: 1425, Paid: 0, Credit: 1425, ID: 662da223-b1da-4e4b-a0b9-965c671723b7
+Date: 2026-01-22, Total: 1600, Paid: 1600, Credit: 0, ID: af090563-4503-4e19-accb-e5bf2c6c2df7
+Date: 2026-01-23, Total: 2700, Paid: 0, Credit: 2700, ID: f5a351cd-4ff4-48f2-a66b-b9e57dca0658

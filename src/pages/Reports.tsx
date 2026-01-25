@@ -1,9 +1,9 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { supabase } from "../lib/supabase";
-import { ArrowLeft, Trash2, Calendar, ShoppingBag, Wallet, Edit2, ChevronDown, TrendingUp, TrendingDown, ArrowUpDown, X, ChevronRight, User, CheckCircle2, Circle, MoreVertical, Download } from "lucide-react";
+import { ArrowLeft, Trash2, Calendar, ShoppingBag, Wallet, Edit2, ChevronDown, TrendingUp, TrendingDown, ArrowUpDown, X, ChevronRight, User, CheckCircle2, Circle, MoreVertical, Download, ArrowDownLeft } from "lucide-react";
 import Papa from "papaparse";
 import { Link, useLocation } from "react-router-dom";
-import { format, subDays, startOfMonth, startOfWeek, endOfWeek, endOfMonth } from "date-fns";
+import { format, subDays, startOfMonth, startOfWeek, endOfWeek, endOfMonth, addDays } from "date-fns";
 import { Button } from "../components/ui/Button";
 import { cn } from "../lib/utils";
 import { useToast } from "../components/toast-provider";
@@ -11,6 +11,8 @@ import { Modal } from "../components/ui/Modal";
 import { useRealtimeTables } from "../hooks/useRealtimeSync";
 import { useDropdownClose } from "../hooks/useDropdownClose";
 import { useHistorySyncedState } from "../hooks/useHistorySyncedState";
+import { CashInHandBreakdown } from "../components/CashInHandBreakdown";
+import type { BreakdownItem } from "../components/CashInHandBreakdown";
 
 type DateRangeType = "today" | "yesterday" | "week" | "month" | "custom";
 
@@ -68,7 +70,12 @@ export default function Reports() {
 
     // Export State - synced with browser history
     const [showExportModal, setShowExportModal] = useHistorySyncedState(false, 'reportsExportModal');
+
     const [isExporting, setIsExporting] = useState(false);
+
+    // Cash In Hand Breakdown State
+    const [showBreakdown, setShowBreakdown] = useHistorySyncedState(false, 'reportsBreakdown');
+    const [breakdownItems, setBreakdownItems] = useState<BreakdownItem[]>([]);
 
     // Handle back navigation for modals
     useEffect(() => {
@@ -171,17 +178,21 @@ export default function Reports() {
             const { data: collections, error: cError } = await supabase
                 .from('credit_collections')
                 .select('*, customers(name)')
-                .gte('collected_at', start)
-                .lte('collected_at', end)
+                .gte('collected_at', `${start}T00:00:00`)
+                .lte('collected_at', `${end}T23:59:59`)
                 .order('collected_at', { ascending: false });
 
             if (cError) throw cError;
 
+            // Fetch reminders with a buffer to support heuristic check (sale date + 3 days)
+            const remindersEnd = addDays(new Date(end), 4);
+            const remindersEndStr = format(remindersEnd, 'yyyy-MM-dd');
+
             const { data: reminders, error: rError } = await supabase
                 .from('payment_reminders')
                 .select('customer_id, recorded_at')
-                .gte('recorded_at', start)
-                .lte('recorded_at', end);
+                .gte('recorded_at', `${start}T00:00:00`)
+                .lte('recorded_at', `${remindersEndStr}T23:59:59`);
 
             if (rError) throw rError;
 
@@ -543,6 +554,57 @@ export default function Reports() {
             }
         }
 
+        // 3. Update Linked Supplier Payable if applicable
+        const oldPayable = originalTx.linked_supplier_amount ?? 0;
+        const linkedSupplierId = originalTx.linked_supplier_id;
+
+        if (linkedSupplierId && oldPayable > 0) {
+            // Heuristic: Calculate ratio of payable vs original cost to maintain partial links
+            const oldCost = oldQty * originalTx.buy_price;
+            const payableRatio = oldCost > 0 ? (oldPayable / oldCost) : 0;
+
+            const newBuyPriceVal = parseFloat(editBuyPrice) || 0;
+            const newCost = newQty * newBuyPriceVal;
+            const newPayable = newCost * payableRatio;
+
+            const payableDiff = newPayable - oldPayable;
+
+            if (Math.abs(payableDiff) > 0.01) {
+                // Update Transaction with new linked amount
+                await supabase.from('transactions')
+                    .update({ linked_supplier_amount: newPayable })
+                    .eq('id', editingId);
+
+                // Update Payable Record
+                const { data: pendingPayable } = await supabase
+                    .from('accounts_payable')
+                    .select('*')
+                    .eq('supplier_id', linkedSupplierId)
+                    .eq('status', 'pending')
+                    .order('due_date', { ascending: true })
+                    .limit(1)
+                    .maybeSingle();
+
+                if (pendingPayable) {
+                    const newPayableAmount = Math.max(0, pendingPayable.amount + payableDiff);
+
+                    let newNote = pendingPayable.note || "";
+                    const balancePattern = /Balance: ₹[\d,]+(?:\.\d+)?(?![\s\S]*Balance: ₹)/;
+                    if (balancePattern.test(newNote)) {
+                        newNote = newNote.replace(balancePattern, `Balance: ₹${newPayableAmount.toLocaleString()}`);
+                    }
+
+                    await supabase.from('accounts_payable').update({
+                        amount: newPayableAmount,
+                        status: newPayableAmount <= 0 ? 'paid' : 'pending',
+                        note: newNote
+                    }).eq('id', pendingPayable.id);
+
+                    toast("Supplier payable updated", "success");
+                }
+            }
+        }
+
         fetchData();
     };
 
@@ -849,54 +911,105 @@ export default function Reports() {
     // - Partial Credit:    (Net Profit - Credit Amount) + Partial Paid
     // Then add debt collections at the end
     // ============================================================
-    const CUTOFF_DATE = '2026-01-22';
+    // Then add debt collections at the end
+    // ============================================================
 
     let totalCreditGiven = 0; // Keep for display in P&L breakdown
     let cihTransactionContribution = 0;
 
     data.transactions.forEach((t) => {
         const saleValue = t.quantity * t.sell_price;
-        const productCost = t.quantity * t.buy_price;
-        const profit = saleValue - productCost;
+        const buyValue = t.quantity * t.buy_price;
 
-        if (t.date >= CUTOFF_DATE) {
-            const creditAmount = t.credit_amount || 0;
-            totalCreditGiven += creditAmount;
+        // Migration Complete: Database now has accurate credit_amount for all history.
+        const creditVal = t.credit_amount || 0;
 
-            const paidAmount = saleValue - creditAmount;
+        // Track displayed credit total regardless of logic
+        totalCreditGiven += creditVal;
 
-            if (paidAmount === saleValue) {
-                // Full Cash: Profit
-                cihTransactionContribution += profit;
-            } else if (paidAmount === 0) {
-                // Full Credit: 0
-                cihTransactionContribution += 0;
-            } else {
-                // Partial: Paid Amount
-                cihTransactionContribution += paidAmount;
-            }
+        let contribution = 0;
+
+        // Unified Logic (Matches Dashboard)
+        if (creditVal > 0) {
+            contribution = 0;
         } else {
-            // Historical heuristic (pre-cutoff): only full cash or full credit
-            const wasCredit = data.paymentReminders.some((r: any) =>
-                r.customer_id === t.customer_id && (r.recorded_at === t.date || r.recorded_at?.startsWith(t.date))
-            );
-
-            if (wasCredit) {
-                // FULL CREDIT
-                totalCreditGiven += saleValue;
-                cihTransactionContribution += 0;
-            } else {
-                // FULL CASH
-                cihTransactionContribution += profit;
-            }
+            contribution = saleValue - buyValue;
         }
+
+        cihTransactionContribution += contribution;
     });
 
-    // Add collections
     const totalCollections = data.collections.reduce((acc, c) => acc + c.amount, 0);
 
-    // Final Cash in Hand = Transaction Contributions + Collections
+    // Adjusted CIH: (Profit from Cash Sales + Collections)
+    // Note: 'transactionCOGS' is NOT deducted here because it was already deducted per-transaction for cash sales,
+    // and ignored for credit sales.
     const cashInHand = cihTransactionContribution + totalCollections;
+
+    // Recalculate Breakdown Items whenever data changes for the Modal
+    useEffect(() => {
+        const items: BreakdownItem[] = [];
+
+        const custMap = new Map();
+        // We don't have a direct map of customer IDs to names in 'data' object itself easily accessible by id,
+        // but data.transactions has customers joined.
+        // Let's create a quick map from transactions
+        data.transactions.forEach(t => {
+            if (t.customer_id && t.customers?.name) custMap.set(t.customer_id, t.customers.name);
+        });
+        // Also from collections
+        data.collections.forEach(c => {
+            if (c.customer_id && c.customers?.name) custMap.set(c.customer_id, c.customers.name);
+        });
+
+        data.transactions.forEach((t) => {
+            const saleValue = t.quantity * t.sell_price;
+            const buyValue = t.quantity * t.buy_price;
+
+            let contribution = 0;
+            let type: 'cash_profit' | 'collection' = 'cash_profit';
+
+            const creditVal = t.credit_amount || 0;
+
+            if (creditVal > 0) {
+                contribution = 0;
+            } else {
+                contribution = saleValue - buyValue;
+            }
+
+            if (contribution > 0) {
+                type = 'cash_profit';
+            } else {
+                // skip
+            }
+
+
+            if (contribution > 0) {
+                items.push({
+                    id: t.id,
+                    date: t.date,
+                    type,
+                    customerName: t.customers?.name || custMap.get(t.customer_id) || 'Unknown',
+                    amount: contribution,
+                    originalTotal: saleValue
+                });
+            }
+        });
+
+        data.collections.forEach((c) => {
+            if (c.amount > 0) {
+                items.push({
+                    id: c.id,
+                    date: c.collected_at ? c.collected_at.split('T')[0] : '',
+                    type: 'collection',
+                    customerName: c.customers?.name || custMap.get(c.customer_id) || 'Unknown',
+                    amount: c.amount
+                });
+            }
+        });
+
+        setBreakdownItems(items);
+    }, [data]);
 
     // 2. Customer Aggregation
     const customerStats = useMemo(() => {
@@ -1273,6 +1386,29 @@ export default function Reports() {
                                     <span className="font-bold text-emerald-600 text-sm py-1.5">+ ₹{totalCollections.toLocaleString()}</span>
                                 </div>
 
+                                {/* Link to Cash In Hand Modal */}
+                                <div
+                                    onClick={() => setShowBreakdown(true)}
+                                    role="button"
+                                    className="flex justify-between items-center p-2.5 md:p-3 -mx-2 md:-mx-3 rounded-xl bg-sky-50 dark:bg-sky-900/10 hover:bg-sky-100 dark:hover:bg-sky-900/20 cursor-pointer transition-colors group border border-dashed border-sky-200 dark:border-sky-800"
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <div className="p-1.5 bg-sky-500 rounded-lg text-white">
+                                            <ArrowDownLeft size={16} />
+                                        </div>
+                                        <div className="flex flex-col items-start">
+                                            <span className="text-sky-700 dark:text-sky-400 font-bold text-sm">Cash In Hand</span>
+                                            <span className="text-[10px] text-sky-500 font-medium">Click to view breakdown</span>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-black text-sky-600 dark:text-sky-400">₹{cashInHand.toLocaleString()}</span>
+                                        <ChevronRight size={14} className="text-sky-400 opacity-50 group-hover:opacity-100 transition-opacity" />
+                                    </div>
+                                </div>
+
+                                <div className="h-px bg-border my-2 border-dashed"></div>
+
                                 <div className="bg-sky-500/10 p-2.5 md:p-3 rounded-xl mt-4 flex justify-between items-center border border-sky-500/20">
                                     <span className="text-sm font-black text-sky-700 dark:text-sky-400 uppercase tracking-wide">Cash in Hand</span>
                                     <div className="text-right">
@@ -1370,18 +1506,11 @@ export default function Reports() {
                                         {/* CREDIT GIVEN BREAKDOWN */}
                                         {selectedDetail === 'credit' && (
                                             (() => {
-                                                const creditSales = data.transactions.filter(t => {
-                                                    if (t.date >= CUTOFF_DATE) return (t.credit_amount || 0) > 0;
-                                                    // Heuristic
-                                                    return data.paymentReminders.some((r: any) =>
-                                                        r.customer_id === t.customer_id && (r.recorded_at === t.date || r.recorded_at?.startsWith(t.date))
-                                                    );
-                                                });
+                                                const creditSales = data.transactions.filter(t => (t.credit_amount || 0) > 0);
 
                                                 return creditSales.length === 0 ? <p className="text-center text-zinc-500 py-8">No credit sales found.</p> :
                                                     creditSales.map((t: any) => {
-                                                        const isModern = t.date >= CUTOFF_DATE;
-                                                        const amount = isModern ? t.credit_amount : (t.quantity * t.sell_price);
+                                                        const amount = t.credit_amount; // Always use credit_amount now
 
                                                         return (
                                                             <div key={t.id} className="flex justify-between items-center p-3 bg-zinc-900 border border-zinc-800 rounded-xl">
@@ -1398,6 +1527,8 @@ export default function Reports() {
                                                     });
                                             })()
                                         )}
+
+
 
                                         {/* COLLECTIONS BREAKDOWN */}
                                         {selectedDetail === 'collections' && (
@@ -2064,6 +2195,21 @@ export default function Reports() {
             </Modal>
 
 
+            {/* Cash In Hand Breakdown Modal */}
+            <CashInHandBreakdown
+                isOpen={showBreakdown}
+                onClose={() => setShowBreakdown(false)}
+                items={breakdownItems}
+                total={cashInHand}
+                dateLabel={
+                    rangeType === 'today' ? 'Today' :
+                        rangeType === 'yesterday' ? 'Yesterday' :
+                            rangeType === 'week' ? 'This Week' :
+                                rangeType === 'month' ? 'This Month' :
+                                    'Custom Range'
+                }
+            />
         </div >
     );
 }
+

@@ -1,0 +1,201 @@
+[
+    {
+        "customer": "V M BALAJI MILK KOVA DIARY",
+        "entries": [
+            {
+                "date": "2026-01-15",
+                "amount": 2800
+            },
+            {
+                "date": "2026-01-08",
+                "amount": 1900
+            },
+            {
+                "date": "2026-01-08",
+                "amount": 2350
+            }
+        ]
+    },
+    {
+        "customer": "PREM",
+        "entries": [
+            {
+                "date": "2026-01-23",
+                "amount": 2700
+            },
+            {
+                "date": "2026-01-17",
+                "amount": 4125
+            },
+            {
+                "date": "2026-01-15",
+                "amount": 3650
+            },
+            {
+                "date": "2026-01-08",
+                "amount": 3650
+            },
+            {
+                "date": "2026-01-08",
+                "amount": 5400
+            }
+        ]
+    },
+    {
+        "customer": "ARMANE BIRIYANI JUNCTION",
+        "entries": [
+            {
+                "date": "2026-01-24",
+                "amount": 660
+            },
+            {
+                "date": "2026-01-22",
+                "amount": 410
+            },
+            {
+                "date": "2026-01-21",
+                "amount": 590
+            },
+            {
+                "date": "2026-01-21",
+                "amount": 590
+            },
+            {
+                "date": "2026-01-17",
+                "amount": 590
+            },
+            {
+                "date": "2026-01-13",
+                "amount": 410
+            },
+            {
+                "date": "2026-01-11",
+                "amount": 660
+            },
+            {
+                "date": "2026-01-08",
+                "amount": 250
+            },
+            {
+                "date": "2026-01-08",
+                "amount": 590
+            },
+            {
+                "date": "2026-01-08",
+                "amount": 750
+            }
+        ]
+    },
+    {
+        "customer": "TAJ HOTEL M M ROAD",
+        "entries": [
+            {
+                "date": "2026-01-22",
+                "amount": 850
+            },
+            {
+                "date": "2026-01-22",
+                "amount": 850
+            },
+            {
+                "date": "2026-01-20",
+                "amount": 850
+            },
+            {
+                "date": "2026-01-16",
+                "amount": 935
+            },
+            {
+                "date": "2026-01-13",
+                "amount": 850
+            },
+            {
+                "date": "2026-01-11",
+                "amount": 850
+            },
+            {
+                "date": "2026-01-08",
+                "amount": 850
+            }
+        ]
+    },
+    {
+        "customer": "BIRIYANI PARADISE",
+        "entries": [
+            {
+                "date": "2026-01-20",
+                "amount": 10
+            },
+            {
+                "date": "2026-01-09",
+                "amount": 510
+            }
+        ]
+    },
+    {
+        "customer": "TAJ HOTEL SIVAJINAGAR",
+        "entries": [
+            {
+                "date": "2026-01-09",
+                "amount": 1000
+            },
+            {
+                "date": "2026-01-08",
+                "amount": 1000
+            },
+            {
+                "date": "2026-01-08",
+                "amount": 1000
+            },
+            {
+                "date": "2026-01-08",
+                "amount": 1000
+            },
+            {
+                "date": "2026-01-08",
+                "amount": 1000
+            },
+            {
+                "date": "2026-01-08",
+                "amount": 1000
+            },
+            {
+                "date": "2026-01-08",
+                "amount": 1715
+            },
+            {
+                "date": "2026-01-08",
+                "amount": 3995
+            },
+            {
+                "date": "2026-01-08",
+                "amount": 2140
+            },
+            {
+                "date": "2026-01-08",
+                "amount": 2140
+            },
+            {
+                "date": "2026-01-08",
+                "amount": 1000
+            }
+        ]
+    },
+    {
+        "customer": "KUKKOS RESTAURANT",
+        "entries": [
+            {
+                "date": "2026-01-22",
+                "amount": 435
+            },
+            {
+                "date": "2026-01-12",
+                "amount": 525
+            },
+            {
+                "date": "2026-01-08",
+                "amount": 330
+            }
+        ]
+    }
+]

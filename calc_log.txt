@@ -1,0 +1,46 @@
+﻿Fetching customer IDs...
+Matched 'V M BALAJI MILK KOVA DIARY' -> V M BALAJI MILK KOVA DIARY  (1a41c4d3-e519-4b0e-af0c-b78854f8a2de)
+Matched 'PREM' -> PREM (f448a23c-1a4d-4ed0-8d3a-b6113c0a31d9)
+Matched 'ARMANE BIRIYANI JUNCTION' -> ARMANE BIRIYANI JUNCTION  (e9c019f3-2970-436d-9337-eae5686469ff)
+Matched 'TAJ HOTEL M M ROAD' -> TAJ HOTEL M M ROAD (bca810cf-6cfa-45de-b4f7-6eb68a0205ee)
+Matched 'BIRIYANI PARADISE' -> BIRIYANI PARADISE  (1e527e72-e6bd-49af-bfc9-8a6b29c864b5)
+Matched 'TAJ HOTEL SIVAJINAGAR' -> TAJ HOTEL SIVAJINAGAR (f47a9f43-b0fb-4c7f-b1d3-e2d02ecd47bd)
+Matched 'KUKKOS RESTAURANT' -> KUKKOS RESTAURANT  (cf8474ab-4934-4f9f-81f6-af3cedd01232)
+
+Processing 41 confirmed credit sales...
+MISSING: Could not find sale to match log: 2026-01-15 Γé╣2800 for V M BALAJI MILK KOVA DIARY
+MISSING: Could not find sale to match log: 2026-01-08 Γé╣2350 for V M BALAJI MILK KOVA DIARY
+MISSING: Could not find sale to match log: 2026-01-17 Γé╣4125 for PREM
+MISSING: Could not find sale to match log: 2026-01-15 Γé╣3650 for PREM
+MISSING: Could not find sale to match log: 2026-01-08 Γé╣3650 for PREM
+MISSING: Could not find sale to match log: 2026-01-08 Γé╣5400 for PREM
+MISSING: Could not find sale to match log: 2026-01-24 Γé╣660 for ARMANE BIRIYANI JUNCTION
+MISSING: Could not find sale to match log: 2026-01-22 Γé╣410 for ARMANE BIRIYANI JUNCTION
+MISSING: Could not find sale to match log: 2026-01-21 Γé╣590 for ARMANE BIRIYANI JUNCTION
+MISSING: Could not find sale to match log: 2026-01-21 Γé╣590 for ARMANE BIRIYANI JUNCTION
+MISSING: Could not find sale to match log: 2026-01-17 Γé╣590 for ARMANE BIRIYANI JUNCTION
+MISSING: Could not find sale to match log: 2026-01-13 Γé╣410 for ARMANE BIRIYANI JUNCTION
+MISSING: Could not find sale to match log: 2026-01-11 Γé╣660 for ARMANE BIRIYANI JUNCTION
+MISSING: Could not find sale to match log: 2026-01-08 Γé╣250 for ARMANE BIRIYANI JUNCTION
+MISSING: Could not find sale to match log: 2026-01-08 Γé╣590 for ARMANE BIRIYANI JUNCTION
+MISSING: Could not find sale to match log: 2026-01-08 Γé╣750 for ARMANE BIRIYANI JUNCTION
+MISSING: Could not find sale to match log: 2026-01-08 Γé╣850 for TAJ HOTEL M M ROAD
+MISSING: Could not find sale to match log: 2026-01-20 Γé╣10 for BIRIYANI PARADISE
+MISSING: Could not find sale to match log: 2026-01-09 Γé╣1000 for TAJ HOTEL SIVAJINAGAR
+MISSING: Could not find sale to match log: 2026-01-08 Γé╣1000 for TAJ HOTEL SIVAJINAGAR
+MISSING: Could not find sale to match log: 2026-01-08 Γé╣1000 for TAJ HOTEL SIVAJINAGAR
+MISSING: Could not find sale to match log: 2026-01-08 Γé╣1000 for TAJ HOTEL SIVAJINAGAR
+MISSING: Could not find sale to match log: 2026-01-08 Γé╣1000 for TAJ HOTEL SIVAJINAGAR
+MISSING: Could not find sale to match log: 2026-01-08 Γé╣1000 for TAJ HOTEL SIVAJINAGAR
+MISSING: Could not find sale to match log: 2026-01-08 Γé╣1715 for TAJ HOTEL SIVAJINAGAR
+MISSING: Could not find sale to match log: 2026-01-08 Γé╣3995 for TAJ HOTEL SIVAJINAGAR
+MISSING: Could not find sale to match log: 2026-01-08 Γé╣2140 for TAJ HOTEL SIVAJINAGAR
+MISSING: Could not find sale to match log: 2026-01-08 Γé╣2140 for TAJ HOTEL SIVAJINAGAR
+MISSING: Could not find sale to match log: 2026-01-08 Γé╣1000 for TAJ HOTEL SIVAJINAGAR
+MISSING: Could not find sale to match log: 2026-01-22 Γé╣435 for KUKKOS RESTAURANT
+MISSING: Could not find sale to match log: 2026-01-12 Γé╣525 for KUKKOS RESTAURANT
+MISSING: Could not find sale to match log: 2026-01-08 Γé╣330 for KUKKOS RESTAURANT
+
+Proposed Updates: 0
+Applying updates...
+Applied all updates.

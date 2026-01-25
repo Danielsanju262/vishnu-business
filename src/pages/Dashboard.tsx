@@ -10,6 +10,9 @@ import { Modal } from "../components/ui/Modal";
 import { useHistorySyncedState } from "../hooks/useHistorySyncedState";
 import { DailyRevenueLineGraph } from "../components/DailyRevenueLineGraph";
 import { eachDayOfInterval } from "date-fns";
+import { CashInHandBreakdown } from "../components/CashInHandBreakdown";
+import type { BreakdownItem } from "../components/CashInHandBreakdown";
+
 
 
 export default function Dashboard() {
@@ -24,6 +27,10 @@ export default function Dashboard() {
     const [userName, setUserName] = useState("Vishnu");
     const [isLoadingStats, setIsLoadingStats] = useState(true);
     const [statsError, setStatsError] = useState<string | null>(null);
+
+    // Breakdown State
+    const [showBreakdown, setShowBreakdown] = useHistorySyncedState(false, 'dashboardBreakdown');
+    const [breakdownItems, setBreakdownItems] = useState<BreakdownItem[]>([]);
 
 
     // Chart State
@@ -141,9 +148,12 @@ export default function Dashboard() {
 
             const { start, end } = getDateRange();
 
+            // 0. Fetch Customers for names
+            const custQuery = supabase.from('customers').select('id, name');
+
             // 1. Transactions Query
             let tQuery = supabase.from('transactions')
-                .select('date, quantity, sell_price, buy_price, credit_amount, customer_id')
+                .select('id, date, quantity, sell_price, buy_price, credit_amount, customer_id')
                 .is('deleted_at', null);
 
             // 2. Expenses Query
@@ -154,112 +164,113 @@ export default function Dashboard() {
             // 3. Credit Collections Query (for Cash In Hand - Debt Repayment)
             // Note: collected_at is date type based on usage patterns
             let cQuery = supabase.from('credit_collections')
-                .select('amount, collected_at');
-
-            // 4. Payment Reminders (for Historical Cash In Hand Heuristic)
-            // We check if a reminder existed on the sale date to infer if it was a credit sale (pre-Jan 22, 2026)
-            let prQuery = supabase.from('payment_reminders')
-                .select('customer_id, recorded_at');
+                .select('id, amount, collected_at, customer_id');
 
             if (start === end) {
                 tQuery = tQuery.eq('date', start);
                 eQuery = eQuery.eq('date', start);
-                cQuery = cQuery.eq('collected_at', start);
-                // For reminders, we filter by recorded_at matching the day
-                // Assuming recorded_at is date or we rely on app creating it as date-like for this check
-                // If recorded_at is timestamp, 'eq' might be strict. But typically in this app 'date' cols are used.
-                // To be safe for heuristic matching, let's fetch a slightly wider range or just day? 
-                // Let's use same eq for consistency with other queries, optimizing for 'date' column type.
-                prQuery = prQuery.gte('recorded_at', start).lte('recorded_at', end);
+                cQuery = cQuery.gte('collected_at', `${start}T00:00:00`).lte('collected_at', `${end}T23:59:59`);
             } else {
                 tQuery = tQuery.gte('date', start).lte('date', end);
                 eQuery = eQuery.gte('date', start).lte('date', end);
-                cQuery = cQuery.gte('collected_at', start).lte('collected_at', end);
-                prQuery = prQuery.gte('recorded_at', start).lte('recorded_at', end);
+                cQuery = cQuery.gte('collected_at', `${start}T00:00:00`).lte('collected_at', `${end}T23:59:59`);
             }
 
-            const [tRes, eRes, cRes, prRes] = await Promise.all([tQuery, eQuery, cQuery, prQuery]);
+            const [custRes, tRes, eRes, cRes] = await Promise.all([custQuery, tQuery, eQuery, cQuery]);
 
             if (tRes.error) throw tRes.error;
             if (eRes.error) throw eRes.error;
             if (cRes.error) throw cRes.error;
-            // prRes failure shouldn't block everything, but let's assume success
+
+            const customers = custRes.data || [];
+            const custMap = new Map(customers.map(c => [c.id, c.name]));
 
             const transactions = tRes.data || [];
             const expenses = eRes.data || [];
             const collections = cRes.data || [];
-            const reminders = prRes.data || [];
 
             // Calculate Totals
             const { revenue, netProfit } = calculateProfit(transactions, expenses);
 
             // ============================================================
-            // CASH IN HAND CALCULATION
+            // CASH IN HAND CALCULATION & BREAKDOWN
             // ============================================================
-            // Formula per transaction:
-            // - Full Cash Sale:    Net Profit (profit - 0)
-            // - Full Credit Sale:  Net Profit - Credit Amount (= -cost)
-            // - Partial Credit:    (Net Profit - Credit Amount) + Partial Paid
-            //
-            // Then add debt collections at the end
-            // ============================================================
-
-            // ============================================================
-            // CASH IN HAND CALCULATION - STRICT PER-SALE LOGIC
-            // ============================================================
-            // 1. Calculate Contribution from Sales
             let totalCihContribution = 0;
-            const CUTOFF_DATE = '2026-01-22';
+            const breakdownList: BreakdownItem[] = [];
 
             transactions.forEach((t: any) => {
-                const saleValue = t.sell_price * t.quantity;
-                const productCost = t.buy_price * t.quantity;
-                const profit = saleValue - productCost;
                 const d = t.date;
+                const saleValue = t.sell_price * t.quantity;
+                const buyValue = t.buy_price * t.quantity;
 
-                if (d >= CUTOFF_DATE) {
-                    const creditAmount = t.credit_amount || 0;
-                    const paidAmount = saleValue - creditAmount;
+                let contribution = 0;
+                let type: 'cash_profit' | 'collection' = 'cash_profit';
 
-                    if (paidAmount === saleValue) {
-                        // Full Cash: Profit
-                        totalCihContribution += profit;
-                    } else if (paidAmount === 0) {
-                        // Full Credit: 0
-                        totalCihContribution += 0;
-                    } else {
-                        // Partial: Paid Amount
-                        totalCihContribution += paidAmount;
-                    }
+                // Strict Logic: Full Credit or Full Cash ONLY (User Request)
+                const creditAmount = t.credit_amount || 0;
+
+                if (creditAmount > 0) {
+                    // Credit Sale: 0 CIH. We do NOT deduct cost (as per "it'll be 0" instruction)
+                    contribution = 0;
                 } else {
-                    // Historical heuristic
-                    const wasCredit = reminders.some((r: any) =>
-                        r.customer_id === t.customer_id &&
-                        (r.recorded_at === d || r.recorded_at?.startsWith(d))
-                    );
+                    // Full Cash Sale: Net Profit (Sell - Buy)
+                    contribution = saleValue - buyValue;
+                    type = 'cash_profit';
+                }
 
-                    if (wasCredit) {
-                        totalCihContribution += 0;
-                    } else {
-                        totalCihContribution += profit;
-                    }
+                if (contribution > 0) {
+                    totalCihContribution += contribution;
+
+                    breakdownList.push({
+                        id: t.id || Math.random().toString(),
+                        date: d,
+                        type,
+                        customerName: custMap.get(t.customer_id) || 'Unknown',
+                        amount: contribution,
+                        originalTotal: saleValue
+                    });
                 }
             });
 
             // 2. Sum Collections
             let totalCollections = 0;
             collections.forEach((c: any) => {
-                totalCollections += c.amount;
+                const amount = c.amount || 0;
+                totalCollections += amount;
+
+                // collected_at is likely YYYY-MM-DDT...
+                const d = c.collected_at ? c.collected_at.split('T')[0] : (start || 'Unknown');
+
+                if (amount > 0) {
+                    breakdownList.push({
+                        id: c.id || Math.random().toString(),
+                        date: d,
+                        type: 'collection',
+                        customerName: custMap.get(c.customer_id) || 'Unknown',
+                        amount: amount
+                    });
+                }
             });
 
-            // 3. Final CIH = Contribution + Collections (NO global expense deduction)
+            // 3. Final CIH
+            // Formula: (Profit from Cash Sales) + (Full Collection Amounts)
+            // Note: We already deducted 'buyValue' inside the loop for cash sales. 
+            // We do NOT deduct it again globally.
+
             const cashInHand = totalCihContribution + totalCollections;
-
-
             setStats({ revenue, profit: netProfit, cashInHand });
+            setBreakdownItems(breakdownList);
 
             // Generate Chart Data Points - Always daily
             const days = eachDayOfInterval({ start: new Date(start), end: new Date(end) });
+
+            // Create a quick lookup for transactions by day
+            const chartTransactionsByDay: Record<string, any[]> = {};
+            transactions.forEach((t: any) => {
+                const d = t.date;
+                if (!chartTransactionsByDay[d]) chartTransactionsByDay[d] = [];
+                chartTransactionsByDay[d].push(t);
+            });
 
             // Pre-process sales for performance
             const salesByDay: Record<string, { revenue: number; cost: number }> = {};
@@ -287,38 +298,38 @@ export default function Dashboard() {
             transactions.forEach((t: any) => {
                 const d = t.date;
                 const saleValue = t.sell_price * t.quantity;
-                const productCost = t.buy_price * t.quantity;
-                const profit = saleValue - productCost;
+                const buyValue = t.buy_price * t.quantity;
 
+                // Ensure accumulator exists
                 if (!cihContributionByDay[d]) cihContributionByDay[d] = 0;
 
-                if (d >= CUTOFF_DATE) {
-                    const creditAmount = t.credit_amount || 0;
-                    const paidAmount = saleValue - creditAmount;
+                let contribution = 0;
+                const type = 'cash_profit';
 
-                    if (paidAmount === saleValue) {
-                        // Full Cash: Net Profit (Sale - Cost)
-                        // Note: OpEx is subtracted globally later to reach true "Net"
-                        cihContributionByDay[d] += profit;
-                    } else if (paidAmount === 0) {
-                        // Full Credit: 0
-                        cihContributionByDay[d] += 0;
-                    } else {
-                        // Partial: Partial Amount Paid
-                        cihContributionByDay[d] += paidAmount;
-                    }
+                const creditVal = t.credit_amount || 0;
+
+                // Unified Logic (Matches Main Stats)
+                if (creditVal > 0) {
+                    // Credit Sale: 0 CIH
+                    contribution = 0;
                 } else {
-                    const wasCredit = reminders.some((r: any) =>
-                        r.customer_id === t.customer_id &&
-                        (r.recorded_at === d || r.recorded_at?.startsWith(d))
-                    );
-                    if (wasCredit) {
-                        // Full Credit: 0
-                        cihContributionByDay[d] += 0;
-                    } else {
-                        // Full Cash: Profit
-                        cihContributionByDay[d] += profit;
-                    }
+                    // Full Cash Sale: Net Profit (Sell - Buy)
+                    contribution = saleValue - buyValue;
+                }
+
+                if (contribution > 0) {
+                    cihContributionByDay[d] += contribution; // Graph accumulator
+
+                    totalCihContribution += contribution; // Total accumulator
+
+                    breakdownList.push({
+                        id: t.id || Math.random().toString(),
+                        date: d,
+                        type,
+                        customerName: custMap.get(t.customer_id) || 'Unknown',
+                        amount: contribution,
+                        originalTotal: saleValue
+                    });
                 }
             });
 
@@ -340,11 +351,10 @@ export default function Dashboard() {
                 const dayNet = dayGross - dayOpEx;
 
                 // CIH = Sum of Daily Contributions + Collections
-                // User requirement: "CIH of each sale + any payment collected... nothing else"
+                // Note: 'dayContribution' already deducted buy_price for Cash Sales, and is 0 for Credit Sales.
+                // We do NOT deduct cost again.
                 const dayContribution = cihContributionByDay[dateStr] || 0;
                 const dayCollections = collectionsByDay[dateStr] || 0;
-
-
 
                 const dayCashInHand = dayContribution + dayCollections;
 
@@ -380,6 +390,19 @@ export default function Dashboard() {
 
     return (
         <div className="space-y-6 px-4 pt-6 pb-6 md:px-6 md:pt-8 md:pb-8 w-full md:max-w-lg md:mx-auto animate-in fade-in">
+            <CashInHandBreakdown
+                isOpen={showBreakdown}
+                onClose={() => setShowBreakdown(false)}
+                items={breakdownItems}
+                total={stats.cashInHand}
+                dateLabel={
+                    dateFilter === 'today' ? 'Today' :
+                        dateFilter === 'yesterday' ? 'Yesterday' :
+                            dateFilter === 'thisWeek' ? 'This Week' :
+                                dateFilter === 'thisMonth' ? 'This Month' :
+                                    'Custom Range'
+                }
+            />
             {/* Header */}
             <div className="space-y-1.5">
                 {/* Date at top */}
@@ -579,16 +602,19 @@ export default function Dashboard() {
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-7 mt-4 pt-4 border-t border-white/10">
-                                    <div className="space-y-1 flex flex-col items-start">
-                                        <p className="text-white/50 font-medium text-[10px] uppercase tracking-wider text-left w-full whitespace-nowrap">Cash in Hand</p>
-                                        <h2 className="text-3xl font-bold text-sky-400 tracking-tight flex items-center gap-1">
+                                    <div
+                                        onClick={() => setShowBreakdown(true)}
+                                        className="space-y-1 flex flex-col items-start cursor-pointer hover:bg-white/5 p-2 -ml-2 rounded-xl transition-colors group"
+                                    >
+                                        <p className="text-white/50 font-medium text-[10px] uppercase tracking-wider text-left w-full whitespace-nowrap group-hover:text-sky-300 transition-colors">Cash in Hand</p>
+                                        <h2 className="text-3xl font-bold text-sky-400 tracking-tight flex items-center gap-1 group-hover:scale-105 transition-transform origin-left">
                                             <span>
                                                 <span className="text-lg align-top opacity-60 font-normal mr-0.5">₹</span>
                                                 {stats.cashInHand.toLocaleString()}
                                             </span>
                                         </h2>
                                     </div>
-                                    <div className="space-y-1 flex flex-col items-start">
+                                    <div className="space-y-1 flex flex-col items-start p-2 -ml-2">
                                         <p className="text-white/50 font-medium text-[10px] uppercase tracking-wider text-left w-full whitespace-nowrap">Net Profit</p>
                                         <h2 className={cn(
                                             "text-3xl font-bold tracking-tight flex items-center gap-1",

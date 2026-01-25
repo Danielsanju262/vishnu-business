@@ -276,7 +276,6 @@ export default function BusinessInsights() {
         let sourceTransactions = data.transactions;
         let sourceExpenses = data.expenses;
         let sourceCollections = data.creditCollections;
-        let sourceReminders = data.paymentReminders;
         let start: Date;
         let end: Date;
 
@@ -291,7 +290,6 @@ export default function BusinessInsights() {
             sourceTransactions = historicalData.transactions.length > 0 ? historicalData.transactions : data.transactions;
             sourceExpenses = historicalData.expenses.length > 0 ? historicalData.expenses : data.expenses;
             sourceCollections = historicalData.creditCollections.length > 0 ? historicalData.creditCollections : data.creditCollections;
-            sourceReminders = historicalData.paymentReminders.length > 0 ? historicalData.paymentReminders : data.paymentReminders;
             end = new Date();
             start = subMonths(end, 12); // Ensuring we have coverage for the requested logic
         }
@@ -329,38 +327,34 @@ export default function BusinessInsights() {
                     const net = gross - opEx;
 
                     // Calculate CIH Transaction Contribution
-                    let dayContrib = 0;
+                    let dayPaid = 0;
+                    let dayCOGS_Transaction = 0;
+
                     sourceTransactions.filter(t => t.date === dateStr).forEach((t: any) => {
                         const saleVal = t.sell_price * t.quantity;
                         const productCost = t.buy_price * t.quantity;
-                        const profit = saleVal - productCost;
 
-                        if (dateStr >= '2026-01-22') {
-                            const creditAmt = t.credit_amount || 0;
-                            const paidAmt = saleVal - creditAmt;
-                            if (paidAmt === saleVal) dayContrib += profit;
-                            else if (paidAmt === 0) dayContrib += 0;
-                            else dayContrib += paidAmt;
-                        } else {
-                            const wasCredit = sourceReminders.some((r: any) =>
-                                r.customer_id === t.customer_id && (r.recorded_at === dateStr || r.recorded_at?.startsWith(dateStr))
-                            );
-                            if (wasCredit) dayContrib += 0;
-                            else dayContrib += profit;
-                        }
+                        // Strict Logic per recent migration
+                        const creditAmt = t.credit_amount || 0;
+                        const paidAmt = saleVal - creditAmt;
+
+                        dayPaid += paidAmt;
+                        dayCOGS_Transaction += productCost;
                     });
 
                     // Collections
                     const collected = sourceCollections.filter(c => (c.collected_at?.startsWith(dateStr))).reduce((acc, c: any) => acc + c.amount, 0);
 
-                    // CIH = Contributions + Collections
-                    const dayCIH = dayContrib + collected;
+                    // CIH = (Cash Received + Collections) - COGS
+                    // Note: We deduct Transaction COGS (Buy Price). 
+                    // Ingredient expenses are usually OpEx or separate COGS, but for "Product Value" deduction we stick to sales COGS.
+                    const dayCIH = (dayPaid + collected) - dayCOGS_Transaction;
 
                     chartData.push({
                         date: dateStr,
                         label: format(day, 'd MMM'),
                         revenue: revenue,
-                        profit: net, // Using Net Profit for consistency
+                        profit: net,
                         cashInHand: dayCIH
                     });
                 });
@@ -368,42 +362,44 @@ export default function BusinessInsights() {
             }
         } else if (chartAggregation === 'week') {
             // Last 31 weeks
-            // Start from 31 weeks ago to now
-            // We'll iterate BACKWARDS from end week to ensure we capture the "last 31 weeks" correctly relative to today?
-            // Or just interval. Let's do interval for simplicity, but construct start date carefully.
-            // 31 weeks approx 7 months, so our 12 month historical fetch covers it.
-            // Let's explicitly set start to 31 weeks ago.
             const weekStartPoint = subDays(end, 31 * 7);
-            const validStart = weekStartPoint; // simplified
+            const validStart = weekStartPoint;
 
             const weeks = eachWeekOfInterval({ start: validStart, end }, { weekStartsOn: 1 });
-            // Take only last 31 if somehow we got more
             const weeksToShow = weeks.slice(-31);
 
             weeksToShow.forEach(weekStart => {
                 const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
                 const weekKey = format(weekStart, 'yyyy-MM-dd');
 
-                // Filter source for this week
-                const weekRevenue = sourceTransactions
-                    .filter((t: any) => {
-                        const d = new Date(t.date);
-                        return d >= weekStart && d <= weekEnd;
-                    })
-                    .reduce((acc: number, t: any) => acc + (t.quantity * t.sell_price), 0);
+                let weekRevenue = 0;
+                let weekTransactionCOGS = 0;
+                let weekIngredientCost = 0;
+                let weekPaid = 0;
 
-                const weekCost = sourceTransactions
+                // Filter source for this week
+                sourceTransactions
                     .filter((t: any) => {
                         const d = new Date(t.date);
                         return d >= weekStart && d <= weekEnd;
                     })
-                    .reduce((acc: number, t: any) => acc + (t.quantity * t.buy_price), 0)
-                    + sourceExpenses
-                        .filter((e: any) => {
-                            const d = new Date(e.date);
-                            return e.is_ghee_ingredient && d >= weekStart && d <= weekEnd;
-                        })
-                        .reduce((acc: number, e: any) => acc + e.amount, 0);
+                    .forEach((t: any) => {
+                        const saleVal = t.quantity * t.sell_price;
+                        const cost = t.quantity * t.buy_price;
+                        weekRevenue += saleVal;
+                        weekTransactionCOGS += cost;
+
+                        const creditAmt = t.credit_amount || 0;
+                        const paidAmt = saleVal - creditAmt;
+                        weekPaid += paidAmt;
+                    });
+
+                weekIngredientCost = sourceExpenses
+                    .filter((e: any) => {
+                        const d = new Date(e.date);
+                        return e.is_ghee_ingredient && d >= weekStart && d <= weekEnd;
+                    })
+                    .reduce((acc: number, e: any) => acc + e.amount, 0);
 
                 const weekOpEx = sourceExpenses
                     .filter((e: any) => {
@@ -412,33 +408,8 @@ export default function BusinessInsights() {
                     })
                     .reduce((acc: number, e: any) => acc + e.amount, 0);
 
+                const weekCost = weekTransactionCOGS + weekIngredientCost;
                 const weekNet = weekRevenue - weekCost - weekOpEx;
-
-                // Calculate CIH Transaction Contribution for Week
-                let weekContrib = 0;
-                sourceTransactions.filter((t: any) => {
-                    const d = new Date(t.date);
-                    return d >= weekStart && d <= weekEnd;
-                }).forEach((t: any) => {
-                    const dStr = t.date;
-                    const saleVal = t.sell_price * t.quantity;
-                    const productCost = t.buy_price * t.quantity;
-                    const profit = saleVal - productCost;
-
-                    if (dStr >= '2026-01-22') {
-                        const creditAmt = t.credit_amount || 0;
-                        const paidAmt = saleVal - creditAmt;
-                        if (paidAmt === saleVal) weekContrib += profit;
-                        else if (paidAmt === 0) weekContrib += 0;
-                        else weekContrib += paidAmt;
-                    } else {
-                        const wasCredit = sourceReminders.some((r: any) =>
-                            r.customer_id === t.customer_id && (r.recorded_at === dStr || r.recorded_at?.startsWith(dStr))
-                        );
-                        if (wasCredit) weekContrib += 0;
-                        else weekContrib += profit;
-                    }
-                });
 
                 const weekCollected = sourceCollections
                     .filter((c: any) => {
@@ -453,38 +424,46 @@ export default function BusinessInsights() {
                     axisLabel: format(weekStart, 'd MMM'),
                     revenue: weekRevenue,
                     profit: weekNet,
-                    cashInHand: weekContrib + weekCollected
+                    cashInHand: (weekPaid + weekCollected) - weekTransactionCOGS
                 });
             });
             canShowChart = true;
         } else if (chartAggregation === 'month') {
             // Last 12 months
-            const validStart = subMonths(end, 11); // 11 months back + current month = 12 months
+            const validStart = subMonths(end, 11);
             const months = eachMonthOfInterval({ start: validStart, end });
 
             months.forEach(monthStart => {
                 const monthEnd = endOfMonth(monthStart);
                 const monthKey = format(monthStart, 'yyyy-MM-dd');
 
-                const monthRevenue = sourceTransactions
-                    .filter((t: any) => {
-                        const d = new Date(t.date);
-                        return d >= monthStart && d <= monthEnd;
-                    })
-                    .reduce((acc: number, t: any) => acc + (t.quantity * t.sell_price), 0);
+                let monthRevenue = 0;
+                let monthTransactionCOGS = 0;
+                let monthIngredientCost = 0;
+                let monthPaid = 0;
 
-                const monthCost = sourceTransactions
+                sourceTransactions
                     .filter((t: any) => {
                         const d = new Date(t.date);
                         return d >= monthStart && d <= monthEnd;
                     })
-                    .reduce((acc: number, t: any) => acc + (t.quantity * t.buy_price), 0)
-                    + sourceExpenses
-                        .filter((e: any) => {
-                            const d = new Date(e.date);
-                            return e.is_ghee_ingredient && d >= monthStart && d <= monthEnd;
-                        })
-                        .reduce((acc: number, e: any) => acc + e.amount, 0);
+                    .forEach((t: any) => {
+                        const saleVal = t.quantity * t.sell_price;
+                        const cost = t.quantity * t.buy_price;
+                        monthRevenue += saleVal;
+                        monthTransactionCOGS += cost;
+
+                        const creditAmt = t.credit_amount || 0;
+                        const paidAmt = saleVal - creditAmt;
+                        monthPaid += paidAmt;
+                    });
+
+                monthIngredientCost = sourceExpenses
+                    .filter((e: any) => {
+                        const d = new Date(e.date);
+                        return e.is_ghee_ingredient && d >= monthStart && d <= monthEnd;
+                    })
+                    .reduce((acc: number, e: any) => acc + e.amount, 0);
 
                 const monthOpEx = sourceExpenses
                     .filter((e: any) => {
@@ -493,33 +472,8 @@ export default function BusinessInsights() {
                     })
                     .reduce((acc: number, e: any) => acc + e.amount, 0);
 
+                const monthCost = monthTransactionCOGS + monthIngredientCost;
                 const monthNet = monthRevenue - monthCost - monthOpEx;
-
-                // Calculate CIH Transaction Contribution for Month
-                let monthContrib = 0;
-                sourceTransactions.filter((t: any) => {
-                    const d = new Date(t.date);
-                    return d >= monthStart && d <= monthEnd;
-                }).forEach((t: any) => {
-                    const dStr = t.date;
-                    const saleVal = t.sell_price * t.quantity;
-                    const productCost = t.buy_price * t.quantity;
-                    const profit = saleVal - productCost;
-
-                    if (dStr >= '2026-01-22') {
-                        const creditAmt = t.credit_amount || 0;
-                        const paidAmt = saleVal - creditAmt;
-                        if (paidAmt === saleVal) monthContrib += profit;
-                        else if (paidAmt === 0) monthContrib += 0;
-                        else monthContrib += paidAmt;
-                    } else {
-                        const wasCredit = sourceReminders.some((r: any) =>
-                            r.customer_id === t.customer_id && (r.recorded_at === dStr || r.recorded_at?.startsWith(dStr))
-                        );
-                        if (wasCredit) monthContrib += 0;
-                        else monthContrib += profit;
-                    }
-                });
 
                 const monthCollected = sourceCollections
                     .filter((c: any) => {
@@ -531,10 +485,10 @@ export default function BusinessInsights() {
                 chartData.push({
                     date: monthKey,
                     label: format(monthStart, 'MMMM yyyy'),
-                    axisLabel: format(monthStart, 'MMM'), // Jan, Feb...
+                    axisLabel: format(monthStart, 'MMM'),
                     revenue: monthRevenue,
                     profit: monthNet,
-                    cashInHand: monthContrib + monthCollected
+                    cashInHand: (monthPaid + monthCollected) - monthTransactionCOGS
                 });
             });
             canShowChart = true;
