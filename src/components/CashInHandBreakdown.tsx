@@ -1,5 +1,5 @@
 import { format } from "date-fns";
-import { X, ArrowDownLeft, TrendingUp, Wallet } from "lucide-react";
+import { ArrowDownLeft, TrendingUp, Wallet } from "lucide-react";
 import { cn } from "../lib/utils";
 import { Modal } from "./ui/Modal";
 
