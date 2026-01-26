@@ -488,6 +488,31 @@ export default function Dashboard() {
 
 
 
+            {/* Quick Actions - Dark Mode Grayscale */}
+            <div className="grid grid-cols-2 gap-3">
+                <Link
+                    to="/sale/new"
+                    className="group relative overflow-hidden flex flex-col items-center justify-center bg-gradient-to-br from-emerald-500 to-emerald-600 p-5 md:p-6 rounded-2xl shadow-lg shadow-black/20 active:scale-[0.97] transition-all duration-200 border border-emerald-400/50 hover:border-emerald-400/70 hover:shadow-xl hover:shadow-emerald-600/30 min-h-[120px]"
+                >
+                    <div className="absolute inset-0 bg-emerald-400/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+                    <div className="bg-white/20 p-3.5 rounded-full mb-3 backdrop-blur-sm group-hover:bg-white/30 group-hover:scale-105 transition-all duration-200 border-2 border-white/40">
+                        <Plus className="text-white" size={24} strokeWidth={2.5} />
+                    </div>
+                    <p className="text-white font-semibold text-sm md:text-base tracking-wide">New Sale</p>
+                </Link>
+
+                <Link
+                    to="/expense/new"
+                    className="group relative overflow-hidden flex flex-col items-center justify-center bg-gradient-to-br from-red-500 to-red-600 p-5 md:p-6 rounded-2xl shadow-lg shadow-black/20 active:scale-[0.97] transition-all duration-200 border border-red-400/50 hover:border-red-400/70 hover:shadow-xl hover:shadow-red-600/30 min-h-[120px]"
+                >
+                    <div className="absolute inset-0 bg-red-400/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+                    <div className="bg-white/20 p-3.5 rounded-full mb-3 backdrop-blur-sm group-hover:bg-white/30 group-hover:scale-105 transition-all duration-200 border-2 border-white/40">
+                        <Minus className="text-white" size={24} strokeWidth={2.5} />
+                    </div>
+                    <p className="text-white font-semibold text-sm md:text-base tracking-wide">New Expense</p>
+                </Link>
+            </div>
+
             {/* Date Filter and Stats Card - Grouped with tighter spacing */}
             <div className="space-y-3">
                 {/* Date Filter - Outside and above the stats card */}
@@ -663,30 +688,7 @@ export default function Dashboard() {
             </div>
 
 
-            {/* Quick Actions - Dark Mode Grayscale */}
-            <div className="grid grid-cols-2 gap-3">
-                <Link
-                    to="/sale/new"
-                    className="group relative overflow-hidden flex flex-col items-center justify-center bg-gradient-to-br from-emerald-500 to-emerald-600 p-5 md:p-6 rounded-2xl shadow-lg shadow-black/20 active:scale-[0.97] transition-all duration-200 border border-emerald-400/50 hover:border-emerald-400/70 hover:shadow-xl hover:shadow-emerald-600/30 min-h-[120px]"
-                >
-                    <div className="absolute inset-0 bg-emerald-400/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
-                    <div className="bg-white/20 p-3.5 rounded-full mb-3 backdrop-blur-sm group-hover:bg-white/30 group-hover:scale-105 transition-all duration-200 border-2 border-white/40">
-                        <Plus className="text-white" size={24} strokeWidth={2.5} />
-                    </div>
-                    <p className="text-white font-semibold text-sm md:text-base tracking-wide">New Sale</p>
-                </Link>
 
-                <Link
-                    to="/expense/new"
-                    className="group relative overflow-hidden flex flex-col items-center justify-center bg-gradient-to-br from-red-500 to-red-600 p-5 md:p-6 rounded-2xl shadow-lg shadow-black/20 active:scale-[0.97] transition-all duration-200 border border-red-400/50 hover:border-red-400/70 hover:shadow-xl hover:shadow-red-600/30 min-h-[120px]"
-                >
-                    <div className="absolute inset-0 bg-red-400/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
-                    <div className="bg-white/20 p-3.5 rounded-full mb-3 backdrop-blur-sm group-hover:bg-white/30 group-hover:scale-105 transition-all duration-200 border-2 border-white/40">
-                        <Minus className="text-white" size={24} strokeWidth={2.5} />
-                    </div>
-                    <p className="text-white font-semibold text-sm md:text-base tracking-wide">New Expense</p>
-                </Link>
-            </div>
 
             {/* Navigation Cards - Dark Mode Grayscale */}
             <div className="space-y-4 pt-2">

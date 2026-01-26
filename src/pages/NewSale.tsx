@@ -58,7 +58,7 @@ export default function NewSale() {
     // Payment Confirm State
     const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
     const [addToOutstanding, setAddToOutstanding] = useState(false);
-    const [paidNowAmount, setPaidNowAmount] = useState("");
+
     const [outstandingDueDate, setOutstandingDueDate] = useState("");
 
     const [confirmConfig, setConfirmConfig] = useState<{
@@ -77,6 +77,8 @@ export default function NewSale() {
     });
 
     const closeConfirm = () => setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Workflow State -- Synced with browser history for proper back navigation
     // Determine initial step based on stored data
@@ -582,235 +584,243 @@ export default function NewSale() {
             }
         }
 
-        // 1. Calculate Totals & Distributed Amounts
-        const totalSaleValue = cart.reduce((acc, item) => acc + (item.quantity * item.sellPrice), 0);
+        setIsSubmitting(true);
 
-        // Calculate total credit amount (if any)
-        let totalCredit = 0;
-        let totalPaidNow = totalSaleValue;  // Default: full cash sale
-        if (addToOutstanding && totalSaleValue > 0) {
-            const paid = parseFloat(paidNowAmount) || 0;
-            totalCredit = Math.max(0, totalSaleValue - paid);
-            totalPaidNow = paid;
-        }
+        try {
+            // 1. Calculate Totals & Distributed Amounts
+            const totalSaleValue = cart.reduce((acc, item) => acc + (item.quantity * item.sellPrice), 0);
 
-        // Calculate total linked payable amount (if any)
-        let totalLinkedPayable = 0;
-        if (isLinkedPayable && payableAmount) {
-            totalLinkedPayable = parseFloat(payableAmount) || 0;
-        }
+            // Calculate total credit amount (if any)
+            let totalCredit = 0;
+            let totalPaidNow = totalSaleValue;  // Default: full cash sale
+            if (addToOutstanding && totalSaleValue > 0) {
+                // Full credit sale requested
+                totalCredit = totalSaleValue;
+                totalPaidNow = 0;
+            }
 
-        // 2. Prepare Transactions with Tracking Fields
-        const transactions = cart.map(item => {
-            const itemTotal = item.quantity * item.sellPrice;
-            const ratio = totalSaleValue > 0 ? (itemTotal / totalSaleValue) : 0;
+            // Calculate total linked payable amount (if any)
+            let totalLinkedPayable = 0;
+            if (isLinkedPayable && payableAmount) {
+                totalLinkedPayable = parseFloat(payableAmount) || 0;
+            }
 
-            return {
-                customer_id: selectedCust.id,
-                product_id: item.product.id,
-                quantity: item.quantity,
-                sell_price: item.sellPrice,
-                buy_price: item.buyPrice,
-                date: date,
-                // Tracking Fields (for delete/edit sync and CIH calculation)
-                credit_amount: totalCredit * ratio,
-                paid_amount: totalPaidNow * ratio,  // Cash received at sale time
-                linked_supplier_id: (isLinkedPayable && payableSelectedSupplierId) ? payableSelectedSupplierId : null,
-                linked_supplier_amount: totalLinkedPayable * ratio
-            };
-        });
+            // 2. Prepare Transactions with Tracking Fields
+            const transactions = cart.map(item => {
+                const itemTotal = item.quantity * item.sellPrice;
+                const ratio = totalSaleValue > 0 ? (itemTotal / totalSaleValue) : 0;
 
-        // Try insert with tracking fields, fallback to basic insert if columns don't exist
-        let insertError = null;
-        const { error } = await supabase.from("transactions").insert(transactions);
-
-        if (error) {
-            // If error is about missing columns, try without tracking fields
-            if (error.message?.includes('column') || error.code === '42703') {
-                console.warn("Tracking columns not found, inserting without them:", error.message);
-                const basicTransactions = cart.map(item => ({
+                return {
                     customer_id: selectedCust.id,
                     product_id: item.product.id,
                     quantity: item.quantity,
                     sell_price: item.sellPrice,
                     buy_price: item.buyPrice,
-                    date: date
-                }));
-                const { error: fallbackError } = await supabase.from("transactions").insert(basicTransactions);
-                insertError = fallbackError;
-            } else {
-                insertError = error;
-            }
-        }
-
-        if (insertError) {
-            console.error("Failed to save sale:", insertError);
-            toast("Failed to save sale", "error");
-            return;
-        }
-
-        // 3. Handle Linked Payable (Create Record)
-        if (isLinkedPayable && payableSelectedSupplierId && payableAmount) {
-            // Check for existing pending payable
-            const { data: existingPayable } = await supabase
-                .from('accounts_payable')
-                .select('*')
-                .eq('supplier_id', payableSelectedSupplierId)
-                .eq('status', 'pending')
-                .order('due_date', { ascending: true })
-                .limit(1)
-                .maybeSingle();
-
-            const pAmount = parseFloat(payableAmount);
-            const today = new Date();
-            const dateStr = today.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-            const timeStr = today.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
-
-            if (existingPayable) {
-                // Update existing
-                const newAmount = existingPayable.amount + pAmount;
-                let newNote = existingPayable.note || "";
-                if (newNote) newNote += "\n";
-                newNote += `[${dateStr} ${timeStr}] Credit Purchase: ₹${pAmount.toLocaleString()}. Balance: ₹${newAmount.toLocaleString()} (Sale to ${selectedCust.name})`;
-
-                const updates: any = {
-                    amount: newAmount,
-                    note: newNote
+                    date: date,
+                    // Tracking Fields (for delete/edit sync and CIH calculation)
+                    credit_amount: totalCredit * ratio,
+                    paid_amount: totalPaidNow * ratio,  // Cash received at sale time
+                    linked_supplier_id: (isLinkedPayable && payableSelectedSupplierId) ? payableSelectedSupplierId : null,
+                    linked_supplier_amount: totalLinkedPayable * ratio
                 };
+            });
 
-                // Update due date if provided and earlier
-                if (payableDueDate) {
-                    const newDue = new Date(payableDueDate);
-                    const existingDue = new Date(existingPayable.due_date);
-                    if (newDue < existingDue) {
-                        updates.due_date = payableDueDate;
-                    }
-                }
+            // Try insert with tracking fields, fallback to basic insert if columns don't exist
+            let insertError = null;
+            const { error } = await supabase.from("transactions").insert(transactions);
 
-                const { error: updateError } = await supabase
-                    .from('accounts_payable')
-                    .update(updates)
-                    .eq('id', existingPayable.id);
-
-                if (updateError) {
-                    console.error("Failed to update payable", updateError);
-                    toast("Sale saved, but failed to update supplier payment.", "warning");
-                }
-            } else {
-                // Insert new
-                const { error: payableError } = await supabase
-                    .from('accounts_payable')
-                    .insert({
-                        supplier_id: payableSelectedSupplierId,
-                        amount: pAmount,
-                        // Validate/Format Date for Note
-                        due_date: payableDueDate || format(new Date(), 'yyyy-MM-dd'),
-                        note: `[${dateStr} ${timeStr}] Credit Purchase: ₹${pAmount.toLocaleString()}. Balance: ₹${pAmount.toLocaleString()} (Sale to ${selectedCust.name})`,
-                        status: 'pending',
-                        recorded_at: new Date().toISOString()
-                    });
-
-                if (payableError) {
-                    console.error("Failed to create linked payable", payableError);
-                    toast("Sale saved, but failed to link supplier payment.", "warning");
+            if (error) {
+                // If error is about missing columns, try without tracking fields
+                if (error.message?.includes('column') || error.code === '42703') {
+                    console.warn("Tracking columns not found, inserting without them:", error.message);
+                    const basicTransactions = cart.map(item => ({
+                        customer_id: selectedCust.id,
+                        product_id: item.product.id,
+                        quantity: item.quantity,
+                        sell_price: item.sellPrice,
+                        buy_price: item.buyPrice,
+                        date: date
+                    }));
+                    const { error: fallbackError } = await supabase.from("transactions").insert(basicTransactions);
+                    insertError = fallbackError;
+                } else {
+                    insertError = error;
                 }
             }
 
+            if (insertError) {
+                console.error("Failed to save sale:", insertError);
+                toast("Failed to save sale", "error");
+                return;
+            }
 
-        }
-
-        // 2. Handle Outstanding (Credit)
-        if (addToOutstanding) {
-            const totalAmount = cart.reduce((acc, item) => acc + (item.quantity * item.sellPrice), 0);
-            const paid = parseFloat(paidNowAmount) || 0;
-            const remaining = totalAmount - paid;
-
-            if (remaining > 0) {
-                const today = new Date();
-                const dateStr = today.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-                const timeStr = today.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
-
-                // Check if a pending reminder already exists for this customer
-                const { data: existingReminder } = await supabase
-                    .from('payment_reminders')
+            // 3. Handle Linked Payable (Create Record)
+            if (isLinkedPayable && payableSelectedSupplierId && payableAmount) {
+                // Check for existing pending payable
+                const { data: existingPayable } = await supabase
+                    .from('accounts_payable')
                     .select('*')
-                    .eq('customer_id', selectedCust.id)
+                    .eq('supplier_id', payableSelectedSupplierId)
                     .eq('status', 'pending')
                     .order('due_date', { ascending: true })
                     .limit(1)
                     .maybeSingle();
 
-                if (existingReminder) {
-                    // Update existing reminder
-                    const newAmount = existingReminder.amount + remaining;
-                    let newNote = existingReminder.note || "";
+                const pAmount = parseFloat(payableAmount);
+                const today = new Date();
+                const dateStr = today.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+                const timeStr = today.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+
+                if (existingPayable) {
+                    // Update existing
+                    const newAmount = existingPayable.amount + pAmount;
+                    let newNote = existingPayable.note || "";
                     if (newNote) newNote += "\n";
-                    newNote += `[${dateStr} ${timeStr}] Credit Sale: ₹${remaining.toLocaleString()}. Balance: ₹${newAmount.toLocaleString()}`;
+                    newNote += `[${dateStr} ${timeStr}] Credit Purchase: ₹${pAmount.toLocaleString()}. Balance: ₹${newAmount.toLocaleString()} (Sale to ${selectedCust.name})`;
 
                     const updates: any = {
                         amount: newAmount,
                         note: newNote
                     };
 
-                    // Update due date if provided and earlier than existing
-                    if (outstandingDueDate) {
-                        const newDue = new Date(outstandingDueDate);
-                        const existingDue = new Date(existingReminder.due_date);
+                    // Update due date if provided and earlier
+                    if (payableDueDate) {
+                        const newDue = new Date(payableDueDate);
+                        const existingDue = new Date(existingPayable.due_date);
                         if (newDue < existingDue) {
-                            updates.due_date = outstandingDueDate;
+                            updates.due_date = payableDueDate;
                         }
                     }
 
                     const { error: updateError } = await supabase
-                        .from('payment_reminders')
+                        .from('accounts_payable')
                         .update(updates)
-                        .eq('id', existingReminder.id);
+                        .eq('id', existingPayable.id);
 
                     if (updateError) {
-                        console.error("Failed to update reminder", updateError);
-                        toast("Sale saved, but failed to update reminder.", "warning");
+                        console.error("Failed to update payable", updateError);
+                        toast("Sale saved, but failed to update supplier payment.", "warning");
                     }
                 } else {
-                    // Create new reminder with proper note format
-                    const noteStr = `[${dateStr} ${timeStr}] Credit Sale: ₹${remaining.toLocaleString()}. Balance: ₹${remaining.toLocaleString()}`;
+                    // Insert new
+                    const { error: payableError } = await supabase
+                        .from('accounts_payable')
+                        .insert({
+                            supplier_id: payableSelectedSupplierId,
+                            amount: pAmount,
+                            // Validate/Format Date for Note
+                            due_date: payableDueDate || format(new Date(), 'yyyy-MM-dd'),
+                            note: `[${dateStr} ${timeStr}] Credit Purchase: ₹${pAmount.toLocaleString()}. Balance: ₹${pAmount.toLocaleString()} (Sale to ${selectedCust.name})`,
+                            status: 'pending',
+                            recorded_at: new Date().toISOString()
+                        });
 
-                    const { error: reminderError } = await supabase.from('payment_reminders').insert({
-                        customer_id: selectedCust.id,
-                        amount: remaining,
-                        due_date: outstandingDueDate || format(new Date(), 'yyyy-MM-dd'),
-                        status: 'pending',
-                        note: noteStr
-                    });
+                    if (payableError) {
+                        console.error("Failed to create linked payable", payableError);
+                        toast("Sale saved, but failed to link supplier payment.", "warning");
+                    }
+                }
 
-                    if (reminderError) {
-                        console.error("Failed to create reminder", reminderError);
-                        toast("Sale saved, but failed to set reminder.", "warning");
+
+            }
+
+            // 2. Handle Outstanding (Credit)
+            if (addToOutstanding) {
+                const totalAmount = cart.reduce((acc, item) => acc + (item.quantity * item.sellPrice), 0);
+
+                const remaining = totalAmount;
+
+                if (remaining > 0) {
+                    const today = new Date();
+                    const dateStr = today.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+                    const timeStr = today.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+
+                    // Check if a pending reminder already exists for this customer
+                    const { data: existingReminder } = await supabase
+                        .from('payment_reminders')
+                        .select('*')
+                        .eq('customer_id', selectedCust.id)
+                        .eq('status', 'pending')
+                        .order('due_date', { ascending: true })
+                        .limit(1)
+                        .maybeSingle();
+
+                    if (existingReminder) {
+                        // Update existing reminder
+                        const newAmount = existingReminder.amount + remaining;
+                        let newNote = existingReminder.note || "";
+                        if (newNote) newNote += "\n";
+                        newNote += `[${dateStr} ${timeStr}] Credit Sale: ₹${remaining.toLocaleString()}. Balance: ₹${newAmount.toLocaleString()}`;
+
+                        const updates: any = {
+                            amount: newAmount,
+                            note: newNote
+                        };
+
+                        // Update due date if provided and earlier than existing
+                        if (outstandingDueDate) {
+                            const newDue = new Date(outstandingDueDate);
+                            const existingDue = new Date(existingReminder.due_date);
+                            if (newDue < existingDue) {
+                                updates.due_date = outstandingDueDate;
+                            }
+                        }
+
+                        const { error: updateError } = await supabase
+                            .from('payment_reminders')
+                            .update(updates)
+                            .eq('id', existingReminder.id);
+
+                        if (updateError) {
+                            console.error("Failed to update reminder", updateError);
+                            toast("Sale saved, but failed to update reminder.", "warning");
+                        }
+                    } else {
+                        // Create new reminder with proper note format
+                        const noteStr = `[${dateStr} ${timeStr}] Credit Sale: ₹${remaining.toLocaleString()}. Balance: ₹${remaining.toLocaleString()}`;
+
+                        const { error: reminderError } = await supabase.from('payment_reminders').insert({
+                            customer_id: selectedCust.id,
+                            amount: remaining,
+                            due_date: outstandingDueDate || format(new Date(), 'yyyy-MM-dd'),
+                            status: 'pending',
+                            note: noteStr
+                        });
+
+                        if (reminderError) {
+                            console.error("Failed to create reminder", reminderError);
+                            toast("Sale saved, but failed to set reminder.", "warning");
+                        }
                     }
                 }
             }
+
+            // 3. Success & Reset
+            // Clear stored state on success
+            localStorage.removeItem('vishnu_new_sale_cust');
+            localStorage.removeItem('vishnu_new_sale_cart');
+            setCart([]);
+            setSelectedCust(null);
+            setIsPaymentModalOpen(false); // Close modal
+            setAddToOutstanding(false);
+
+            // Reset Linked Payable state
+            setIsLinkedPayable(false);
+            setPayableSupplierSearch("");
+            setPayableSelectedSupplierId("");
+            setPayableAmount("");
+            setPayableDueDate("");
+
+            // Notify insights to refresh (auto-complete 'no sales today' task)
+            notifySaleAdded();
+
+            toast("Sale saved successfully!", "success");
+            navigate("/");
+        } catch (error) {
+            console.error("Sale processing error:", error);
+            toast("An unexpected error occurred", "error");
+            setIsSubmitting(false);
         }
-
-        // 3. Success & Reset
-        // Clear stored state on success
-        localStorage.removeItem('vishnu_new_sale_cust');
-        localStorage.removeItem('vishnu_new_sale_cart');
-        setCart([]);
-        setSelectedCust(null);
-        setIsPaymentModalOpen(false); // Close modal
-        setAddToOutstanding(false);
-
-        // Reset Linked Payable state
-        setIsLinkedPayable(false);
-        setPayableSupplierSearch("");
-        setPayableSelectedSupplierId("");
-        setPayableAmount("");
-        setPayableDueDate("");
-
-        // Notify insights to refresh (auto-complete 'no sales today' task)
-        notifySaleAdded();
-
-        toast("Sale saved successfully!", "success");
-        navigate("/");
     };
 
     // --- Render ---
@@ -1305,8 +1315,7 @@ export default function NewSale() {
                 >
                     {(() => {
                         const totalAmount = cart.reduce((acc, item) => acc + (item.quantity * item.sellPrice), 0);
-                        const paid = parseFloat(paidNowAmount) || 0;
-                        const remaining = Math.max(0, totalAmount - paid);
+
 
                         return (
                             <div className="space-y-6">
@@ -1335,8 +1344,8 @@ export default function NewSale() {
                                     aria-label={`${addToOutstanding ? 'Disable' : 'Enable'} credit sale`}
                                 >
                                     <div className="flex flex-col items-center text-center">
-                                        <span className="font-bold text-sm">Add to Outstanding?</span>
-                                        <span className="text-xs text-muted-foreground">Is this a credit/partial payment?</span>
+                                        <span className="font-bold text-sm">Credit Sale?</span>
+                                        <span className="text-xs text-muted-foreground">Mark this entire sale as Unpaid (Credit)</span>
                                     </div>
                                     <div className={cn(
                                         "w-12 h-7 rounded-full p-1 transition-colors duration-200 ease-in-out relative",
@@ -1351,46 +1360,28 @@ export default function NewSale() {
 
                                 {/* Credit Details */}
                                 {addToOutstanding && (
-                                    <div className="space-y-2 animate-in slide-in-from-top-2">
-                                        <div>
-                                            <label className="text-xs font-bold text-muted-foreground ml-1 uppercase tracking-wider">Paid Now</label>
-                                            <div className="relative mt-1">
-                                                <input
-                                                    type="number"
-                                                    min="0"
-                                                    step="0.01"
-                                                    autoFocus
-                                                    className="w-full bg-background border-2 border-zinc-200 dark:border-zinc-700 focus:border-amber-500 dark:focus:border-amber-500 rounded-xl px-4 h-14 text-2xl font-black outline-none transition-all placeholder:text-muted-foreground/30"
-                                                    placeholder="0"
-                                                    value={paidNowAmount}
-                                                    onChange={e => setPaidNowAmount(e.target.value)}
-                                                />
-                                            </div>
+                                    <div className="space-y-4 animate-in slide-in-from-top-2 pt-2">
+                                        <div className="flex items-center justify-between px-5 py-4 bg-amber-50 dark:bg-amber-900/10 rounded-xl border border-amber-100 dark:border-amber-900/30">
+                                            <span className="text-sm font-bold text-amber-700 dark:text-amber-400">Total Credit Amount</span>
+                                            <span className="text-2xl font-black text-amber-600 dark:text-amber-500">₹{totalAmount.toLocaleString()}</span>
                                         </div>
 
-                                        <div className="flex items-center justify-end gap-4 px-4 py-2.5 bg-amber-50 dark:bg-amber-900/10 rounded-xl border border-amber-100 dark:border-amber-900/30">
-                                            <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Balance Due:</span>
-                                            <span className="text-2xl font-black text-amber-600 dark:text-amber-500">₹{remaining.toLocaleString()}</span>
+                                        <div className="">
+                                            <label className="text-xs font-bold text-muted-foreground ml-1 uppercase tracking-wider">Due Date (Optional)</label>
+                                            <input
+                                                type="date"
+                                                className="w-full mt-1 bg-background border-2 border-zinc-200 dark:border-zinc-700 focus:border-amber-500 dark:focus:border-amber-500 rounded-xl px-4 h-12 text-base font-bold outline-none transition-all cursor-pointer"
+                                                value={outstandingDueDate}
+                                                onChange={e => setOutstandingDueDate(e.target.value)}
+                                            />
                                         </div>
-
-                                        {remaining > 0 && (
-                                            <div className="pt-5">
-                                                <label className="text-xs font-bold text-muted-foreground ml-1 uppercase tracking-wider">Due Date (Optional)</label>
-                                                <input
-                                                    type="date"
-                                                    className="w-full mt-1 bg-background border-2 border-zinc-200 dark:border-zinc-700 focus:border-amber-500 dark:focus:border-amber-500 rounded-xl px-4 h-12 text-base font-bold outline-none transition-all cursor-pointer"
-                                                    value={outstandingDueDate}
-                                                    onChange={e => setOutstandingDueDate(e.target.value)}
-                                                />
-                                            </div>
-                                        )}
                                     </div>
                                 )}
 
                                 <div className="pt-2">
                                     <Button
                                         onClick={finalizeSale}
-                                        disabled={addToOutstanding && paidNowAmount === ""}
+                                        disabled={isSubmitting}
                                         className={cn(
                                             "w-full h-12 text-lg font-bold shadow-lg",
                                             addToOutstanding
@@ -1398,7 +1389,7 @@ export default function NewSale() {
                                                 : "bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/25"
                                         )}
                                     >
-                                        {addToOutstanding ? "Save Credit Sale" : "Mark Full Paid & Save"}
+                                        {isSubmitting ? "Saving..." : (addToOutstanding ? "Save Credit Sale" : "Mark Full Paid & Save")}
                                     </Button>
                                 </div>
                             </div>
