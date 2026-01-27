@@ -5,15 +5,24 @@ import { useToast } from '../components/toast-provider';
 export const useRecurringReminders = () => {
     const { toast } = useToast();
     const isProcessing = useRef(false);
+    const lastProcessed = useRef<number>(0);
+    const PROCESS_INTERVAL = 30 * 60 * 1000; // 30 minutes
 
     useEffect(() => {
         const processRecurringReminders = async () => {
-            if (isProcessing.current) return;
+            const now = Date.now();
+
+            // Throttle processing to every 30 minutes
+            if (isProcessing.current || (now - lastProcessed.current) < PROCESS_INTERVAL) {
+                return;
+            }
+
             isProcessing.current = true;
+            lastProcessed.current = now;
 
             try {
-                const now = new Date();
-                const nowIso = now.toISOString();
+                const nowDate = new Date();
+                const nowIso = nowDate.toISOString();
 
                 // 1. Fetch due configs
                 const { data: configs, error } = await supabase
@@ -35,8 +44,8 @@ export const useRecurringReminders = () => {
                 for (const config of configs) {
                     // Create the reminder
                     // Note: We format the note to indicate it was auto-generated
-                    const dateStr = now.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-                    const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+                    const dateStr = nowDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+                    const timeStr = nowDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
                     const note = config.note
                         ? `${config.note}\n[Auto-Generated on ${dateStr} ${timeStr}]`
                         : `[Auto-Generated Recurring Reminder on ${dateStr} ${timeStr}]`;
@@ -59,16 +68,10 @@ export const useRecurringReminders = () => {
                     // Calculate next run date
                     const nextRun = new Date(config.next_run_at); // Start from previous scheduled time to keep cadence
 
-                    // Safety: If nextRun is way in the past, bring it to near present to avoid infinite loop of catching up
-                    // For this MVP, we will just increment from the *scheduled* time, but if it's still in the past, we loop until it's future
-                    // Or simpler: just increment once. But 'catch up' is requested. 
-                    // Let's do simple increment. If it's still in past, the next page load will catch it. 
-                    // Better: Ensure next run is in the future.
-
                     let newNextRun = new Date(nextRun);
 
                     // Logic to find next candidate that is > NOW
-                    while (newNextRun <= now) {
+                    while (newNextRun <= nowDate) {
                         if (config.frequency === 'daily') {
                             newNextRun.setDate(newNextRun.getDate() + 1);
                         } else if (config.frequency === 'weekly') {

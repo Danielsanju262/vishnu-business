@@ -105,12 +105,15 @@ export default function GoalBubbleWidget() {
             const allGoals = await getAllGoals();
             const activeGoals = allGoals.filter(g => g.status === 'active');
 
+            const updatedGoals = [];
             for (const goal of activeGoals) {
-                await updateGoalProgress(goal.id);
+                const updatedGoal = await updateGoalProgress(goal.id);
+                if (updatedGoal) {
+                    updatedGoals.push(updatedGoal);
+                }
             }
 
-            const updatedGoals = await getAllGoals();
-            setGoals(updatedGoals.filter(g => g.status === 'active'));
+            setGoals(updatedGoals);
         } catch (error) {
             console.error('Error loading goals:', error);
         } finally {

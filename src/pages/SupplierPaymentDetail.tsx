@@ -39,13 +39,35 @@ type TransactionLog = {
 // Helper function to format date with ordinal suffix
 const formatDateWithOrdinal = (dateStr: string): string => {
     try {
-        // Parse the date string (format: "8 Jan" or similar)
-        const parts = dateStr.trim().split(' ');
-        if (parts.length < 2) return dateStr;
+        // Handle various date formats
+        let date: Date;
 
-        const day = parseInt(parts[0]);
-        const month = parts[1];
-        const currentYear = new Date().getFullYear();
+        // If it's a standard date string (YYYY-MM-DD), parse directly
+        if (dateStr.includes('-') && dateStr.length >= 8) {
+            date = new Date(dateStr);
+        } else {
+            // Parse formats like "8 Jan" or "8 Jan 10:30"
+            const parts = dateStr.trim().split(' ');
+            if (parts.length < 2) return dateStr;
+
+            const day = parseInt(parts[0]);
+            const monthStr = parts[1];
+            const currentYear = new Date().getFullYear();
+
+            // Convert month string to number (Jan=0, Feb=1, etc.)
+            const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+            const month = monthNames.indexOf(monthStr.toLowerCase());
+
+            if (month === -1 || isNaN(day) || day < 1 || day > 31) {
+                return dateStr;
+            }
+
+            date = new Date(currentYear, month, day);
+        }
+
+        if (isNaN(date.getTime())) {
+            return dateStr;
+        }
 
         // Get ordinal suffix
         const getOrdinal = (n: number): string => {
@@ -54,8 +76,13 @@ const formatDateWithOrdinal = (dateStr: string): string => {
             return n + (s[(v - 20) % 10] || s[v] || s[0]);
         };
 
-        return `${getOrdinal(day)} ${month} ${currentYear}`;
+        const day = date.getDate();
+        const month = date.toLocaleString('default', { month: 'short' });
+        const year = date.getFullYear();
+
+        return `${getOrdinal(day)} ${month} ${year}`;
     } catch (e) {
+        console.error('Error formatting date:', e);
         return dateStr;
     }
 };

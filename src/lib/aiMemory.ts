@@ -430,70 +430,75 @@ export interface WaterfallGoalStatus {
 }
 
 export async function calculateWaterfallGoals(): Promise<WaterfallGoalStatus[]> {
-    // 1. Get all active goals sorted by deadline
-    const goals = await getActiveGoals(); // Already sorted by deadline
-    if (goals.length === 0) return [];
+    try {
+        // 1. Get all active goals sorted by deadline
+        const goals = await getActiveGoals(); // Already sorted by deadline
+        if (goals.length === 0) return [];
 
-    // 2. Calculate Total Available "Pool" (Net Profit This Month)
-    // We assume the "pool" is the Net Profit for the current month because usually EMI/Goals are paid from monthly income.
-    // If a goal started *before* this month, we might need a different pool, but "Net Profit This Month" is the safest "Active Cash Flow" metric for now.
-    const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
-    let availablePool = await calculateNetProfitSince(startOfMonth);
+        // 2. Calculate Total Available "Pool" (Net Profit This Month)
+        // We assume the "pool" is the Net Profit for the current month because usually EMI/Goals are paid from monthly income.
+        // If a goal started *before* this month, we might need a different pool, but "Net Profit This Month" is the safest "Active Cash Flow" metric for now.
+        const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+        let availablePool = await calculateNetProfitSince(startOfMonth);
 
-    // Ensure pool isn't negative for allocation purposes
-    if (availablePool < 0) availablePool = 0;
+        // Ensure pool isn't negative for allocation purposes
+        if (availablePool < 0) availablePool = 0;
 
-    const results: WaterfallGoalStatus[] = [];
+        const results: WaterfallGoalStatus[] = [];
 
-    for (const goal of goals) {
-        // Calculate days left
-        let daysLeft = 0;
-        if (goal.deadline) {
-            daysLeft = Math.ceil((new Date(goal.deadline).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-        }
-
-        // Waterfall Allocation
-        const amountNeeded = goal.target_amount;
-        const allocated = Math.min(availablePool, amountNeeded);
-
-        // Deduct from pool for next goal
-        availablePool -= allocated;
-
-        const remaining = amountNeeded - allocated;
-        const isFullyFunded = remaining <= 0;
-
-        let dailyRunRate = 0;
-        if (!isFullyFunded && daysLeft > 0) {
-            dailyRunRate = remaining / daysLeft;
-        }
-
-        // Generate Message
-        let statusMessage = '';
-        if (isFullyFunded) {
-            statusMessage = `🎉 You've allocated enough (₹${allocated.toLocaleString()}) to cover this! Great job!`;
-        } else {
-            statusMessage = `You have ₹${allocated.toLocaleString()} allocated. Need ₹${remaining.toLocaleString()} more.`;
-            if (daysLeft > 0) {
-                statusMessage += ` That's ~₹${Math.ceil(dailyRunRate).toLocaleString()}/day for ${daysLeft} days. You can do it! 💪`;
-            } else if (daysLeft === 0) {
-                statusMessage += ` Due TODAY! Push hard! 🔥`;
-            } else {
-                statusMessage += ` Overdue by ${Math.abs(daysLeft)} days. Prioritize this! 🚨`;
+        for (const goal of goals) {
+            // Calculate days left
+            let daysLeft = 0;
+            if (goal.deadline) {
+                daysLeft = Math.ceil((new Date(goal.deadline).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
             }
+
+            // Waterfall Allocation
+            const amountNeeded = goal.target_amount;
+            const allocated = Math.min(availablePool, amountNeeded);
+
+            // Deduct from pool for next goal
+            availablePool -= allocated;
+
+            const remaining = amountNeeded - allocated;
+            const isFullyFunded = remaining <= 0;
+
+            let dailyRunRate = 0;
+            if (!isFullyFunded && daysLeft > 0) {
+                dailyRunRate = remaining / daysLeft;
+            }
+
+            // Generate Message
+            let statusMessage = '';
+            if (isFullyFunded) {
+                statusMessage = `🎉 You've allocated enough (₹${allocated.toLocaleString()}) to cover this! Great job!`;
+            } else {
+                statusMessage = `You have ₹${allocated.toLocaleString()} allocated. Need ₹${remaining.toLocaleString()} more.`;
+                if (daysLeft > 0) {
+                    statusMessage += ` That's ~₹${Math.ceil(dailyRunRate).toLocaleString()}/day for ${daysLeft} days. You can do it! 💪`;
+                } else if (daysLeft === 0) {
+                    statusMessage += ` Due TODAY! Push hard! 🔥`;
+                } else {
+                    statusMessage += ` Overdue by ${Math.abs(daysLeft)} days. Prioritize this! 🚨`;
+                }
+            }
+
+            results.push({
+                goal,
+                allocatedAmount: allocated,
+                remainingNeeded: remaining,
+                daysLeft,
+                dailyRunRate,
+                isFullyFunded,
+                statusMessage
+            });
         }
 
-        results.push({
-            goal,
-            allocatedAmount: allocated,
-            remainingNeeded: remaining,
-            daysLeft,
-            dailyRunRate,
-            isFullyFunded,
-            statusMessage
-        });
+        return results;
+    } catch (error) {
+        console.error('[AI Goals] Error calculating waterfall goals:', error);
+        return [];
     }
-
-    return results;
 }
 
 

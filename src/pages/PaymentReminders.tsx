@@ -481,7 +481,6 @@ export default function PaymentReminders() {
             toast("Failed to update due date", "error");
         } else {
             toast("Due date updated for all pending items", "success");
-            toast("Due date updated for all pending items", "success");
             setIsEditDateOpen(false);
             setEditDateValue("");
             loadData();
