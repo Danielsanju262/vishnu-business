@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { supabase } from "../lib/supabase";
-import { ArrowLeft, Trash2, Calendar, ShoppingBag, Wallet, Edit2, ChevronDown, TrendingUp, TrendingDown, ArrowUpDown, X, ChevronRight, User, CheckCircle2, Circle, MoreVertical, Download, ArrowDownLeft } from "lucide-react";
+import { ArrowLeft, Trash2, Calendar, ShoppingBag, Wallet, Edit2, ChevronDown, TrendingUp, TrendingDown, ArrowUpDown, X, ChevronRight, User, CheckCircle2, Circle, MoreVertical, Download } from "lucide-react";
 import Papa from "papaparse";
 import { Link, useLocation } from "react-router-dom";
 import { format, subDays, startOfMonth, startOfWeek, endOfWeek, endOfMonth, addDays } from "date-fns";
@@ -11,8 +11,7 @@ import { Modal } from "../components/ui/Modal";
 import { useRealtimeTables } from "../hooks/useRealtimeSync";
 import { useDropdownClose } from "../hooks/useDropdownClose";
 import { useHistorySyncedState } from "../hooks/useHistorySyncedState";
-import { CashInHandBreakdown } from "../components/CashInHandBreakdown";
-import type { BreakdownItem } from "../components/CashInHandBreakdown";
+
 
 type DateRangeType = "today" | "yesterday" | "week" | "month" | "custom";
 
@@ -73,9 +72,7 @@ export default function Reports() {
 
     const [isExporting, setIsExporting] = useState(false);
 
-    // Cash In Hand Breakdown State
-    const [showBreakdown, setShowBreakdown] = useHistorySyncedState(false, 'reportsBreakdown');
-    const [breakdownItems, setBreakdownItems] = useState<BreakdownItem[]>([]);
+
 
     // Handle back navigation for modals
     useEffect(() => {
@@ -941,75 +938,9 @@ export default function Reports() {
 
     const totalCollections = data.collections.reduce((acc, c) => acc + c.amount, 0);
 
-    // Adjusted CIH: (Profit from Cash Sales + Collections)
-    // Note: 'transactionCOGS' is NOT deducted here because it was already deducted per-transaction for cash sales,
-    // and ignored for credit sales.
-    const cashInHand = cihTransactionContribution + totalCollections;
-
-    // Recalculate Breakdown Items whenever data changes for the Modal
-    useEffect(() => {
-        const items: BreakdownItem[] = [];
-
-        const custMap = new Map();
-        // We don't have a direct map of customer IDs to names in 'data' object itself easily accessible by id,
-        // but data.transactions has customers joined.
-        // Let's create a quick map from transactions
-        data.transactions.forEach(t => {
-            if (t.customer_id && t.customers?.name) custMap.set(t.customer_id, t.customers.name);
-        });
-        // Also from collections
-        data.collections.forEach(c => {
-            if (c.customer_id && c.customers?.name) custMap.set(c.customer_id, c.customers.name);
-        });
-
-        data.transactions.forEach((t) => {
-            const saleValue = t.quantity * t.sell_price;
-            const buyValue = t.quantity * t.buy_price;
-
-            let contribution = 0;
-            let type: 'cash_profit' | 'collection' = 'cash_profit';
-
-            const creditVal = t.credit_amount || 0;
-
-            if (creditVal > 0) {
-                contribution = 0;
-            } else {
-                contribution = saleValue - buyValue;
-            }
-
-            if (contribution > 0) {
-                type = 'cash_profit';
-            } else {
-                // skip
-            }
 
 
-            if (contribution > 0) {
-                items.push({
-                    id: t.id,
-                    date: t.date,
-                    type,
-                    customerName: t.customers?.name || custMap.get(t.customer_id) || 'Unknown',
-                    amount: contribution,
-                    originalTotal: saleValue
-                });
-            }
-        });
 
-        data.collections.forEach((c) => {
-            if (c.amount > 0) {
-                items.push({
-                    id: c.id,
-                    date: c.collected_at ? c.collected_at.split('T')[0] : '',
-                    type: 'collection',
-                    customerName: c.customers?.name || custMap.get(c.customer_id) || 'Unknown',
-                    amount: c.amount
-                });
-            }
-        });
-
-        setBreakdownItems(items);
-    }, [data]);
 
     // 2. Customer Aggregation
     const customerStats = useMemo(() => {
@@ -1357,68 +1288,7 @@ export default function Reports() {
                             </div>
                         </div>
 
-                        {/* CASH FLOW STATEMENT */}
-                        <div className="bg-card rounded-2xl border border-border/60 p-5 shadow-sm space-y-4">
-                            <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
-                                <Wallet className="text-sky-500" size={20} />
-                                Cash Flow Statement
-                            </h3>
-                            <div className="space-y-3 pt-2">
-                                {/* 1. CIH from Sales */}
-                                <div className="flex justify-between items-center px-2.5 md:px-3 py-1 bg-muted/20 rounded-xl">
-                                    <div className="flex flex-col">
-                                        <span className="text-muted-foreground font-medium text-sm">CIH from Sales</span>
-                                        <span className="text-[10px] text-muted-foreground/50">Profit (Cash) + Paid Amount (Partial)</span>
-                                    </div>
-                                    <span className="font-bold text-sm text-emerald-600">
-                                        ₹{cihTransactionContribution.toLocaleString()}
-                                    </span>
-                                </div>
 
-                                {/* 2. Past Dues Collected */}
-                                <div className="flex justify-between items-center px-2.5 md:px-3 py-1 bg-muted/20 rounded-xl">
-                                    <div className="flex items-center gap-2">
-                                        <div className="p-1.5 bg-sky-500/10 rounded-lg text-sky-600">
-                                            <TrendingUp size={16} />
-                                        </div>
-                                        <span className="text-muted-foreground font-medium text-sm">Collections</span>
-                                    </div>
-                                    <span className="font-bold text-emerald-600 text-sm py-1.5">+ ₹{totalCollections.toLocaleString()}</span>
-                                </div>
-
-                                {/* Link to Cash In Hand Modal */}
-                                <div
-                                    onClick={() => setShowBreakdown(true)}
-                                    role="button"
-                                    className="flex justify-between items-center p-2.5 md:p-3 -mx-2 md:-mx-3 rounded-xl bg-sky-50 dark:bg-sky-900/10 hover:bg-sky-100 dark:hover:bg-sky-900/20 cursor-pointer transition-colors group border border-dashed border-sky-200 dark:border-sky-800"
-                                >
-                                    <div className="flex items-center gap-2">
-                                        <div className="p-1.5 bg-sky-500 rounded-lg text-white">
-                                            <ArrowDownLeft size={16} />
-                                        </div>
-                                        <div className="flex flex-col items-start">
-                                            <span className="text-sky-700 dark:text-sky-400 font-bold text-sm">Cash In Hand</span>
-                                            <span className="text-[10px] text-sky-500 font-medium">Click to view breakdown</span>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <span className="font-black text-sky-600 dark:text-sky-400">₹{cashInHand.toLocaleString()}</span>
-                                        <ChevronRight size={14} className="text-sky-400 opacity-50 group-hover:opacity-100 transition-opacity" />
-                                    </div>
-                                </div>
-
-                                <div className="h-px bg-border my-2 border-dashed"></div>
-
-                                <div className="bg-sky-500/10 p-2.5 md:p-3 rounded-xl mt-4 flex justify-between items-center border border-sky-500/20">
-                                    <span className="text-sm font-black text-sky-700 dark:text-sky-400 uppercase tracking-wide">Cash in Hand</span>
-                                    <div className="text-right">
-                                        <span className="text-xl font-black text-sky-600 dark:text-sky-400">
-                                            ₹{cashInHand.toLocaleString()}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
 
                         {/* --- DETAIL MODAL --- */}
                         <Modal
@@ -2195,20 +2065,7 @@ export default function Reports() {
             </Modal>
 
 
-            {/* Cash In Hand Breakdown Modal */}
-            <CashInHandBreakdown
-                isOpen={showBreakdown}
-                onClose={() => setShowBreakdown(false)}
-                items={breakdownItems}
-                total={cashInHand}
-                dateLabel={
-                    rangeType === 'today' ? 'Today' :
-                        rangeType === 'yesterday' ? 'Yesterday' :
-                            rangeType === 'week' ? 'This Week' :
-                                rangeType === 'month' ? 'This Month' :
-                                    'Custom Range'
-                }
-            />
+
         </div >
     );
 }

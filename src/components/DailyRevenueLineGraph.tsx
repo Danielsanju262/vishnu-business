@@ -12,7 +12,7 @@ interface DailyRevenueLineGraphProps {
 
 
 export function DailyRevenueLineGraph({ chartData, selectedChartDay, setSelectedChartDay }: DailyRevenueLineGraphProps) {
-    const [chartMetric, setChartMetric] = useState<'revenue' | 'profit' | 'cashInHand' | 'margin'>('profit');
+    const [chartMetric, setChartMetric] = useState<'revenue' | 'profit' | 'margin'>('profit');
     const [isTransitioning, setIsTransitioning] = useState(false);
     const prevMetricRef = useRef(chartMetric);
 
@@ -30,7 +30,6 @@ export function DailyRevenueLineGraph({ chartData, selectedChartDay, setSelected
         if (chartMetric === 'margin') {
             return d.revenue > 0 ? (d.profit / d.revenue) * 100 : 0;
         }
-        if (chartMetric === 'cashInHand') return Math.abs(d.cashInHand);
         return chartMetric === 'revenue' ? d.revenue : Math.abs(d.profit);
     }), 1);
 
@@ -93,7 +92,7 @@ export function DailyRevenueLineGraph({ chartData, selectedChartDay, setSelected
 
 
     const titlePrefix = 'Daily';
-    const metricLabel = chartMetric === 'revenue' ? 'Revenue' : chartMetric === 'profit' ? 'Profit' : chartMetric === 'cashInHand' ? 'Cash In Hand' : 'Margin';
+    const metricLabel = chartMetric === 'revenue' ? 'Revenue' : chartMetric === 'profit' ? 'Profit' : 'Margin';
 
     // Filter out ONLY future dates. Keep past dates even if they have 0 data.
     const effectiveData = chartData.filter(d => {
@@ -119,7 +118,7 @@ export function DailyRevenueLineGraph({ chartData, selectedChartDay, setSelected
             if (chartMetric === 'margin') {
                 value = d.revenue > 0 ? (d.profit / d.revenue) * 100 : 0;
             } else {
-                value = chartMetric === 'revenue' ? d.revenue : chartMetric === 'profit' ? d.profit : d.cashInHand;
+                value = chartMetric === 'revenue' ? d.revenue : d.profit;
             }
             const normalizedValue = Math.max(0, Math.min(Math.abs(value), yMax)); // Clip to max
             const y = topPadding + (height - ((normalizedValue / yMax) * height));
@@ -165,9 +164,6 @@ export function DailyRevenueLineGraph({ chartData, selectedChartDay, setSelected
         const totalProfit = chartData.reduce((acc, d) => acc + d.profit, 0);
         strokeColor = totalProfit >= 0 ? "#10b981" : "#f43f5e"; // Emerald or Rose
         fillColor = totalProfit >= 0 ? "url(#emeraldGradient)" : "url(#roseGradient)";
-    } else if (chartMetric === 'cashInHand') {
-        strokeColor = "#0ea5e9"; // Sky-500
-        fillColor = "url(#skyGradient)";
     } else if (chartMetric === 'margin') {
         strokeColor = "#f59e0b"; // Amber
         fillColor = "url(#amberGradient)";
@@ -208,15 +204,7 @@ export function DailyRevenueLineGraph({ chartData, selectedChartDay, setSelected
                         >
                             Profit
                         </button>
-                        <button
-                            onClick={(e) => { e.stopPropagation(); setChartMetric('cashInHand'); }}
-                            className={cn(
-                                "px-3 py-1.5 text-[10px] font-bold rounded-md transition-all min-w-[48px]",
-                                chartMetric === 'cashInHand' ? "bg-sky-500/20 text-sky-200 shadow-sm ring-1 ring-sky-500/30" : "text-white/40 hover:text-white hover:bg-white/5"
-                            )}
-                        >
-                            CIH
-                        </button>
+
                         <button
                             onClick={(e) => { e.stopPropagation(); setChartMetric('margin'); }}
                             className={cn(

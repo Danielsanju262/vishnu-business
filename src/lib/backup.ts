@@ -14,7 +14,9 @@ export const exportData = async (onProgress?: (progress: number) => void) => {
 
     const tables = [
         'customers', 'products', 'suppliers', 'expense_presets',
-        'transactions', 'expenses', 'payment_reminders', 'accounts_payable', 'app_settings'
+        'transactions', 'expenses', 'payment_reminders', 'accounts_payable', 'app_settings',
+        'credit_collections', 'recurring_reminder_configs',
+        'user_goals', 'ai_config', 'ai_memories', 'ai_chat_sessions', 'ai_chat_messages'
     ];
 
     let completed = 0;
@@ -26,9 +28,10 @@ export const exportData = async (onProgress?: (progress: number) => void) => {
 
     const fetchTable = async (table: string) => {
         const query = supabase.from(table).select('*');
-        if (table !== 'app_settings') {
-            query.is('deleted_at', null);
-        }
+        // Include ALL records, even deleted ones (for complete history/logs)
+        // if (table !== 'app_settings') {
+        //     query.is('deleted_at', null);
+        // }
         const { data } = await query;
         updateProgress();
         return data || [];
@@ -40,7 +43,9 @@ export const exportData = async (onProgress?: (progress: number) => void) => {
 
     const [
         customers, products, suppliers, expense_presets,
-        transactions, expenses, payment_reminders, accounts_payable, app_settings
+        transactions, expenses, payment_reminders, accounts_payable, app_settings,
+        credit_collections, recurring_reminder_configs,
+        user_goals, ai_config, ai_memories, ai_chat_sessions, ai_chat_messages
     ] = results;
 
     const backup = {
@@ -58,7 +63,14 @@ export const exportData = async (onProgress?: (progress: number) => void) => {
             transactions,
             expenses,
             payment_reminders,
-            accounts_payable
+            accounts_payable,
+            credit_collections,
+            recurring_reminder_configs,
+            user_goals,
+            ai_config,
+            ai_memories,
+            ai_chat_sessions,
+            ai_chat_messages
         }
     };
 
@@ -78,6 +90,11 @@ export const getBackupStats = (jsonString: string) => {
             expenses: backup.data.expenses?.length || 0,
             payment_reminders: backup.data.payment_reminders?.length || 0,
             accounts_payable: backup.data.accounts_payable?.length || 0,
+            credit_collections: backup.data.credit_collections?.length || 0,
+            recurring_reminder_configs: backup.data.recurring_reminder_configs?.length || 0,
+            user_goals: backup.data.user_goals?.length || 0,
+            ai_memories: backup.data.ai_memories?.length || 0,
+            ai_chat_sessions: backup.data.ai_chat_sessions?.length || 0,
             created_at: backup.meta?.date
         };
     } catch (e) {
@@ -87,13 +104,15 @@ export const getBackupStats = (jsonString: string) => {
 
 export const getCurrentStats = async () => {
     const fetchCount = async (table: string) => {
-        const { count } = await supabase.from(table).select('*', { count: 'exact', head: true }).is('deleted_at', null);
+        const { count } = await supabase.from(table).select('*', { count: 'exact', head: true });
         return count || 0;
     };
 
     const [
         customers, products, suppliers,
-        transactions, expenses, payment_reminders, accounts_payable
+        transactions, expenses, payment_reminders, accounts_payable,
+        credit_collections, recurring_reminder_configs,
+        user_goals, ai_config, ai_memories, ai_chat_sessions, ai_chat_messages
     ] = await Promise.all([
         fetchCount('customers'),
         fetchCount('products'),
@@ -101,12 +120,21 @@ export const getCurrentStats = async () => {
         fetchCount('transactions'),
         fetchCount('expenses'),
         fetchCount('payment_reminders'),
-        fetchCount('accounts_payable')
+        fetchCount('accounts_payable'),
+        fetchCount('credit_collections'),
+        fetchCount('recurring_reminder_configs'),
+        fetchCount('user_goals'),
+        fetchCount('ai_config'),
+        fetchCount('ai_memories'),
+        fetchCount('ai_chat_sessions'),
+        fetchCount('ai_chat_messages')
     ]);
 
     return {
         customers, products, suppliers,
-        transactions, expenses, payment_reminders, accounts_payable
+        transactions, expenses, payment_reminders, accounts_payable,
+        credit_collections, recurring_reminder_configs,
+        user_goals, ai_config, ai_memories, ai_chat_sessions, ai_chat_messages
     };
 };
 
@@ -135,7 +163,14 @@ export const importData = async (jsonString: string, onProgress?: (progress: num
         transactions,
         expenses,
         payment_reminders,
-        accounts_payable
+        accounts_payable,
+        credit_collections,
+        recurring_reminder_configs,
+        user_goals,
+        ai_config,
+        ai_memories,
+        ai_chat_sessions,
+        ai_chat_messages
     } = backup.data;
 
     // Helper: Upsert (Insert or Update)
@@ -172,7 +207,21 @@ export const importData = async (jsonString: string, onProgress?: (progress: num
         { name: 'expenses', data: expenses, op: 'upsert' },
         { name: 'payment_reminders', data: payment_reminders, op: 'upsert' },
         { name: 'accounts_payable', data: accounts_payable, op: 'upsert' },
+        { name: 'credit_collections', data: credit_collections, op: 'upsert' },
+        { name: 'recurring_reminder_configs', data: recurring_reminder_configs, op: 'upsert' },
+        { name: 'user_goals', data: user_goals, op: 'upsert' },
+        { name: 'ai_config', data: ai_config, op: 'upsert' },
+        { name: 'ai_memories', data: ai_memories, op: 'upsert' },
+        { name: 'ai_chat_sessions', data: ai_chat_sessions, op: 'upsert' },
+        { name: 'ai_chat_messages', data: ai_chat_messages, op: 'upsert' },
         // Prune phases
+        { name: 'ai_chat_messages', data: ai_chat_messages, op: 'prune' },
+        { name: 'ai_chat_sessions', data: ai_chat_sessions, op: 'prune' },
+        { name: 'ai_memories', data: ai_memories, op: 'prune' },
+        { name: 'ai_config', data: ai_config, op: 'prune' },
+        { name: 'user_goals', data: user_goals, op: 'prune' },
+        { name: 'credit_collections', data: credit_collections, op: 'prune' },
+        { name: 'recurring_reminder_configs', data: recurring_reminder_configs, op: 'prune' },
         { name: 'transactions', data: transactions, op: 'prune' },
         { name: 'expenses', data: expenses, op: 'prune' },
         { name: 'payment_reminders', data: payment_reminders, op: 'prune' },

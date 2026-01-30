@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { Button } from "../components/ui/Button";
-import { ArrowLeft, Plus, Receipt, IndianRupee, Calendar, WifiOff, Edit2, ChevronDown, ChevronUp, SlidersHorizontal, Trash2, RefreshCw, Clock, Repeat, ToggleLeft, ToggleRight } from "lucide-react";
+import { ArrowLeft, Plus, Receipt, IndianRupee, Calendar, WifiOff, Edit2, ChevronDown, SlidersHorizontal, Trash2, RefreshCw, Clock, Repeat, ToggleLeft, ToggleRight } from "lucide-react";
 import { useToast } from "../components/toast-provider";
 import { cn } from "../lib/utils";
 import { Link } from "react-router-dom";
@@ -11,7 +11,7 @@ import { Modal } from "../components/ui/Modal";
 import { ConfirmationModal } from "../components/ui/ConfirmationModal";
 import { useDropdownClose } from "../hooks/useDropdownClose";
 import { useHistorySyncedState } from "../hooks/useHistorySyncedState";
-import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subMonths } from "date-fns";
+import { format } from "date-fns";
 
 type Customer = {
     id: string;
@@ -80,26 +80,14 @@ export default function PaymentReminders() {
     // Search for main list
     const [searchQuery, setSearchQuery] = useState("");
 
-    // Date Filter State
-    const [dateFilter, setDateFilter] = useState("thisMonth");
-    const [customDateRange, setCustomDateRange] = useState({
-        start: format(new Date(), 'yyyy-MM-dd'),
-        end: format(new Date(), 'yyyy-MM-dd')
-    });
-    const [showFilterDropdown, setShowFilterDropdown] = useHistorySyncedState(false, 'paymentDateFilter');
-    const [showCustomDateModal, setShowCustomDateModal] = useHistorySyncedState(false, 'paymentCustomDate');
-    const filterDropdownRef = useRef<HTMLDivElement>(null);
+
 
     // Sort State for customer cards
     const [sortBy, setSortBy] = useState<'dueDateAsc' | 'dueDateDesc' | 'amountAsc' | 'amountDesc'>('dueDateAsc');
     const [showSortDropdown, setShowSortDropdown] = useHistorySyncedState(false, 'paymentSortFilter');
     const sortDropdownRef = useRef<HTMLDivElement>(null);
 
-    // Earned Amount State
-    const [earnedAmount, setEarnedAmount] = useState(0);
-    const [earnedLoading, setEarnedLoading] = useState(false);
-    const [isEarnedExpanded, setIsEarnedExpanded] = useState(false);
-    const [earnedBreakdown, setEarnedBreakdown] = useState<{ customerId: string; customerName: string; total: number }[]>([]);
+
 
     // Edit Due Date Modal
     const [editDateCustomer, setEditDateCustomer] = useState<{ id: string; name: string } | null>(null);
@@ -145,96 +133,9 @@ export default function PaymentReminders() {
     const recurringListRef = useRef<HTMLDivElement>(null);
     useDropdownClose(showCustomerList, () => setShowCustomerList(false), listRef);
     useDropdownClose(showRecurringCustomerList, () => setShowRecurringCustomerList(false), recurringListRef);
-    useDropdownClose(showFilterDropdown, () => setShowFilterDropdown(false), filterDropdownRef);
 
-    // Get date range based on filter
-    const getDateRange = useCallback(() => {
-        const now = new Date();
-        const todayStr = format(now, 'yyyy-MM-dd');
 
-        switch (dateFilter) {
-            case 'today':
-                return { start: todayStr, end: todayStr };
-            case 'yesterday':
-                const yest = format(subDays(now, 1), 'yyyy-MM-dd');
-                return { start: yest, end: yest };
-            case 'thisWeek':
-                return {
-                    start: format(startOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd'),
-                    end: format(endOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd')
-                };
-            case 'thisMonth':
-                return {
-                    start: format(startOfMonth(now), 'yyyy-MM-dd'),
-                    end: format(endOfMonth(now), 'yyyy-MM-dd')
-                };
-            case 'lastMonth':
-                const lastMonth = subMonths(now, 1);
-                return {
-                    start: format(startOfMonth(lastMonth), 'yyyy-MM-dd'),
-                    end: format(endOfMonth(lastMonth), 'yyyy-MM-dd')
-                };
-            case 'custom':
-                return customDateRange;
-            default:
-                return { start: todayStr, end: todayStr };
-        }
-    }, [dateFilter, customDateRange]);
 
-    // Fetch earned amount based on date filter
-    const fetchEarnedAmount = useCallback(async () => {
-        setEarnedLoading(true);
-        try {
-            const { start, end } = getDateRange();
-
-            const { data, error } = await supabase
-                .from('credit_collections')
-                .select('amount, customer_id')
-                .gte('collected_at', `${start}T00:00:00`)
-                .lte('collected_at', `${end}T23:59:59`);
-
-            if (error) {
-                // Table might not exist yet
-                if (error.code === '42P01' || error.message.includes('does not exist')) {
-                    setEarnedAmount(0);
-                    setEarnedBreakdown([]);
-                } else {
-                    console.error('Error fetching earned amount:', error);
-                }
-            } else if (data) {
-                const total = data.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
-                setEarnedAmount(total);
-
-                // Group by customer
-                const customerTotals: Record<string, number> = {};
-                data.forEach(item => {
-                    const cid = item.customer_id || 'unknown';
-                    customerTotals[cid] = (customerTotals[cid] || 0) + (Number(item.amount) || 0);
-                });
-
-                // Convert to array with customer names
-                const breakdown = Object.entries(customerTotals).map(([customerId, total]) => {
-                    const customer = customers.find(c => c.id === customerId);
-                    return {
-                        customerId,
-                        customerName: customer?.name || 'Unknown Customer',
-                        total
-                    };
-                }).sort((a, b) => b.total - a.total); // Sort by highest first
-
-                setEarnedBreakdown(breakdown);
-            }
-        } catch (err) {
-            console.error('Error fetching earned amount:', err);
-        } finally {
-            setEarnedLoading(false);
-        }
-    }, [getDateRange, customers]);
-
-    // Fetch earned amount when date filter changes
-    useEffect(() => {
-        fetchEarnedAmount();
-    }, [fetchEarnedAmount]);
 
     const loadData = useCallback(async () => {
         if (isFirstLoad.current) setLoading(true);
@@ -452,8 +353,7 @@ export default function PaymentReminders() {
                     note: `Received from ${quickActionCustomer.name}`
                 });
 
-                // Refresh earned amount
-                fetchEarnedAmount();
+
 
                 toast(newBalance <= 0 ? "Fully paid!" : `Received ₹${received.toLocaleString()}`, "success");
                 closeQuickAction();
@@ -1009,56 +909,7 @@ export default function PaymentReminders() {
                         {/* Date Filter and Sort */}
                         {!loading && (
                             <div className="flex items-center gap-2 mb-4">
-                                {/* Date Filter */}
-                                <div className="relative" ref={filterDropdownRef}>
-                                    <button
-                                        onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-                                        className="flex items-center gap-1.5 px-3 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-lg text-xs font-bold text-zinc-600 dark:text-zinc-300 transition-all border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
-                                    >
-                                        <Calendar size={14} className="opacity-70" />
-                                        <span>
-                                            {dateFilter === 'today' && 'Today'}
-                                            {dateFilter === 'yesterday' && 'Yesterday'}
-                                            {dateFilter === 'thisWeek' && 'This Week'}
-                                            {dateFilter === 'thisMonth' && 'This Month'}
-                                            {dateFilter === 'lastMonth' && 'Last Month'}
-                                            {dateFilter === 'custom' && 'Custom'}
-                                        </span>
-                                        <ChevronDown size={12} className={`opacity-70 transition-transform duration-200 ${showFilterDropdown ? 'rotate-180' : ''}`} />
-                                    </button>
 
-                                    {showFilterDropdown && (
-                                        <div className="absolute left-0 top-full mt-2 w-44 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-xl overflow-hidden py-1.5 z-50 animate-in fade-in zoom-in-95 duration-200">
-                                            {['today', 'yesterday', 'thisWeek', 'thisMonth', 'lastMonth', 'custom'].map((filter) => (
-                                                <button
-                                                    key={filter}
-                                                    onClick={() => {
-                                                        if (filter === 'custom') {
-                                                            setShowFilterDropdown(false);
-                                                            setTimeout(() => {
-                                                                setShowCustomDateModal(true);
-                                                            }, 100);
-                                                        } else {
-                                                            setDateFilter(filter);
-                                                            setShowFilterDropdown(false);
-                                                        }
-                                                    }}
-                                                    className={cn(
-                                                        "w-full text-left px-4 py-2.5 text-xs font-bold transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800",
-                                                        dateFilter === filter ? "text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10" : "text-zinc-600 dark:text-zinc-400"
-                                                    )}
-                                                >
-                                                    {filter === 'today' && 'Today'}
-                                                    {filter === 'yesterday' && 'Yesterday'}
-                                                    {filter === 'thisWeek' && 'This Week'}
-                                                    {filter === 'thisMonth' && 'This Month'}
-                                                    {filter === 'lastMonth' && 'Last Month'}
-                                                    {filter === 'custom' && 'Custom Range...'}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
 
                                 {/* Sort Filter */}
                                 <div className="relative" ref={sortDropdownRef}>
@@ -1122,72 +973,7 @@ export default function PaymentReminders() {
                                     </div>
                                 </div>
 
-                                {/* Divider */}
-                                <div className="border-t border-zinc-200 dark:border-zinc-700 my-3" />
 
-                                {/* Earned Row - Expandable */}
-                                <div>
-                                    <button
-                                        onClick={() => setIsEarnedExpanded(!isEarnedExpanded)}
-                                        className="w-full flex items-center justify-between hover:bg-zinc-200/50 dark:hover:bg-zinc-700/30 -mx-2 px-2 py-1 rounded-lg transition-colors"
-                                    >
-                                        <div className="text-left">
-                                            <p className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-0.5 flex items-center gap-1.5">
-                                                Earned
-                                                <span className="text-[10px] font-medium text-zinc-400 dark:text-zinc-500 normal-case">
-                                                    ({dateFilter === 'today' ? 'Today' :
-                                                        dateFilter === 'yesterday' ? 'Yesterday' :
-                                                            dateFilter === 'thisWeek' ? 'This Week' :
-                                                                dateFilter === 'thisMonth' ? 'This Month' :
-                                                                    dateFilter === 'lastMonth' ? 'Last Month' :
-                                                                        'Custom'})
-                                                </span>
-                                                {isEarnedExpanded ? (
-                                                    <ChevronUp size={14} className="text-zinc-400" />
-                                                ) : (
-                                                    <ChevronDown size={14} className="text-zinc-400" />
-                                                )}
-                                            </p>
-                                            <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-medium">
-                                                {earnedBreakdown.length} customer{earnedBreakdown.length !== 1 ? 's' : ''} • Tap to {isEarnedExpanded ? 'collapse' : 'expand'}
-                                            </p>
-                                        </div>
-                                        <div className="text-right">
-                                            {earnedLoading ? (
-                                                <div className="h-7 w-20 bg-zinc-300 dark:bg-zinc-700 rounded animate-pulse" />
-                                            ) : (
-                                                <p className="text-xl font-black text-blue-600 dark:text-blue-400 tracking-tight">
-                                                    ₹{earnedAmount.toLocaleString()}
-                                                </p>
-                                            )}
-                                        </div>
-                                    </button>
-
-                                    {/* Expanded Breakdown */}
-                                    {isEarnedExpanded && earnedBreakdown.length > 0 && (
-                                        <div className="mt-3 space-y-2 border-t border-zinc-200 dark:border-zinc-700 pt-3">
-                                            {earnedBreakdown.map((item) => (
-                                                <div
-                                                    key={item.customerId}
-                                                    className="flex items-center justify-between py-2 px-3 bg-blue-50 dark:bg-blue-500/10 rounded-lg border border-blue-100 dark:border-blue-500/20"
-                                                >
-                                                    <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 truncate flex-1 mr-3">
-                                                        {item.customerName}
-                                                    </p>
-                                                    <p className="text-sm font-bold text-blue-600 dark:text-blue-400 whitespace-nowrap">
-                                                        ₹{item.total.toLocaleString()}
-                                                    </p>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-
-                                    {isEarnedExpanded && earnedBreakdown.length === 0 && !earnedLoading && (
-                                        <div className="mt-3 py-4 text-center border-t border-zinc-200 dark:border-zinc-700">
-                                            <p className="text-sm text-zinc-400 dark:text-zinc-500">No collections in this period</p>
-                                        </div>
-                                    )}
-                                </div>
                             </div>
                         )}
 
@@ -1515,56 +1301,6 @@ export default function PaymentReminders() {
                 variant="default"
             />
 
-            {/* Custom Date Modal */}
-            <Modal
-                isOpen={showCustomDateModal}
-                onClose={() => setShowCustomDateModal(false)}
-                title={<span className="text-lg font-bold">Select Date Range</span>}
-            >
-                <div className="space-y-5">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">From</label>
-                            <input
-                                id="payment-start-date"
-                                type="date"
-                                value={customDateRange.start}
-                                onChange={(e) => {
-                                    const newStart = e.target.value;
-                                    setCustomDateRange(prev => {
-                                        const end = prev.end < newStart ? newStart : prev.end;
-                                        return { start: newStart, end };
-                                    });
-                                }}
-                                className="w-full bg-secondary/50 border border-border rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">To</label>
-                            <input
-                                id="payment-end-date"
-                                type="date"
-                                value={customDateRange.end}
-                                min={customDateRange.start}
-                                onChange={(e) => {
-                                    setCustomDateRange(prev => ({ ...prev, end: e.target.value }));
-                                }}
-                                className="w-full bg-secondary/50 border border-border rounded-xl px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
-                            />
-                        </div>
-                    </div>
-
-                    <button
-                        onClick={() => {
-                            setDateFilter('custom');
-                            setShowCustomDateModal(false);
-                        }}
-                        className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white font-bold rounded-xl shadow-lg shadow-emerald-900/20 transition-all"
-                    >
-                        Apply Filter
-                    </button>
-                </div>
-            </Modal>
             {/* NEW RECURRING MODAL */}
             <Modal
                 isOpen={showNewRecurring}
