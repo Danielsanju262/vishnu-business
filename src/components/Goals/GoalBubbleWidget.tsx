@@ -30,6 +30,7 @@ import { supabase } from '../../lib/supabase';
 // Storage Keys
 const WIDGET_VISIBLE_KEY = 'goal_widget_visible';
 const WIDGET_POSITION_KEY = 'goal_widget_position_v2';
+const WIDGET_AUTO_OPENED_KEY = 'goal_widget_auto_opened'; // Session storage - tracks if we auto-opened this session
 
 interface WidgetPosition {
     side: 'left' | 'right';
@@ -40,6 +41,18 @@ function getWidgetVisibility(): boolean {
     const stored = localStorage.getItem(WIDGET_VISIBLE_KEY);
     if (stored === null) return true;
     return stored === 'true';
+}
+
+// Check if we should auto-open the panel (only once per session)
+function shouldAutoOpen(): boolean {
+    const alreadyOpened = sessionStorage.getItem(WIDGET_AUTO_OPENED_KEY);
+    if (alreadyOpened === 'true') return false;
+    return true;
+}
+
+// Mark that we've auto-opened this session
+function markAutoOpened(): void {
+    sessionStorage.setItem(WIDGET_AUTO_OPENED_KEY, 'true');
 }
 
 function setWidgetVisibility(visible: boolean): void {
@@ -144,6 +157,26 @@ export default function GoalBubbleWidget() {
             window.removeEventListener('goal-updated', handleGoalUpdate);
         };
     }, []);
+
+    // Auto-open the panel on first app load (once per session)
+    useEffect(() => {
+        // Only auto-open when:
+        // 1. Loading is complete
+        // 2. Widget is visible
+        // 3. We haven't auto-opened this session yet
+        // 4. Not on a hidden route
+        // 5. No modals are open
+        if (!isLoading && isVisible && shouldAutoOpen() && !shouldHide && openModalCount === 0) {
+            // Small delay to ensure UI is ready
+            const timer = setTimeout(() => {
+                window.history.pushState({ goalBubbleOpen: true }, '');
+                setIsOpen(true);
+                markAutoOpened();
+            }, 500);
+            return () => clearTimeout(timer);
+        }
+    }, [isLoading, isVisible, shouldHide, openModalCount]);
+
 
     // Wake/resume handling
     useEffect(() => {
