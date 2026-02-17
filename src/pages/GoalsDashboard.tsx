@@ -52,6 +52,7 @@ import {
     processOverdueRecurringGoals,
     getRecurringPeriodStart,
     getRecurringPeriodEnd,
+    formatLocalDate,
     type UserGoal
 } from '../lib/aiMemory';
 import { supabase } from '../lib/supabase';
@@ -136,14 +137,17 @@ export default function GoalsDashboard() {
 
     // Auto-set start date for recurring goals (only when creating new or changing recurrence type, not when editing)
     useEffect(() => {
-        if (formIsRecurring && !editingGoal) {
+        // Run if creating a new goal OR if editing and we just switched to recurring mode
+        const shouldUpdateDate = formIsRecurring && (!editingGoal || !editingGoal.is_recurring);
+
+        if (shouldUpdateDate) {
             const today = new Date();
             if (formRecurrenceType === 'daily') {
                 setFormStartDate(format(today, 'yyyy-MM-dd'));
             } else if (formRecurrenceType === 'monthly') {
                 setFormStartDate(format(startOfMonth(today), 'yyyy-MM-dd'));
             } else if (formRecurrenceType === 'weekly') {
-                setFormStartDate(format(startOfWeek(today, { weekStartsOn: 1 }), 'yyyy-MM-dd'));
+                setFormStartDate(format(startOfWeek(today), 'yyyy-MM-dd'));
             } else if (formRecurrenceType === 'yearly') {
                 setFormStartDate(format(new Date(today.getFullYear(), 0, 1), 'yyyy-MM-dd'));
             }
@@ -241,7 +245,15 @@ export default function GoalsDashboard() {
         setFormTitle(goal.title);
         setFormDescription(goal.description || '');
         setFormTargetAmount(goal.target_amount.toString());
-        setFormDeadline(goal.deadline || '');
+        // Only show deadline in form if user explicitly set it (custom deadline).
+        // For recurring goals without a custom deadline, the system auto-calculates
+        // the period end — showing it here would make the user think they set it.
+        const hasCustomDeadline = goal.metadata?.has_custom_deadline === true;
+        if (goal.is_recurring && !hasCustomDeadline) {
+            setFormDeadline(''); // Let system auto-calculate period end
+        } else {
+            setFormDeadline(goal.deadline || '');
+        }
         setFormMetricType(goal.metric_type);
         setFormIsRecurring(!!goal.is_recurring);
         setFormRecurrenceType((goal.recurrence_type as 'daily' | 'monthly' | 'weekly' | 'yearly') || 'monthly');
@@ -261,11 +273,17 @@ export default function GoalsDashboard() {
             return;
         }
 
+        const safeDate = (dStr: string) => {
+            const [y, m, d] = dStr.split('-').map(Number);
+            return new Date(y, m - 1, d);
+        };
+
         try {
             // Build metadata for custom deadline anchor (if user sets a deadline on recurring goal)
             let metadata: Record<string, any> | undefined = undefined;
             if (formIsRecurring && formDeadline) {
-                const deadlineDate = new Date(formDeadline);
+                // Use safeDate() to avoid UTC timezone shift (new Date("YYYY-MM-DD") parses as UTC)
+                const deadlineDate = safeDate(formDeadline);
                 metadata = {
                     has_custom_deadline: true,
                     deadline_day: deadlineDate.getDate(),
@@ -276,7 +294,12 @@ export default function GoalsDashboard() {
 
             if (editingGoal) {
                 // Update existing
-                let startDate = formMetricType !== 'manual_check' ? formStartDate : editingGoal.start_tracking_date?.split('T')[0];
+                // If recurring was newly enabled (not present in original goal), use current formStartDate 
+                // Otherwise preserve original start date for consistency
+                const isNewRecurring = formIsRecurring && !editingGoal.is_recurring;
+                let startDate = (formMetricType !== 'manual_check' || isNewRecurring)
+                    ? formStartDate
+                    : editingGoal.start_tracking_date?.split('T')[0];
                 let deadline = formDeadline || undefined;
 
                 // If recurring, calculate deadline and start date
@@ -286,16 +309,16 @@ export default function GoalsDashboard() {
                         deadline = formDeadline;
                         // Keep the existing start date for updates, but align to period start
                         if (startDate) {
-                            const periodStart = getRecurringPeriodStart(new Date(startDate), formRecurrenceType);
-                            startDate = periodStart.toISOString().split('T')[0];
+                            const periodStart = getRecurringPeriodStart(safeDate(startDate), formRecurrenceType);
+                            startDate = formatLocalDate(periodStart);
                         }
                     } else {
                         // No custom deadline — use period boundaries
-                        const refDate = startDate ? new Date(startDate) : new Date();
+                        const refDate = startDate ? safeDate(startDate) : new Date();
                         const periodStart = getRecurringPeriodStart(refDate, formRecurrenceType);
                         const periodEnd = getRecurringPeriodEnd(refDate, formRecurrenceType);
-                        startDate = periodStart.toISOString().split('T')[0];
-                        deadline = periodEnd.toISOString().split('T')[0];
+                        startDate = formatLocalDate(periodStart);
+                        deadline = formatLocalDate(periodEnd);
                     }
                 }
 
@@ -328,7 +351,7 @@ export default function GoalsDashboard() {
                 toast('Goal updated! 🎯', 'success');
             } else {
                 // Create new
-                let startDate = formMetricType !== 'manual_check' ? formStartDate : new Date().toISOString().split('T')[0];
+                let startDate = formMetricType !== 'manual_check' ? formStartDate : formatLocalDate(new Date());
                 let deadline = formDeadline || undefined;
 
                 // If recurring, calculate deadline and start date
@@ -336,14 +359,14 @@ export default function GoalsDashboard() {
                     if (formDeadline) {
                         // User set a custom deadline — use it as-is for this period
                         deadline = formDeadline;
-                        const periodStart = getRecurringPeriodStart(new Date(startDate), formRecurrenceType);
-                        startDate = periodStart.toISOString().split('T')[0];
+                        const periodStart = getRecurringPeriodStart(safeDate(startDate), formRecurrenceType);
+                        startDate = formatLocalDate(periodStart);
                     } else {
                         // No custom deadline — use natural period boundaries
-                        const periodStart = getRecurringPeriodStart(new Date(startDate), formRecurrenceType);
-                        const periodEnd = getRecurringPeriodEnd(new Date(startDate), formRecurrenceType);
-                        startDate = periodStart.toISOString().split('T')[0];
-                        deadline = periodEnd.toISOString().split('T')[0];
+                        const periodStart = getRecurringPeriodStart(safeDate(startDate), formRecurrenceType);
+                        const periodEnd = getRecurringPeriodEnd(safeDate(startDate), formRecurrenceType);
+                        startDate = formatLocalDate(periodStart);
+                        deadline = formatLocalDate(periodEnd);
                     }
                 }
 
@@ -591,6 +614,12 @@ export default function GoalsDashboard() {
                                                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-neutral-300">
                                                         {goalTypeLabels[goal.metric_type]}
                                                     </span>
+                                                    {goal.is_recurring && (
+                                                        <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/20">
+                                                            <RefreshCw size={10} />
+                                                            {(goal.recurrence_type || 'recurring').charAt(0).toUpperCase() + (goal.recurrence_type || 'recurring').slice(1)}
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
