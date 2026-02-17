@@ -131,22 +131,24 @@ export default function GoalsDashboard() {
     const [formDeadline, setFormDeadline] = useState('');
     const [formMetricType, setFormMetricType] = useState<'net_profit' | 'revenue' | 'sales_count' | 'manual_check' | 'customer_count' | 'gross_profit' | 'margin' | 'product_sales' | 'daily_revenue' | 'daily_margin' | 'avg_margin' | 'avg_revenue' | 'avg_profit'>('net_profit');
     const [formIsRecurring, setFormIsRecurring] = useState(false);
-    const [formRecurrenceType, setFormRecurrenceType] = useState<'monthly' | 'weekly' | 'yearly'>('monthly');
+    const [formRecurrenceType, setFormRecurrenceType] = useState<'daily' | 'monthly' | 'weekly' | 'yearly'>('monthly');
     const [formStartDate, setFormStartDate] = useState(new Date().toISOString().split('T')[0]);
 
-    // Auto-set start date for recurring goals
+    // Auto-set start date for recurring goals (only when creating new or changing recurrence type, not when editing)
     useEffect(() => {
-        if (formIsRecurring) {
+        if (formIsRecurring && !editingGoal) {
             const today = new Date();
-            if (formRecurrenceType === 'monthly') {
+            if (formRecurrenceType === 'daily') {
+                setFormStartDate(format(today, 'yyyy-MM-dd'));
+            } else if (formRecurrenceType === 'monthly') {
                 setFormStartDate(format(startOfMonth(today), 'yyyy-MM-dd'));
             } else if (formRecurrenceType === 'weekly') {
                 setFormStartDate(format(startOfWeek(today, { weekStartsOn: 1 }), 'yyyy-MM-dd'));
-            } else {
-                setFormStartDate(format(today, 'yyyy-MM-dd'));
+            } else if (formRecurrenceType === 'yearly') {
+                setFormStartDate(format(new Date(today.getFullYear(), 0, 1), 'yyyy-MM-dd'));
             }
         }
-    }, [formIsRecurring, formRecurrenceType]);
+    }, [formIsRecurring, formRecurrenceType, editingGoal]);
 
     // Load goals
     useEffect(() => {
@@ -242,7 +244,7 @@ export default function GoalsDashboard() {
         setFormDeadline(goal.deadline || '');
         setFormMetricType(goal.metric_type);
         setFormIsRecurring(!!goal.is_recurring);
-        setFormRecurrenceType(goal.recurrence_type || 'monthly');
+        setFormRecurrenceType((goal.recurrence_type as 'daily' | 'monthly' | 'weekly' | 'yearly') || 'monthly');
         setFormStartDate(goal.start_tracking_date?.split('T')[0] || new Date().toISOString().split('T')[0]);
         setEditingGoal(goal);
         setShowAddModal(true);
@@ -260,41 +262,89 @@ export default function GoalsDashboard() {
         }
 
         try {
+            // Build metadata for custom deadline anchor (if user sets a deadline on recurring goal)
+            let metadata: Record<string, any> | undefined = undefined;
+            if (formIsRecurring && formDeadline) {
+                const deadlineDate = new Date(formDeadline);
+                metadata = {
+                    has_custom_deadline: true,
+                    deadline_day: deadlineDate.getDate(),
+                    deadline_weekday: deadlineDate.getDay(), // 0=Sun...6=Sat
+                    deadline_month: deadlineDate.getMonth(), // 0=Jan...11=Dec
+                };
+            }
+
             if (editingGoal) {
                 // Update existing
-                let startDate = formMetricType !== 'manual_check' ? formStartDate : undefined;
+                let startDate = formMetricType !== 'manual_check' ? formStartDate : editingGoal.start_tracking_date?.split('T')[0];
                 let deadline = formDeadline || undefined;
 
-                // If recurring, align to period boundaries
-                if (formIsRecurring && formRecurrenceType && startDate) {
-                    const periodStart = getRecurringPeriodStart(new Date(startDate), formRecurrenceType);
-                    const periodEnd = getRecurringPeriodEnd(new Date(startDate), formRecurrenceType);
-                    startDate = periodStart.toISOString().split('T')[0];
-                    deadline = periodEnd.toISOString().split('T')[0];
+                // If recurring, calculate deadline and start date
+                if (formIsRecurring && formRecurrenceType) {
+                    if (formDeadline) {
+                        // User set a custom deadline — use it as-is
+                        deadline = formDeadline;
+                        // Keep the existing start date for updates, but align to period start
+                        if (startDate) {
+                            const periodStart = getRecurringPeriodStart(new Date(startDate), formRecurrenceType);
+                            startDate = periodStart.toISOString().split('T')[0];
+                        }
+                    } else {
+                        // No custom deadline — use period boundaries
+                        const refDate = startDate ? new Date(startDate) : new Date();
+                        const periodStart = getRecurringPeriodStart(refDate, formRecurrenceType);
+                        const periodEnd = getRecurringPeriodEnd(refDate, formRecurrenceType);
+                        startDate = periodStart.toISOString().split('T')[0];
+                        deadline = periodEnd.toISOString().split('T')[0];
+                    }
                 }
 
-                await updateGoal(editingGoal.id, {
+                const updates: any = {
                     title: formTitle.trim(),
-                    description: formDescription.trim() || undefined,
+                    description: formDescription.trim() || null,
                     target_amount: parseFloat(formTargetAmount),
-                    deadline: deadline,
+                    deadline: deadline || null,
                     metric_type: formMetricType,
                     is_recurring: formIsRecurring,
-                    recurrence_type: formIsRecurring ? formRecurrenceType : undefined,
+                    recurrence_type: formIsRecurring ? formRecurrenceType : null,
                     start_tracking_date: startDate
-                });
+                };
+
+                // Store/clear metadata for custom deadline anchors
+                if (formIsRecurring) {
+                    updates.metadata = metadata || { has_custom_deadline: false };
+                } else {
+                    updates.metadata = null;
+                }
+
+                console.log('[GoalsDashboard] Updating goal:', editingGoal.id, updates);
+                const success = await updateGoal(editingGoal.id, updates);
+
+                if (!success) {
+                    toast('Failed to update goal. Please check logs.', 'error');
+                    return;
+                }
+
                 toast('Goal updated! 🎯', 'success');
             } else {
                 // Create new
                 let startDate = formMetricType !== 'manual_check' ? formStartDate : new Date().toISOString().split('T')[0];
                 let deadline = formDeadline || undefined;
 
-                // If recurring, align start date and deadline to period boundaries
+                // If recurring, calculate deadline and start date
                 if (formIsRecurring && formRecurrenceType) {
-                    const periodStart = getRecurringPeriodStart(new Date(startDate), formRecurrenceType);
-                    const periodEnd = getRecurringPeriodEnd(new Date(startDate), formRecurrenceType);
-                    startDate = periodStart.toISOString().split('T')[0];
-                    deadline = periodEnd.toISOString().split('T')[0];
+                    if (formDeadline) {
+                        // User set a custom deadline — use it as-is for this period
+                        deadline = formDeadline;
+                        const periodStart = getRecurringPeriodStart(new Date(startDate), formRecurrenceType);
+                        startDate = periodStart.toISOString().split('T')[0];
+                    } else {
+                        // No custom deadline — use natural period boundaries
+                        const periodStart = getRecurringPeriodStart(new Date(startDate), formRecurrenceType);
+                        const periodEnd = getRecurringPeriodEnd(new Date(startDate), formRecurrenceType);
+                        startDate = periodStart.toISOString().split('T')[0];
+                        deadline = periodEnd.toISOString().split('T')[0];
+                    }
                 }
 
                 console.log('[Goals] Creating goal:', {
@@ -303,7 +353,8 @@ export default function GoalsDashboard() {
                     metric_type: formMetricType,
                     is_recurring: formIsRecurring,
                     start_tracking_date: startDate,
-                    deadline: deadline
+                    deadline: deadline,
+                    metadata: metadata
                 });
 
                 const newGoal = await addGoal({
@@ -314,7 +365,8 @@ export default function GoalsDashboard() {
                     metric_type: formMetricType,
                     start_tracking_date: startDate,
                     is_recurring: formIsRecurring,
-                    recurrence_type: formIsRecurring ? formRecurrenceType : undefined
+                    recurrence_type: formIsRecurring ? formRecurrenceType : undefined,
+                    metadata: metadata
                 });
 
                 if (!newGoal) {
@@ -977,37 +1029,11 @@ export default function GoalsDashboard() {
                         />
                     </div>
 
-                    <div>
-                        <label className="text-xs font-medium text-neutral-400 mb-1.5 block">Deadline (optional)</label>
-                        <Input
-                            type="date"
-                            value={formDeadline}
-                            onChange={(e) => setFormDeadline(e.target.value)}
-                            className="bg-white/5"
-                        />
-                    </div>
-
-                    {/* Start Date - Only show for non-recurring auto-tracked goals */}
-                    {formMetricType !== 'manual_check' && !formIsRecurring && (
-                        <div>
-                            <label className="text-xs font-medium text-neutral-400 mb-1.5 block">Start Tracking From</label>
-                            <Input
-                                type="date"
-                                value={formStartDate}
-                                onChange={(e) => setFormStartDate(e.target.value)}
-                                className="bg-white/5"
-                            />
-                            <p className="text-[10px] text-neutral-500 mt-1">
-                                Net profit/progress will be calculated from this date onwards
-                            </p>
-                        </div>
-                    )}
-
                     {/* Recurrence Toggle */}
                     <div className="flex items-center justify-between bg-white/5 p-3 rounded-xl border border-white/10">
                         <div className="flex flex-col">
                             <span className="text-sm text-white font-medium">Recurring Goal?</span>
-                            <span className="text-[10px] text-neutral-400">e.g., Monthly Rent, Weekly Savings</span>
+                            <span className="text-[10px] text-neutral-400">e.g., Monthly Rent, Weekly Savings, Daily Target</span>
                         </div>
                         <div className="flex items-center gap-2">
                             <Button
@@ -1026,8 +1052,8 @@ export default function GoalsDashboard() {
 
                     {/* Recurrence Type Selection (Conditional) */}
                     {formIsRecurring && (
-                        <div className="grid grid-cols-3 gap-2 animate-in slide-in-from-top-2 fade-in">
-                            {['weekly', 'monthly', 'yearly'].map((type) => (
+                        <div className="grid grid-cols-4 gap-2 animate-in slide-in-from-top-2 fade-in">
+                            {['daily', 'weekly', 'monthly', 'yearly'].map((type) => (
                                 <button
                                     key={type}
                                     onClick={() => setFormRecurrenceType(type as any)}
@@ -1041,6 +1067,55 @@ export default function GoalsDashboard() {
                                     {type.charAt(0).toUpperCase() + type.slice(1)}
                                 </button>
                             ))}
+                        </div>
+                    )}
+
+                    <div>
+                        <label className="text-xs font-medium text-neutral-400 mb-1.5 block">
+                            {formIsRecurring ? 'Recurring Deadline Day (optional)' : 'Deadline (optional)'}
+                        </label>
+                        <Input
+                            type="date"
+                            value={formDeadline}
+                            onChange={(e) => setFormDeadline(e.target.value)}
+                            className="bg-white/5"
+                        />
+                        {formIsRecurring && (
+                            <p className="text-[10px] text-neutral-500 mt-1">
+                                {formDeadline ? (
+                                    formRecurrenceType === 'daily'
+                                        ? '⏰ Goal resets every day'
+                                        : formRecurrenceType === 'weekly'
+                                            ? `📅 Deadline every ${format(new Date(formDeadline), 'EEEE')} (same weekday)`
+                                            : formRecurrenceType === 'monthly'
+                                                ? `📅 Deadline on the ${new Date(formDeadline).getDate()}${((d) => d > 3 && d < 21 ? 'th' : ['th', 'st', 'nd', 'rd'][d % 10] || 'th')(new Date(formDeadline).getDate())} of every month`
+                                                : `📅 Deadline every year on ${format(new Date(formDeadline), 'MMMM d')}`
+                                ) : (
+                                    formRecurrenceType === 'daily'
+                                        ? '⏰ Goal resets every day (end of day)'
+                                        : formRecurrenceType === 'weekly'
+                                            ? '📅 No date set — deadline defaults to end of each week (Sunday)'
+                                            : formRecurrenceType === 'monthly'
+                                                ? '📅 No date set — deadline defaults to last day of each month'
+                                                : '📅 No date set — deadline defaults to Dec 31st each year'
+                                )}
+                            </p>
+                        )}
+                    </div>
+
+                    {/* Start Date - Only show for non-recurring auto-tracked goals */}
+                    {formMetricType !== 'manual_check' && !formIsRecurring && (
+                        <div>
+                            <label className="text-xs font-medium text-neutral-400 mb-1.5 block">Start Tracking From</label>
+                            <Input
+                                type="date"
+                                value={formStartDate}
+                                onChange={(e) => setFormStartDate(e.target.value)}
+                                className="bg-white/5"
+                            />
+                            <p className="text-[10px] text-neutral-500 mt-1">
+                                Net profit/progress will be calculated from this date onwards
+                            </p>
                         </div>
                     )}
 

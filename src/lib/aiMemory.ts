@@ -187,7 +187,12 @@ export async function updateGoal(id: string, updates: Partial<UserGoal>): Promis
         .update(updates)
         .eq('id', id);
 
-    return !error;
+    if (error) {
+        console.error('[AI Goals] Error updating goal:', error);
+        return false;
+    }
+
+    return true;
 }
 
 export async function completeGoal(id: string): Promise<boolean> {
@@ -277,10 +282,13 @@ export async function deleteGoal(id: string): Promise<boolean> {
 
 /**
  * Get the start of the period for a given date and recurrence type.
- * Weekly = Monday of that week, Monthly = 1st of that month, Yearly = Jan 1st of that year
+ * Daily = same day, Weekly = Monday of that week, Monthly = 1st of that month, Yearly = Jan 1st of that year
  */
-export function getRecurringPeriodStart(date: Date, recurrenceType: 'weekly' | 'monthly' | 'yearly'): Date {
+export function getRecurringPeriodStart(date: Date, recurrenceType: 'daily' | 'weekly' | 'monthly' | 'yearly'): Date {
     switch (recurrenceType) {
+        case 'daily': {
+            return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        }
         case 'weekly': {
             const d = new Date(date);
             const day = d.getDay(); // 0=Sun, 1=Mon ... 6=Sat
@@ -299,10 +307,13 @@ export function getRecurringPeriodStart(date: Date, recurrenceType: 'weekly' | '
 
 /**
  * Get the end of the period for a given date and recurrence type.
- * Weekly = Sunday of that week, Monthly = last day of that month, Yearly = Dec 31st of that year
+ * Daily = same day, Weekly = Sunday of that week, Monthly = last day of that month, Yearly = Dec 31st of that year
  */
-export function getRecurringPeriodEnd(date: Date, recurrenceType: 'weekly' | 'monthly' | 'yearly'): Date {
+export function getRecurringPeriodEnd(date: Date, recurrenceType: 'daily' | 'weekly' | 'monthly' | 'yearly'): Date {
     switch (recurrenceType) {
+        case 'daily': {
+            return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        }
         case 'weekly': {
             const start = getRecurringPeriodStart(date, 'weekly');
             const end = new Date(start);
@@ -319,19 +330,89 @@ export function getRecurringPeriodEnd(date: Date, recurrenceType: 'weekly' | 'mo
 }
 
 /**
- * Calculate the next recurring period based on the current deadline and recurrence type.
- * Always aligns to period boundaries:
- * - Weekly: next Monday to next Sunday
- * - Monthly: 1st to last day of next month
- * - Yearly: Jan 1st to Dec 31st of next year
+ * Calculate the next recurring period based on the current deadline, recurrence type,
+ * and optional metadata that stores the user's custom deadline anchor.
+ * 
+ * Custom deadline anchors:
+ * - Monthly: metadata.deadline_day (e.g., 20 = 20th of each month)
+ * - Weekly: metadata.deadline_weekday (e.g., 3 = Wednesday, 0=Sun...6=Sat)
+ * - Yearly: metadata.deadline_month + metadata.deadline_day (e.g., month=5, day=15 = June 15th)
+ * - Daily: always next day
+ * 
+ * If no custom anchor in metadata, uses natural period boundaries (end of week/month/year).
  */
-export function getNextRecurringDate(currentDeadline: string, recurrenceType: 'weekly' | 'monthly' | 'yearly'): { startDate: string; deadline: string } {
+export function getNextRecurringDate(
+    currentDeadline: string,
+    recurrenceType: 'daily' | 'weekly' | 'monthly' | 'yearly',
+    metadata?: Record<string, any> | null
+): { startDate: string; deadline: string } {
     const current = new Date(currentDeadline);
-    // Move to the day after the current deadline to land in the next period
+    const hasCustomDeadline = metadata?.has_custom_deadline === true;
+
+    if (hasCustomDeadline) {
+        // Use the custom deadline anchor to calculate next period
+        switch (recurrenceType) {
+            case 'daily': {
+                // Next day
+                const nextStart = new Date(current);
+                nextStart.setDate(nextStart.getDate() + 1);
+                return {
+                    startDate: nextStart.toISOString().split('T')[0],
+                    deadline: nextStart.toISOString().split('T')[0]
+                };
+            }
+            case 'weekly': {
+                // Same weekday next week
+                const nextDeadline = new Date(current);
+                nextDeadline.setDate(nextDeadline.getDate() + 7);
+                const nextStart = new Date(nextDeadline);
+                nextStart.setDate(nextStart.getDate() - 6); // 6 days before deadline = start
+                return {
+                    startDate: nextStart.toISOString().split('T')[0],
+                    deadline: nextDeadline.toISOString().split('T')[0]
+                };
+            }
+            case 'monthly': {
+                // Same day next month
+                const anchorDay = metadata?.deadline_day || current.getDate();
+                const nextMonth = current.getMonth() + 1;
+                const nextYear = current.getFullYear() + (nextMonth > 11 ? 1 : 0);
+                const adjustedMonth = nextMonth > 11 ? 0 : nextMonth;
+                // Handle months with fewer days (e.g., anchor=31 but month has 30 days)
+                const daysInNextMonth = new Date(nextYear, adjustedMonth + 1, 0).getDate();
+                const actualDay = Math.min(anchorDay, daysInNextMonth);
+                const nextDeadline = new Date(nextYear, adjustedMonth, actualDay);
+                // Start date = day after previous deadline
+                const nextStart = new Date(current);
+                nextStart.setDate(nextStart.getDate() + 1);
+                return {
+                    startDate: nextStart.toISOString().split('T')[0],
+                    deadline: nextDeadline.toISOString().split('T')[0]
+                };
+            }
+            case 'yearly': {
+                // Same month+day next year
+                const nextDeadline = new Date(current);
+                nextDeadline.setFullYear(nextDeadline.getFullYear() + 1);
+                // Handle leap year edge case (Feb 29 → Feb 28)
+                if (current.getMonth() === 1 && current.getDate() === 29) {
+                    const daysInFeb = new Date(nextDeadline.getFullYear(), 2, 0).getDate();
+                    nextDeadline.setDate(Math.min(29, daysInFeb));
+                }
+                const nextStart = new Date(current);
+                nextStart.setDate(nextStart.getDate() + 1);
+                return {
+                    startDate: nextStart.toISOString().split('T')[0],
+                    deadline: nextDeadline.toISOString().split('T')[0]
+                };
+            }
+        }
+    }
+
+    // Default behavior: use natural period boundaries
     const nextDay = new Date(current);
     nextDay.setDate(nextDay.getDate() + 1);
 
-    // Get the proper period boundaries for the next period
     const nextStart = getRecurringPeriodStart(nextDay, recurrenceType);
     const nextDeadline = getRecurringPeriodEnd(nextDay, recurrenceType);
 
@@ -342,7 +423,8 @@ export function getNextRecurringDate(currentDeadline: string, recurrenceType: 'w
 }
 
 /**
- * Create the next occurrence of a recurring goal
+ * Create the next occurrence of a recurring goal.
+ * Passes metadata through so custom deadline anchors are preserved across recurring chains.
  */
 export async function createNextRecurringGoal(goal: UserGoal): Promise<UserGoal | null> {
     if (!goal.recurrence_type || !goal.deadline) {
@@ -350,9 +432,10 @@ export async function createNextRecurringGoal(goal: UserGoal): Promise<UserGoal 
         return null;
     }
 
-    const { startDate, deadline } = getNextRecurringDate(goal.deadline, goal.recurrence_type);
+    // Pass metadata so custom deadline anchors carry forward
+    const { startDate, deadline } = getNextRecurringDate(goal.deadline, goal.recurrence_type, goal.metadata);
 
-    console.log(`[AI Goals] Creating next recurring goal: ${goal.title} | ${startDate} to ${deadline}`);
+    console.log(`[AI Goals] Creating next recurring goal: ${goal.title} | ${startDate} to ${deadline} | metadata:`, goal.metadata);
 
     const newGoal = await addGoal({
         title: goal.title,
@@ -368,6 +451,7 @@ export async function createNextRecurringGoal(goal: UserGoal): Promise<UserGoal 
         goal_type: goal.goal_type,
         include_surplus: goal.include_surplus,
         product_id: goal.product_id,
+        metadata: goal.metadata, // Preserve custom deadline anchor info
     });
 
     if (newGoal) {

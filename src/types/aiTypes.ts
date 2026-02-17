@@ -9,17 +9,17 @@ export interface AIMemory {
 export interface UserGoal {
     id: string;
     title: string;
-    description?: string;
+    description?: string | null;
     target_amount: number;
     current_amount: number;
-    deadline?: string;
+    deadline?: string | null;
     metric_type: 'net_profit' | 'revenue' | 'sales_count' | 'manual_check' | 'customer_count' | 'gross_profit' | 'margin' | 'product_sales' | 'daily_revenue' | 'daily_margin' | 'avg_margin' | 'avg_revenue' | 'avg_profit';
     status: 'active' | 'completed' | 'archived' | 'incomplete';
     start_tracking_date: string;
     metadata?: Record<string, any>; // For recurring rules etc
     created_at: string;
     is_recurring?: boolean;
-    recurrence_type?: 'monthly' | 'weekly' | 'yearly';
+    recurrence_type?: 'daily' | 'monthly' | 'weekly' | 'yearly' | null;
     rollover_preference?: 'ask' | 'immediate' | 'first_of_month';
 
     // New fields for EMI/allocation tracking

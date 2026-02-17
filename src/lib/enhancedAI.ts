@@ -1115,7 +1115,7 @@ ${paymentData}
 - deadline: Optional end date (YYYY-MM-DD)
 - start_tracking_date: When to start counting (YYYY-MM-DD) - REQUIRED for auto-tracked goals
 - is_recurring: true/false - Does this goal repeat?
-- recurrence_type: "monthly" | "weekly" | "yearly"
+- recurrence_type: "daily" | "monthly" | "weekly" | "yearly"
 - status: "active" | "completed" | "archived"
 
 **MANUAL vs AUTO-TRACKED:**
@@ -1489,7 +1489,9 @@ You: "For what time period? Today, this week, this month, or a custom range?"
 
                 let startDate = start_tracking_date;
                 // Auto-calculate start date for recurring goals
-                if (recurrence_type === 'monthly') {
+                if (recurrence_type === 'daily') {
+                    startDate = format(new Date(), 'yyyy-MM-dd');
+                } else if (recurrence_type === 'monthly') {
                     startDate = format(startOfMonth(new Date()), 'yyyy-MM-dd');
                 } else if (recurrence_type === 'weekly') {
                     startDate = format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd'); // Monday start
@@ -1535,6 +1537,7 @@ You: "For what time period? Today, this week, this month, or a custom range?"
                             type: 'update_goal',
                             description: `Update Goal: ${targetGoal.title}`,
                             data: {
+                                goalId: targetGoal.id,
                                 goalTitle: targetGoal.title,
                                 updates: {
                                     targetAmount: updates.target_amount,
@@ -1568,7 +1571,7 @@ You: "For what time period? Today, this week, this month, or a custom range?"
                             id: `delete-goal-${Date.now()}`,
                             type: 'delete_goal',
                             description: `Delete Goal: ${targetGoal.title}`,
-                            data: { searchTitle: targetGoal.title }
+                            data: { goalId: targetGoal.id, searchTitle: targetGoal.title }
                         }
                     };
                 }
@@ -1640,7 +1643,7 @@ You: "For what time period? Today, this week, this month, or a custom range?"
                             id: `add-surplus-${Date.now()}`,
                             type: 'add_surplus',
                             description: `Add Surplus to ${targetGoal.title}`,
-                            data: { goalTitle: targetGoal.title }
+                            data: { goalId: targetGoal.id, goalTitle: targetGoal.title, amount: surplus }
                         }
                     };
                 }
