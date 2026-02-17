@@ -33,7 +33,8 @@ import {
     AlertCircle,
     RotateCcw,
     XCircle,
-    RefreshCw
+    RefreshCw,
+    ChevronDown
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from '../components/ui/Button';
@@ -117,6 +118,11 @@ export default function GoalsDashboard() {
     const [showProgressModal, setShowProgressModal] = useState(false);
     const [updatingGoal, setUpdatingGoal] = useState<UserGoal | null>(null);
     const [newProgressAmount, setNewProgressAmount] = useState('');
+
+    // Section expand/collapse state
+    const [activeExpanded, setActiveExpanded] = useState(true);
+    const [completedExpanded, setCompletedExpanded] = useState(false);
+    const [incompleteExpanded, setIncompleteExpanded] = useState(false);
 
     // Form state
     const [formTitle, setFormTitle] = useState('');
@@ -483,11 +489,21 @@ export default function GoalsDashboard() {
             {/* Active Goals */}
             {!isLoading && activeGoals.length > 0 && (
                 <div className="mb-6">
-                    <h2 className="text-sm font-semibold text-neutral-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-                        <Flame size={14} className="text-orange-500" />
-                        Active Goals ({activeGoals.length})
-                    </h2>
-                    <div className="space-y-4">
+                    <button
+                        onClick={() => setActiveExpanded(!activeExpanded)}
+                        className="w-full flex items-center justify-between py-2.5 px-3 rounded-xl bg-orange-500/5 hover:bg-orange-500/10 border border-orange-500/10 transition-all mb-3 group"
+                    >
+                        <div className="flex items-center gap-2">
+                            <Flame size={14} className="text-orange-500" />
+                            <span className="text-sm font-semibold text-neutral-300 uppercase tracking-wider">Active Goals</span>
+                            <span className="text-xs font-bold text-orange-400 bg-orange-500/15 px-2 py-0.5 rounded-full">{activeGoals.length}</span>
+                        </div>
+                        <ChevronDown size={16} className={cn(
+                            "text-neutral-500 transition-transform duration-200",
+                            activeExpanded ? "rotate-0" : "-rotate-90"
+                        )} />
+                    </button>
+                    {activeExpanded && <div className="space-y-4">
                         {activeGoals.map((goal) => {
                             const progress = (goal.current_amount / goal.target_amount) * 100;
                             const remaining = goal.target_amount - goal.current_amount;
@@ -721,18 +737,28 @@ export default function GoalsDashboard() {
                                 </div>
                             );
                         })}
-                    </div>
+                    </div>}
                 </div>
             )}
 
             {/* Completed Goals */}
             {!isLoading && completedGoals.length > 0 && (
                 <div className="mb-6">
-                    <h2 className="text-sm font-semibold text-neutral-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-                        <Trophy size={14} className="text-emerald-500" />
-                        Completed ({completedGoals.length})
-                    </h2>
-                    <div className="space-y-3">
+                    <button
+                        onClick={() => setCompletedExpanded(!completedExpanded)}
+                        className="w-full flex items-center justify-between py-2.5 px-3 rounded-xl bg-emerald-500/5 hover:bg-emerald-500/10 border border-emerald-500/10 transition-all mb-3 group"
+                    >
+                        <div className="flex items-center gap-2">
+                            <Trophy size={14} className="text-emerald-500" />
+                            <span className="text-sm font-semibold text-neutral-300 uppercase tracking-wider">Completed</span>
+                            <span className="text-xs font-bold text-emerald-400 bg-emerald-500/15 px-2 py-0.5 rounded-full">{completedGoals.length}</span>
+                        </div>
+                        <ChevronDown size={16} className={cn(
+                            "text-neutral-500 transition-transform duration-200",
+                            completedExpanded ? "rotate-0" : "-rotate-90"
+                        )} />
+                    </button>
+                    {completedExpanded && <div className="space-y-3">
                         {completedGoals.map((goal) => (
                             <div
                                 key={goal.id}
@@ -788,75 +814,87 @@ export default function GoalsDashboard() {
                                 </div>
                             </div>
                         ))}
-                    </div>
+                    </div>}
                 </div>
             )}
 
             {/* Incomplete Goals (Missed Deadline) */}
             {!isLoading && incompleteGoals.length > 0 && (
                 <div className="mb-6">
-                    <h2 className="text-sm font-semibold text-neutral-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-                        <XCircle size={14} className="text-red-500" />
-                        Incomplete ({incompleteGoals.length})
-                    </h2>
-                    <p className="text-[10px] text-neutral-600 mb-3 -mt-1">
-                        Goals that missed their deadline. These have been closed and new goals created for the next period.
-                    </p>
-                    <div className="space-y-3">
-                        {incompleteGoals.map((goal) => {
-                            const progress = (goal.current_amount / goal.target_amount) * 100;
-                            return (
-                                <div
-                                    key={goal.id}
-                                    className="bg-zinc-900/50 border-2 border-red-900/20 rounded-xl p-3"
-                                >
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                                            <div className="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center shrink-0">
-                                                <XCircle size={16} className="text-red-400" />
-                                            </div>
-                                            <div className="min-w-0">
-                                                <h3 className="font-medium text-white/60 text-sm truncate">{goal.title}</h3>
-                                                <div className="flex items-center gap-2 mt-0.5">
-                                                    <p className="text-[10px] text-red-400/70">
-                                                        {progress.toFixed(0)}% completed — missed deadline
-                                                    </p>
-                                                    {goal.is_recurring && (
-                                                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300">
-                                                            <RefreshCw size={8} className="inline mr-0.5" />
-                                                            {goal.recurrence_type}
-                                                        </span>
-                                                    )}
-                                                    {goal.closed_date && (
-                                                        <span className="text-[9px] text-neutral-600">
-                                                            closed {format(new Date(goal.closed_date), 'dd MMM yyyy')}
-                                                        </span>
-                                                    )}
+                    <button
+                        onClick={() => setIncompleteExpanded(!incompleteExpanded)}
+                        className="w-full flex items-center justify-between py-2.5 px-3 rounded-xl bg-red-500/5 hover:bg-red-500/10 border border-red-500/10 transition-all mb-3 group"
+                    >
+                        <div className="flex items-center gap-2">
+                            <XCircle size={14} className="text-red-500" />
+                            <span className="text-sm font-semibold text-neutral-300 uppercase tracking-wider">Incomplete</span>
+                            <span className="text-xs font-bold text-red-400 bg-red-500/15 px-2 py-0.5 rounded-full">{incompleteGoals.length}</span>
+                        </div>
+                        <ChevronDown size={16} className={cn(
+                            "text-neutral-500 transition-transform duration-200",
+                            incompleteExpanded ? "rotate-0" : "-rotate-90"
+                        )} />
+                    </button>
+                    {incompleteExpanded && <>
+                        <p className="text-[10px] text-neutral-600 mb-3 -mt-1">
+                            Goals that missed their deadline. These have been closed and new goals created for the next period.
+                        </p>
+                        <div className="space-y-3">
+                            {incompleteGoals.map((goal) => {
+                                const progress = (goal.current_amount / goal.target_amount) * 100;
+                                return (
+                                    <div
+                                        key={goal.id}
+                                        className="bg-zinc-900/50 border-2 border-red-900/20 rounded-xl p-3"
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                                                <div className="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center shrink-0">
+                                                    <XCircle size={16} className="text-red-400" />
                                                 </div>
-                                                {/* Mini progress bar */}
-                                                <div className="mt-1.5 h-1.5 bg-white/5 rounded-full overflow-hidden w-full max-w-[200px]">
-                                                    <div
-                                                        className="h-full rounded-full bg-red-500/50"
-                                                        style={{ width: `${Math.min(100, progress)}%` }}
-                                                    />
+                                                <div className="min-w-0">
+                                                    <h3 className="font-medium text-white/60 text-sm truncate">{goal.title}</h3>
+                                                    <div className="flex items-center gap-2 mt-0.5">
+                                                        <p className="text-[10px] text-red-400/70">
+                                                            {progress.toFixed(0)}% completed — missed deadline
+                                                        </p>
+                                                        {goal.is_recurring && (
+                                                            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300">
+                                                                <RefreshCw size={8} className="inline mr-0.5" />
+                                                                {goal.recurrence_type}
+                                                            </span>
+                                                        )}
+                                                        {goal.closed_date && (
+                                                            <span className="text-[9px] text-neutral-600">
+                                                                closed {format(new Date(goal.closed_date), 'dd MMM yyyy')}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    {/* Mini progress bar */}
+                                                    <div className="mt-1.5 h-1.5 bg-white/5 rounded-full overflow-hidden w-full max-w-[200px]">
+                                                        <div
+                                                            className="h-full rounded-full bg-red-500/50"
+                                                            style={{ width: `${Math.min(100, progress)}%` }}
+                                                        />
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                        <div className="flex items-center gap-1 shrink-0">
-                                            <button
-                                                onClick={() => handleDeleteGoal(goal.id)}
-                                                className="p-2 rounded-lg hover:bg-red-500/20 text-neutral-500 hover:text-red-400 transition-colors"
-                                                aria-label="Delete incomplete goal"
-                                                title="Delete"
-                                            >
-                                                <Trash2 size={14} />
-                                            </button>
+                                            <div className="flex items-center gap-1 shrink-0">
+                                                <button
+                                                    onClick={() => handleDeleteGoal(goal.id)}
+                                                    className="p-2 rounded-lg hover:bg-red-500/20 text-neutral-500 hover:text-red-400 transition-colors"
+                                                    aria-label="Delete incomplete goal"
+                                                    title="Delete"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            );
-                        })}
-                    </div>
+                                );
+                            })}
+                        </div>
+                    </>}
                 </div>
             )}
 
