@@ -14,7 +14,7 @@ export interface UserGoal {
     current_amount: number;
     deadline?: string;
     metric_type: 'net_profit' | 'revenue' | 'sales_count' | 'manual_check' | 'customer_count' | 'gross_profit' | 'margin' | 'product_sales' | 'daily_revenue' | 'daily_margin' | 'avg_margin' | 'avg_revenue' | 'avg_profit';
-    status: 'active' | 'completed' | 'archived';
+    status: 'active' | 'completed' | 'archived' | 'incomplete';
     start_tracking_date: string;
     metadata?: Record<string, any>; // For recurring rules etc
     created_at: string;
@@ -29,6 +29,10 @@ export interface UserGoal {
     include_surplus?: boolean; // Whether to include pre-existing surplus
     reminder_enabled?: boolean; // Whether to remind about this goal
     completed_at?: string; // When the goal was completed
+
+    // For recurring goal chains
+    parent_goal_id?: string; // ID of the previous goal in a recurring chain
+    closed_date?: string; // When an incomplete goal was closed
 
     // For product-specific goals
     product_id?: string; // Track sales of a specific product

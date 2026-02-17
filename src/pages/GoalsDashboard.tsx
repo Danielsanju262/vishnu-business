@@ -30,7 +30,10 @@ import {
     Package,
     TrendingUp,
     Calendar,
-    AlertCircle
+    AlertCircle,
+    RotateCcw,
+    XCircle,
+    RefreshCw
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from '../components/ui/Button';
@@ -44,6 +47,10 @@ import {
     completeGoal,
     deleteGoal,
     updateGoalProgress,
+    reactivateGoal,
+    processOverdueRecurringGoals,
+    getRecurringPeriodStart,
+    getRecurringPeriodEnd,
     type UserGoal
 } from '../lib/aiMemory';
 import { supabase } from '../lib/supabase';
@@ -176,6 +183,15 @@ export default function GoalsDashboard() {
     const loadGoals = async () => {
         setIsLoading(true);
         try {
+            // First, process any overdue recurring goals
+            const overdueResult = await processOverdueRecurringGoals();
+            if (overdueResult.completed.length > 0) {
+                toast(`Auto-completed recurring goals: ${overdueResult.completed.join(', ')}`, 'info');
+            }
+            if (overdueResult.incompleted.length > 0) {
+                toast(`Missed deadline: ${overdueResult.incompleted.join(', ')}`, 'warning');
+            }
+
             const allGoals = await getAllGoals();
 
             // Update progress for all active goals
@@ -240,33 +256,57 @@ export default function GoalsDashboard() {
         try {
             if (editingGoal) {
                 // Update existing
+                let startDate = formMetricType !== 'manual_check' ? formStartDate : undefined;
+                let deadline = formDeadline || undefined;
+
+                // If recurring, align to period boundaries
+                if (formIsRecurring && formRecurrenceType && startDate) {
+                    const periodStart = getRecurringPeriodStart(new Date(startDate), formRecurrenceType);
+                    const periodEnd = getRecurringPeriodEnd(new Date(startDate), formRecurrenceType);
+                    startDate = periodStart.toISOString().split('T')[0];
+                    deadline = periodEnd.toISOString().split('T')[0];
+                }
+
                 await updateGoal(editingGoal.id, {
                     title: formTitle.trim(),
                     description: formDescription.trim() || undefined,
                     target_amount: parseFloat(formTargetAmount),
-                    deadline: formDeadline || undefined,
+                    deadline: deadline,
                     metric_type: formMetricType,
                     is_recurring: formIsRecurring,
                     recurrence_type: formIsRecurring ? formRecurrenceType : undefined,
-                    start_tracking_date: formMetricType !== 'manual_check' ? formStartDate : undefined
+                    start_tracking_date: startDate
                 });
                 toast('Goal updated! 🎯', 'success');
             } else {
                 // Create new
+                let startDate = formMetricType !== 'manual_check' ? formStartDate : new Date().toISOString().split('T')[0];
+                let deadline = formDeadline || undefined;
+
+                // If recurring, align start date and deadline to period boundaries
+                if (formIsRecurring && formRecurrenceType) {
+                    const periodStart = getRecurringPeriodStart(new Date(startDate), formRecurrenceType);
+                    const periodEnd = getRecurringPeriodEnd(new Date(startDate), formRecurrenceType);
+                    startDate = periodStart.toISOString().split('T')[0];
+                    deadline = periodEnd.toISOString().split('T')[0];
+                }
+
                 console.log('[Goals] Creating goal:', {
                     title: formTitle.trim(),
                     target_amount: parseFloat(formTargetAmount),
                     metric_type: formMetricType,
-                    is_recurring: formIsRecurring
+                    is_recurring: formIsRecurring,
+                    start_tracking_date: startDate,
+                    deadline: deadline
                 });
 
                 const newGoal = await addGoal({
                     title: formTitle.trim(),
                     description: formDescription.trim() || undefined,
                     target_amount: parseFloat(formTargetAmount),
-                    deadline: formDeadline || undefined,
+                    deadline: deadline,
                     metric_type: formMetricType,
-                    start_tracking_date: formMetricType !== 'manual_check' ? formStartDate : new Date().toISOString().split('T')[0],
+                    start_tracking_date: startDate,
                     is_recurring: formIsRecurring,
                     recurrence_type: formIsRecurring ? formRecurrenceType : undefined
                 });
@@ -338,13 +378,30 @@ export default function GoalsDashboard() {
 
     const handleCompleteGoal = async (goalId: string) => {
         try {
+            // Check if it's a recurring goal to show appropriate message
+            const goal = goals.find(g => g.id === goalId);
             await completeGoal(goalId);
-            toast('Goal completed! 🎉 Great job!', 'success');
+            if (goal?.is_recurring) {
+                toast('Goal completed! 🎉 Next recurring goal created automatically!', 'success');
+            } else {
+                toast('Goal completed! 🎉 Great job!', 'success');
+            }
             setConfirmComplete(null);
             loadGoals();
         } catch (error) {
             console.error('Error completing goal:', error);
             toast('Failed to complete goal', 'error');
+        }
+    };
+
+    const handleReactivateGoal = async (goalId: string) => {
+        try {
+            await reactivateGoal(goalId);
+            toast('Goal moved back to active! 💪', 'success');
+            loadGoals();
+        } catch (error) {
+            console.error('Error reactivating goal:', error);
+            toast('Failed to reactivate goal', 'error');
         }
     };
 
@@ -362,11 +419,15 @@ export default function GoalsDashboard() {
     // Separate goals by status
     const activeGoals = goals.filter(g => g.status === 'active');
     const completedGoals = goals.filter(g => g.status === 'completed');
+    const incompleteGoals = goals.filter(g => g.status === 'incomplete');
 
     // Debug logging
     console.log('[GoalsDashboard] Total goals in state:', goals.length);
     console.log('[GoalsDashboard] Active goals:', activeGoals.length);
+    console.log('[GoalsDashboard] Completed goals:', completedGoals.length);
+    console.log('[GoalsDashboard] Incomplete goals:', incompleteGoals.length);
     console.log('[GoalsDashboard] All goals:', goals.map(g => ({ id: g.id, title: g.title, status: g.status })));
+
 
     return (
         <div className="min-h-screen bg-background p-3 md:p-4 pb-6 animate-in fade-in w-full md:max-w-2xl md:mx-auto">
@@ -403,7 +464,7 @@ export default function GoalsDashboard() {
             )}
 
             {/* Empty State */}
-            {!isLoading && activeGoals.length === 0 && completedGoals.length === 0 && (
+            {!isLoading && activeGoals.length === 0 && completedGoals.length === 0 && incompleteGoals.length === 0 && (
                 <div className="text-center py-16">
                     <div className="w-20 h-20 rounded-full bg-purple-500/10 flex items-center justify-center mx-auto mb-4">
                         <Target size={40} className="text-purple-400" />
@@ -575,8 +636,16 @@ export default function GoalsDashboard() {
                                                 </Button>
                                                 <Button
                                                     size="sm"
+                                                    onClick={() => setConfirmComplete(goal.id)}
+                                                    className="bg-emerald-600/80 hover:bg-emerald-500 h-8 text-xs text-white font-medium"
+                                                >
+                                                    <CheckCircle2 size={12} className="mr-1" />
+                                                    Mark Complete
+                                                </Button>
+                                                <Button
+                                                    size="sm"
                                                     onClick={() => handleDeleteGoal(goal.id)}
-                                                    className="col-span-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/20 h-8 text-xs font-medium"
+                                                    className="bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/20 h-8 text-xs font-medium"
                                                 >
                                                     Delete Goal
                                                 </Button>
@@ -658,37 +727,135 @@ export default function GoalsDashboard() {
 
             {/* Completed Goals */}
             {!isLoading && completedGoals.length > 0 && (
-                <div>
+                <div className="mb-6">
                     <h2 className="text-sm font-semibold text-neutral-400 uppercase tracking-wider mb-3 flex items-center gap-2">
                         <Trophy size={14} className="text-emerald-500" />
                         Completed ({completedGoals.length})
                     </h2>
                     <div className="space-y-3">
-                        {completedGoals.slice(0, 5).map((goal) => (
+                        {completedGoals.map((goal) => (
                             <div
                                 key={goal.id}
-                                className="bg-zinc-900/50 border-2 border-zinc-700 rounded-xl p-3 flex items-center justify-between"
+                                className="bg-zinc-900/50 border-2 border-emerald-900/30 rounded-xl p-3"
                             >
-                                <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
-                                        <CheckCircle2 size={16} className="text-emerald-400" />
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                                        <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center shrink-0">
+                                            <CheckCircle2 size={16} className="text-emerald-400" />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <h3 className="font-medium text-white/80 text-sm truncate">{goal.title}</h3>
+                                            <div className="flex items-center gap-2 mt-0.5">
+                                                <p className="text-[10px] text-neutral-500">
+                                                    {['margin', 'daily_margin', 'avg_margin'].includes(goal.metric_type)
+                                                        ? `${goal.target_amount.toFixed(1)}% achieved`
+                                                        : ['customer_count', 'sales_count'].includes(goal.metric_type)
+                                                            ? `${goal.target_amount.toLocaleString()} achieved`
+                                                            : `₹${goal.target_amount.toLocaleString()} achieved`}
+                                                </p>
+                                                {goal.is_recurring && (
+                                                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300">
+                                                        <RefreshCw size={8} className="inline mr-0.5" />
+                                                        {goal.recurrence_type}
+                                                    </span>
+                                                )}
+                                                {goal.completed_at && (
+                                                    <span className="text-[9px] text-neutral-600">
+                                                        {format(new Date(goal.completed_at), 'dd MMM yyyy')}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <h3 className="font-medium text-white/80 text-sm">{goal.title}</h3>
-                                        <p className="text-[10px] text-neutral-500">
-                                            ₹{goal.target_amount.toLocaleString()} achieved
-                                        </p>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                        <button
+                                            onClick={() => handleReactivateGoal(goal.id)}
+                                            className="p-2 rounded-lg hover:bg-amber-500/20 text-neutral-500 hover:text-amber-400 transition-colors"
+                                            aria-label="Mark as incomplete (move back to active)"
+                                            title="Mark as Incomplete"
+                                        >
+                                            <RotateCcw size={14} />
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeleteGoal(goal.id)}
+                                            className="p-2 rounded-lg hover:bg-red-500/20 text-neutral-500 hover:text-red-400 transition-colors"
+                                            aria-label="Delete completed goal"
+                                            title="Delete"
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
                                     </div>
                                 </div>
-                                <button
-                                    onClick={() => handleDeleteGoal(goal.id)}
-                                    className="p-2 rounded-lg hover:bg-red-500/20 text-neutral-500 hover:text-red-400 transition-colors"
-                                    aria-label="Delete completed goal"
-                                >
-                                    <Trash2 size={14} />
-                                </button>
                             </div>
                         ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Incomplete Goals (Missed Deadline) */}
+            {!isLoading && incompleteGoals.length > 0 && (
+                <div className="mb-6">
+                    <h2 className="text-sm font-semibold text-neutral-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                        <XCircle size={14} className="text-red-500" />
+                        Incomplete ({incompleteGoals.length})
+                    </h2>
+                    <p className="text-[10px] text-neutral-600 mb-3 -mt-1">
+                        Goals that missed their deadline. These have been closed and new goals created for the next period.
+                    </p>
+                    <div className="space-y-3">
+                        {incompleteGoals.map((goal) => {
+                            const progress = (goal.current_amount / goal.target_amount) * 100;
+                            return (
+                                <div
+                                    key={goal.id}
+                                    className="bg-zinc-900/50 border-2 border-red-900/20 rounded-xl p-3"
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                                            <div className="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center shrink-0">
+                                                <XCircle size={16} className="text-red-400" />
+                                            </div>
+                                            <div className="min-w-0">
+                                                <h3 className="font-medium text-white/60 text-sm truncate">{goal.title}</h3>
+                                                <div className="flex items-center gap-2 mt-0.5">
+                                                    <p className="text-[10px] text-red-400/70">
+                                                        {progress.toFixed(0)}% completed — missed deadline
+                                                    </p>
+                                                    {goal.is_recurring && (
+                                                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300">
+                                                            <RefreshCw size={8} className="inline mr-0.5" />
+                                                            {goal.recurrence_type}
+                                                        </span>
+                                                    )}
+                                                    {goal.closed_date && (
+                                                        <span className="text-[9px] text-neutral-600">
+                                                            closed {format(new Date(goal.closed_date), 'dd MMM yyyy')}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                {/* Mini progress bar */}
+                                                <div className="mt-1.5 h-1.5 bg-white/5 rounded-full overflow-hidden w-full max-w-[200px]">
+                                                    <div
+                                                        className="h-full rounded-full bg-red-500/50"
+                                                        style={{ width: `${Math.min(100, progress)}%` }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-1 shrink-0">
+                                            <button
+                                                onClick={() => handleDeleteGoal(goal.id)}
+                                                className="p-2 rounded-lg hover:bg-red-500/20 text-neutral-500 hover:text-red-400 transition-colors"
+                                                aria-label="Delete incomplete goal"
+                                                title="Delete"
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
             )}

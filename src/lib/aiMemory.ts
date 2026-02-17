@@ -116,6 +116,8 @@ export async function getAllGoals(): Promise<UserGoal[]> {
     const { data, error } = await supabase
         .from('user_goals')
         .select('*')
+        .neq('status', 'archived')
+        .order('deadline', { ascending: true, nullsFirst: false })
         .order('created_at', { ascending: false });
 
     if (error) {
@@ -125,7 +127,6 @@ export async function getAllGoals(): Promise<UserGoal[]> {
     }
 
     console.log('[AI Goals] Fetched goals:', data?.length || 0, 'goals');
-    console.log('[AI Goals] Goals data:', data);
     return data || [];
 }
 
@@ -151,9 +152,16 @@ export async function addGoal(goal: Omit<UserGoal, 'id' | 'created_at' | 'status
         insertData.metadata = goal.metadata;
     }
 
-    // NOTE: is_recurring and recurrence_type are intentionally NOT included
-    // to maintain compatibility with existing database schemas that don't have these columns.
-    // After running the migration, these can be added back.
+    // Include recurring fields
+    if (goal.is_recurring !== undefined) {
+        insertData.is_recurring = goal.is_recurring;
+    }
+    if (goal.recurrence_type) {
+        insertData.recurrence_type = goal.recurrence_type;
+    }
+    if (goal.parent_goal_id) {
+        insertData.parent_goal_id = goal.parent_goal_id;
+    }
 
     console.log('[AI Goals] Inserting goal:', insertData);
 
@@ -183,12 +191,79 @@ export async function updateGoal(id: string, updates: Partial<UserGoal>): Promis
 }
 
 export async function completeGoal(id: string): Promise<boolean> {
+    // Fetch the goal to check if it's recurring
+    const { data: goal } = await supabase
+        .from('user_goals')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+    if (!goal) return false;
+
+    // Mark as completed with timestamp
     const { error } = await supabase
         .from('user_goals')
-        .update({ status: 'completed' })
+        .update({ status: 'completed', completed_at: new Date().toISOString() })
         .eq('id', id);
 
-    return !error;
+    if (error) return false;
+
+    // If recurring, create the next occurrence
+    if (goal.is_recurring && goal.recurrence_type) {
+        await createNextRecurringGoal(goal);
+    }
+
+    window.dispatchEvent(new Event('goal-updated'));
+    return true;
+}
+
+/**
+ * Mark a goal as incomplete (for auto-tracked recurring goals that missed deadline)
+ */
+export async function markGoalIncomplete(id: string): Promise<boolean> {
+    const { data: goal } = await supabase
+        .from('user_goals')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+    if (!goal) return false;
+
+    const { error } = await supabase
+        .from('user_goals')
+        .update({
+            status: 'incomplete',
+            closed_date: new Date().toISOString()
+        })
+        .eq('id', id);
+
+    if (error) return false;
+
+    // If recurring, create the next occurrence
+    if (goal.is_recurring && goal.recurrence_type) {
+        await createNextRecurringGoal(goal);
+    }
+
+    window.dispatchEvent(new Event('goal-updated'));
+    return true;
+}
+
+/**
+ * Reactivate a completed goal (move it back to active)
+ */
+export async function reactivateGoal(id: string): Promise<boolean> {
+    const { error } = await supabase
+        .from('user_goals')
+        .update({
+            status: 'active',
+            completed_at: null
+        })
+        .eq('id', id);
+
+    if (error) return false;
+
+    window.dispatchEvent(new Event('goal-updated'));
+    return true;
 }
 
 export async function deleteGoal(id: string): Promise<boolean> {
@@ -198,6 +273,184 @@ export async function deleteGoal(id: string): Promise<boolean> {
         .eq('id', id);
 
     return !error;
+}
+
+/**
+ * Get the start of the period for a given date and recurrence type.
+ * Weekly = Monday of that week, Monthly = 1st of that month, Yearly = Jan 1st of that year
+ */
+export function getRecurringPeriodStart(date: Date, recurrenceType: 'weekly' | 'monthly' | 'yearly'): Date {
+    switch (recurrenceType) {
+        case 'weekly': {
+            const d = new Date(date);
+            const day = d.getDay(); // 0=Sun, 1=Mon ... 6=Sat
+            const diff = day === 0 ? 6 : day - 1; // distance from Monday
+            d.setDate(d.getDate() - diff);
+            return d;
+        }
+        case 'monthly': {
+            return new Date(date.getFullYear(), date.getMonth(), 1);
+        }
+        case 'yearly': {
+            return new Date(date.getFullYear(), 0, 1);
+        }
+    }
+}
+
+/**
+ * Get the end of the period for a given date and recurrence type.
+ * Weekly = Sunday of that week, Monthly = last day of that month, Yearly = Dec 31st of that year
+ */
+export function getRecurringPeriodEnd(date: Date, recurrenceType: 'weekly' | 'monthly' | 'yearly'): Date {
+    switch (recurrenceType) {
+        case 'weekly': {
+            const start = getRecurringPeriodStart(date, 'weekly');
+            const end = new Date(start);
+            end.setDate(end.getDate() + 6); // Monday + 6 = Sunday
+            return end;
+        }
+        case 'monthly': {
+            return new Date(date.getFullYear(), date.getMonth() + 1, 0); // last day of current month
+        }
+        case 'yearly': {
+            return new Date(date.getFullYear(), 11, 31);
+        }
+    }
+}
+
+/**
+ * Calculate the next recurring period based on the current deadline and recurrence type.
+ * Always aligns to period boundaries:
+ * - Weekly: next Monday to next Sunday
+ * - Monthly: 1st to last day of next month
+ * - Yearly: Jan 1st to Dec 31st of next year
+ */
+export function getNextRecurringDate(currentDeadline: string, recurrenceType: 'weekly' | 'monthly' | 'yearly'): { startDate: string; deadline: string } {
+    const current = new Date(currentDeadline);
+    // Move to the day after the current deadline to land in the next period
+    const nextDay = new Date(current);
+    nextDay.setDate(nextDay.getDate() + 1);
+
+    // Get the proper period boundaries for the next period
+    const nextStart = getRecurringPeriodStart(nextDay, recurrenceType);
+    const nextDeadline = getRecurringPeriodEnd(nextDay, recurrenceType);
+
+    return {
+        startDate: nextStart.toISOString().split('T')[0],
+        deadline: nextDeadline.toISOString().split('T')[0]
+    };
+}
+
+/**
+ * Create the next occurrence of a recurring goal
+ */
+export async function createNextRecurringGoal(goal: UserGoal): Promise<UserGoal | null> {
+    if (!goal.recurrence_type || !goal.deadline) {
+        console.warn('[AI Goals] Cannot create next recurring goal: missing recurrence_type or deadline');
+        return null;
+    }
+
+    const { startDate, deadline } = getNextRecurringDate(goal.deadline, goal.recurrence_type);
+
+    console.log(`[AI Goals] Creating next recurring goal: ${goal.title} | ${startDate} to ${deadline}`);
+
+    const newGoal = await addGoal({
+        title: goal.title,
+        description: goal.description,
+        target_amount: goal.target_amount,
+        metric_type: goal.metric_type,
+        start_tracking_date: startDate,
+        deadline: deadline,
+        is_recurring: true,
+        recurrence_type: goal.recurrence_type,
+        parent_goal_id: goal.id,
+        reminder_enabled: goal.reminder_enabled,
+        goal_type: goal.goal_type,
+        include_surplus: goal.include_surplus,
+        product_id: goal.product_id,
+    });
+
+    if (newGoal) {
+        console.log(`[AI Goals] Next recurring goal created: ${newGoal.id}`);
+    }
+
+    return newGoal;
+}
+
+/**
+ * Process overdue recurring goals:
+ * - Manual goals (manual_check): auto-complete and create next occurrence
+ * - Auto-tracked goals: mark as incomplete and create next occurrence
+ */
+export async function processOverdueRecurringGoals(): Promise<{ completed: string[]; incompleted: string[]; created: string[] }> {
+    const result = { completed: [] as string[], incompleted: [] as string[], created: [] as string[] };
+
+    // Get all active recurring goals
+    const { data: goals } = await supabase
+        .from('user_goals')
+        .select('*')
+        .eq('status', 'active')
+        .eq('is_recurring', true)
+        .not('deadline', 'is', null);
+
+    if (!goals || goals.length === 0) return result;
+
+    const today = new Date().toISOString().split('T')[0];
+
+    for (const goal of goals) {
+        if (!goal.deadline || goal.deadline >= today) continue; // Not overdue
+
+        const isManualGoal = goal.metric_type === 'manual_check';
+
+        if (isManualGoal) {
+            // Manual goals: auto-complete when overdue
+            const { error } = await supabase
+                .from('user_goals')
+                .update({ status: 'completed', completed_at: new Date().toISOString() })
+                .eq('id', goal.id);
+
+            if (!error) {
+                result.completed.push(goal.title);
+                // Create next occurrence
+                const newGoal = await createNextRecurringGoal(goal);
+                if (newGoal) result.created.push(newGoal.title);
+            }
+        } else {
+            // Auto-tracked goals: mark as incomplete if target not reached
+            const progress = (goal.current_amount / goal.target_amount) * 100;
+            if (progress >= 100) {
+                // If target was actually reached, complete it instead
+                const { error } = await supabase
+                    .from('user_goals')
+                    .update({ status: 'completed', completed_at: new Date().toISOString() })
+                    .eq('id', goal.id);
+
+                if (!error) {
+                    result.completed.push(goal.title);
+                    const newGoal = await createNextRecurringGoal(goal);
+                    if (newGoal) result.created.push(newGoal.title);
+                }
+            } else {
+                // Target not reached - mark as incomplete
+                const { error } = await supabase
+                    .from('user_goals')
+                    .update({ status: 'incomplete', closed_date: new Date().toISOString() })
+                    .eq('id', goal.id);
+
+                if (!error) {
+                    result.incompleted.push(goal.title);
+                    const newGoal = await createNextRecurringGoal(goal);
+                    if (newGoal) result.created.push(newGoal.title);
+                }
+            }
+        }
+    }
+
+    if (result.completed.length > 0 || result.incompleted.length > 0) {
+        window.dispatchEvent(new Event('goal-updated'));
+    }
+
+    return result;
 }
 
 // ===== CHAT SESSIONS & MESSAGES =====
@@ -735,9 +988,18 @@ export async function updateGoalProgress(goalId: string): Promise<UserGoal | nul
     }
 
 
-    // Auto-complete validation
-    if (currentAmount >= goal.target_amount && goal.status !== 'completed') {
-        await completeGoalWithTimestamp(goalId);
+    // Auto-complete validation:
+    // If target is reached AND the goal is still active, auto-complete it.
+    // For recurring goals, completeGoal() will also create the next occurrence.
+    if (currentAmount >= goal.target_amount && goal.status === 'active') {
+        // First update the current_amount so it persists
+        if (shouldUpdate && currentAmount !== goal.current_amount) {
+            await supabase
+                .from('user_goals')
+                .update({ current_amount: currentAmount })
+                .eq('id', goalId);
+        }
+        await completeGoal(goalId);
         return {
             ...goal,
             current_amount: currentAmount,
