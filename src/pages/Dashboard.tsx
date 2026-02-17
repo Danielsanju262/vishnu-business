@@ -52,8 +52,28 @@ export default function Dashboard() {
     const dropdownRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        const storedName = localStorage.getItem("dashboard_username");
-        if (storedName) setUserName(storedName);
+        // Load username from database first, fallback to localStorage
+        const loadUsername = async () => {
+            try {
+                const { data } = await supabase
+                    .from('app_settings')
+                    .select('dashboard_username')
+                    .eq('id', 1)
+                    .single();
+                if (data?.dashboard_username) {
+                    setUserName(data.dashboard_username);
+                    localStorage.setItem('dashboard_username', data.dashboard_username);
+                } else {
+                    const storedName = localStorage.getItem('dashboard_username');
+                    if (storedName) setUserName(storedName);
+                }
+            } catch {
+                // Column may not exist yet, fallback to localStorage
+                const storedName = localStorage.getItem('dashboard_username');
+                if (storedName) setUserName(storedName);
+            }
+        };
+        loadUsername();
 
         // Click outside to close dropdown
         const handleClickOutside = (event: MouseEvent) => {
@@ -330,6 +350,7 @@ export default function Dashboard() {
                                     onKeyDown={(e) => {
                                         if (e.key === "Enter") {
                                             localStorage.setItem("dashboard_username", userName);
+                                            supabase.from('app_settings').update({ dashboard_username: userName }).eq('id', 1).then(() => { });
                                             setIsEditingName(false);
                                         }
                                         if (e.key === "Escape") {
@@ -342,6 +363,7 @@ export default function Dashboard() {
                                 <button
                                     onClick={() => {
                                         localStorage.setItem("dashboard_username", userName);
+                                        supabase.from('app_settings').update({ dashboard_username: userName }).eq('id', 1).then(() => { });
                                         setIsEditingName(false);
                                     }}
                                     className="p-3 rounded-full bg-white/10 text-white hover:bg-white/20 active:bg-white/25 transition-all duration-200 focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background"

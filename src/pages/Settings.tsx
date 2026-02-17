@@ -151,6 +151,28 @@ export default function Settings() {
         localStorage.getItem('goal_widget_visible') !== 'false'
     );
 
+    // Load goal widget visibility from database on mount
+    useEffect(() => {
+        const loadGoalWidgetVisibility = async () => {
+            try {
+                const { data } = await supabase
+                    .from('app_settings')
+                    .select('goal_widget_visible')
+                    .eq('id', 1)
+                    .single();
+                if (data && data.goal_widget_visible !== null && data.goal_widget_visible !== undefined) {
+                    const dbValue = data.goal_widget_visible;
+                    setIsGoalWidgetVisible(dbValue);
+                    localStorage.setItem('goal_widget_visible', dbValue ? 'true' : 'false');
+                    window.dispatchEvent(new Event('goal-widget-visibility-changed'));
+                }
+            } catch {
+                // Column may not exist yet, keep localStorage value
+            }
+        };
+        loadGoalWidgetVisibility();
+    }, []);
+
     // useEffect(() => {
     //     fetchLoginActivity();
     // }, []);
@@ -579,6 +601,7 @@ export default function Settings() {
                                 const newValue = !isGoalWidgetVisible;
                                 setIsGoalWidgetVisible(newValue); // Instant UI update
                                 localStorage.setItem('goal_widget_visible', newValue ? 'true' : 'false');
+                                supabase.from('app_settings').update({ goal_widget_visible: newValue }).eq('id', 1).then(() => { });
                                 window.dispatchEvent(new Event('goal-widget-visibility-changed'));
                             }}
                             className={cn(

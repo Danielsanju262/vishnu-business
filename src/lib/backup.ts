@@ -16,7 +16,8 @@ export const exportData = async (onProgress?: (progress: number) => void) => {
         'customers', 'products', 'suppliers', 'expense_presets',
         'transactions', 'expenses', 'payment_reminders', 'accounts_payable', 'app_settings',
         'credit_collections', 'recurring_reminder_configs',
-        'user_goals', 'ai_config', 'ai_memories', 'ai_chat_sessions', 'ai_chat_messages'
+        'user_goals', 'ai_config', 'ai_memories', 'ai_chat_sessions', 'ai_chat_messages',
+        'authorized_devices', 'login_activity', 'backup_config', 'backup_history'
     ];
 
     let completed = 0;
@@ -45,7 +46,8 @@ export const exportData = async (onProgress?: (progress: number) => void) => {
         customers, products, suppliers, expense_presets,
         transactions, expenses, payment_reminders, accounts_payable, app_settings,
         credit_collections, recurring_reminder_configs,
-        user_goals, ai_config, ai_memories, ai_chat_sessions, ai_chat_messages
+        user_goals, ai_config, ai_memories, ai_chat_sessions, ai_chat_messages,
+        authorized_devices, login_activity, backup_config, backup_history
     ] = results;
 
     const backup = {
@@ -70,7 +72,11 @@ export const exportData = async (onProgress?: (progress: number) => void) => {
             ai_config,
             ai_memories,
             ai_chat_sessions,
-            ai_chat_messages
+            ai_chat_messages,
+            authorized_devices,
+            login_activity,
+            backup_config,
+            backup_history
         }
     };
 
@@ -95,6 +101,8 @@ export const getBackupStats = (jsonString: string) => {
             user_goals: backup.data.user_goals?.length || 0,
             ai_memories: backup.data.ai_memories?.length || 0,
             ai_chat_sessions: backup.data.ai_chat_sessions?.length || 0,
+            authorized_devices: backup.data.authorized_devices?.length || 0,
+            login_activity: backup.data.login_activity?.length || 0,
             created_at: backup.meta?.date
         };
     } catch (e) {
@@ -112,7 +120,8 @@ export const getCurrentStats = async () => {
         customers, products, suppliers,
         transactions, expenses, payment_reminders, accounts_payable,
         credit_collections, recurring_reminder_configs,
-        user_goals, ai_config, ai_memories, ai_chat_sessions, ai_chat_messages
+        user_goals, ai_config, ai_memories, ai_chat_sessions, ai_chat_messages,
+        authorized_devices, login_activity, backup_config, backup_history
     ] = await Promise.all([
         fetchCount('customers'),
         fetchCount('products'),
@@ -127,14 +136,19 @@ export const getCurrentStats = async () => {
         fetchCount('ai_config'),
         fetchCount('ai_memories'),
         fetchCount('ai_chat_sessions'),
-        fetchCount('ai_chat_messages')
+        fetchCount('ai_chat_messages'),
+        fetchCount('authorized_devices'),
+        fetchCount('login_activity'),
+        fetchCount('backup_config'),
+        fetchCount('backup_history')
     ]);
 
     return {
         customers, products, suppliers,
         transactions, expenses, payment_reminders, accounts_payable,
         credit_collections, recurring_reminder_configs,
-        user_goals, ai_config, ai_memories, ai_chat_sessions, ai_chat_messages
+        user_goals, ai_config, ai_memories, ai_chat_sessions, ai_chat_messages,
+        authorized_devices, login_activity, backup_config, backup_history
     };
 };
 
@@ -170,7 +184,11 @@ export const importData = async (jsonString: string, onProgress?: (progress: num
         ai_config,
         ai_memories,
         ai_chat_sessions,
-        ai_chat_messages
+        ai_chat_messages,
+        authorized_devices,
+        login_activity,
+        backup_config,
+        backup_history
     } = backup.data;
 
     // Helper: Upsert (Insert or Update)
@@ -214,7 +232,15 @@ export const importData = async (jsonString: string, onProgress?: (progress: num
         { name: 'ai_memories', data: ai_memories, op: 'upsert' },
         { name: 'ai_chat_sessions', data: ai_chat_sessions, op: 'upsert' },
         { name: 'ai_chat_messages', data: ai_chat_messages, op: 'upsert' },
-        // Prune phases
+        { name: 'authorized_devices', data: authorized_devices, op: 'upsert' },
+        { name: 'login_activity', data: login_activity, op: 'upsert' },
+        { name: 'backup_config', data: backup_config, op: 'upsert' },
+        { name: 'backup_history', data: backup_history, op: 'upsert' },
+        // Prune phases (reverse dependency order)
+        { name: 'login_activity', data: login_activity, op: 'prune' },
+        { name: 'authorized_devices', data: authorized_devices, op: 'prune' },
+        { name: 'backup_history', data: backup_history, op: 'prune' },
+        { name: 'backup_config', data: backup_config, op: 'prune' },
         { name: 'ai_chat_messages', data: ai_chat_messages, op: 'prune' },
         { name: 'ai_chat_sessions', data: ai_chat_sessions, op: 'prune' },
         { name: 'ai_memories', data: ai_memories, op: 'prune' },

@@ -138,6 +138,25 @@ export default function GoalBubbleWidget() {
     useEffect(() => {
         loadGoals();
 
+        // Load visibility from database (overrides localStorage)
+        const loadVisibilityFromDB = async () => {
+            try {
+                const { data } = await supabase
+                    .from('app_settings')
+                    .select('goal_widget_visible')
+                    .eq('id', 1)
+                    .single();
+                if (data && data.goal_widget_visible !== null && data.goal_widget_visible !== undefined) {
+                    const dbValue = data.goal_widget_visible;
+                    setIsVisible(dbValue);
+                    localStorage.setItem(WIDGET_VISIBLE_KEY, dbValue ? 'true' : 'false');
+                }
+            } catch {
+                // Column may not exist yet, keep localStorage value
+            }
+        };
+        loadVisibilityFromDB();
+
         const channel = supabase
             .channel('goal-bubble-changes')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'user_goals' }, () => loadGoals())
