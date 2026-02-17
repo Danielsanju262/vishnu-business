@@ -1183,7 +1183,7 @@ export async function generateMorningBriefing(): Promise<MorningBriefing> {
                 title: updated.title,
                 current: updated.current_amount,
                 target: updated.target_amount,
-                deadline: updated.deadline,
+                deadline: updated.deadline || undefined,
                 daysLeft
             });
         }
