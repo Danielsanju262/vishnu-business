@@ -2024,7 +2024,7 @@ export default function Reports() {
                                                                     <div className="flex justify-between items-start mb-2">
                                                                         <div className="flex items-center gap-2">
                                                                             <div className="text-[10px] font-bold text-neutral-400 bg-neutral-800 px-1.5 py-0.5 rounded border border-neutral-700">
-                                                                                {new Date(t.date).toLocaleDateString(undefined, { day: '2-digit', month: 'short' })}
+                                                                                {format(new Date(t.date), "do MMM yyyy")}
                                                                             </div>
                                                                             <span className="text-xs font-bold text-neutral-300">{t.quantity} {t.products?.unit}</span>
                                                                         </div>

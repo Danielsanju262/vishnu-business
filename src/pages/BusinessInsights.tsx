@@ -1342,7 +1342,7 @@ export default function BusinessInsights() {
                                                             <div className="flex justify-between items-start mb-2">
                                                                 <div className="flex items-center gap-2">
                                                                     <div className="text-[10px] font-bold text-zinc-400 bg-zinc-800 px-1.5 py-0.5 rounded border border-zinc-700">
-                                                                        {new Date(t.date).toLocaleDateString(undefined, { day: '2-digit', month: 'short' })}
+                                                                        {format(new Date(t.date), "do MMM yyyy")}
                                                                     </div>
                                                                     <span className="text-xs font-bold text-zinc-300">{t.quantity} {selectedProduct.unit}</span>
                                                                 </div>
@@ -1475,7 +1475,7 @@ export default function BusinessInsights() {
                                                             <div className="flex justify-between items-start mb-2">
                                                                 <div className="flex items-center gap-2">
                                                                     <div className="text-[10px] font-bold text-zinc-400 bg-zinc-800 px-1.5 py-0.5 rounded border border-zinc-700">
-                                                                        {new Date(t.date).toLocaleDateString(undefined, { day: '2-digit', month: 'short' })}
+                                                                        {format(new Date(t.date), "do MMM yyyy")}
                                                                     </div>
                                                                     <span className="text-xs font-bold text-zinc-300">{t.quantity} {group.unit}</span>
                                                                 </div>
