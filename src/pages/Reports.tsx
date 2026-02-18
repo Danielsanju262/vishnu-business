@@ -44,6 +44,7 @@ export default function Reports() {
     // Detail Modal State - synced with browser history
     const [selectedDetail, setSelectedDetail] = useState<'sales' | 'goods' | 'expenses' | 'credit' | 'collections' | null>(null);
     const [selectedCustomer, setSelectedCustomer] = useState<string | null>(null);
+    const [expandedProductGroups, setExpandedProductGroups] = useState<Set<string>>(new Set());
 
     // Customer Report State
     const [customerSearch, setCustomerSearch] = useState("");
@@ -84,6 +85,13 @@ export default function Reports() {
         window.addEventListener('popstate', handlePopState);
         return () => window.removeEventListener('popstate', handlePopState);
     }, [selectedDetail, activeMenuId, showFilters]);
+
+    // Reset expanded groups when customer changes
+    useEffect(() => {
+        if (selectedCustomer) setExpandedProductGroups(new Set());
+    }, [selectedCustomer]);
+
+    // Long Press Refs
 
     // Long Press Refs
     const timerRef = useRef<any>(null);
@@ -1465,37 +1473,41 @@ export default function Reports() {
                         </div>
 
                         <div className="space-y-3">
-                            {filteredCustomers.length === 0 ? (
-                                <div className="text-center py-10 opacity-50">
-                                    <p className="text-sm font-medium">No customers found</p>
+                            <div className="bg-card rounded-2xl border border-border/60 p-4 shadow-sm">
+                                <div className="space-y-2">
+                                    {filteredCustomers.length === 0 ? (
+                                        <div className="text-center py-10 opacity-50">
+                                            <p className="text-sm font-medium">No customers found</p>
+                                        </div>
+                                    ) : (
+                                        filteredCustomers.map((c: any) => (
+                                            <div
+                                                key={c.name}
+                                                onClick={() => setSelectedCustomer(c.name)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === "Enter" || e.key === " ") {
+                                                        e.preventDefault();
+                                                        setSelectedCustomer(c.name);
+                                                    }
+                                                }}
+                                                tabIndex={0}
+                                                role="button"
+                                                className="flex items-center justify-between p-3 rounded-xl cursor-pointer bg-muted/30 hover:bg-muted/50 transition-all group border border-transparent hover:border-border/50"
+                                                aria-label={`View details for ${c.name}`}
+                                            >
+                                                <div>
+                                                    <p className="font-bold text-foreground text-sm md:text-base mb-0.5 group-hover:text-primary transition-colors">{c.name}</p>
+                                                    <p className="text-[10px] md:text-xs text-muted-foreground font-medium">{c.count} items purchased</p>
+                                                </div>
+                                                <div className="text-right flex items-center gap-2 md:gap-3">
+                                                    <p className="text-base md:text-lg font-black text-emerald-600">₹{c.sales.toLocaleString()}</p>
+                                                    <ChevronRight size={16} className="text-muted-foreground/30 group-hover:text-primary group-hover:opacity-100 transition-all" />
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
                                 </div>
-                            ) : (
-                                filteredCustomers.map((c: any) => (
-                                    <div
-                                        key={c.name}
-                                        onClick={() => setSelectedCustomer(c.name)}
-                                        onKeyDown={(e) => {
-                                            if (e.key === "Enter" || e.key === " ") {
-                                                e.preventDefault();
-                                                setSelectedCustomer(c.name);
-                                            }
-                                        }}
-                                        tabIndex={0}
-                                        role="button"
-                                        className="bg-card p-3 md:p-4 rounded-xl border border-border/50 shadow-sm flex items-center justify-between cursor-pointer hover:bg-accent/50 transition-all group focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
-                                        aria-label={`View details for ${c.name}`}
-                                    >
-                                        <div>
-                                            <p className="font-bold text-foreground text-sm md:text-base mb-0.5 group-hover:text-primary transition-colors">{c.name}</p>
-                                            <p className="text-[10px] md:text-xs text-muted-foreground font-medium">{c.count} items purchased</p>
-                                        </div>
-                                        <div className="text-right flex items-center gap-2 md:gap-3">
-                                            <p className="text-base md:text-lg font-black text-emerald-600">₹{c.sales.toLocaleString()}</p>
-                                            <ChevronRight size={16} className="text-muted-foreground/30 group-hover:text-primary group-hover:opacity-100 transition-all" />
-                                        </div>
-                                    </div>
-                                ))
-                            )}
+                            </div>
                         </div>
 
                     </div>
@@ -1932,28 +1944,118 @@ export default function Reports() {
 
                                 </div>
 
-                                <div className="overflow-y-auto p-4 space-y-3 bg-neutral-900">
-                                    {transactions.map((t: any) => (
-                                        <div key={t.id} className="p-3 bg-black/40 border border-neutral-800 rounded-xl space-y-3">
-                                            <div className="flex justify-between items-center border-b border-neutral-800 pb-2">
-                                                <span className="font-bold text-neutral-200 text-sm">{t.products?.name}</span>
-                                                <span className="text-[10px] text-neutral-500 font-bold">{new Date(t.date).toLocaleDateString()}</span>
-                                            </div>
-                                            <div className="flex items-center justify-between gap-4">
-                                                <div className="flex-1">
-                                                    <p className="text-[10px] text-neutral-500 font-bold uppercase mb-0.5">Sold For</p>
-                                                    <p className="text-emerald-500 font-black text-base">₹{(t.quantity * t.sell_price).toLocaleString()}</p>
-                                                    <p className="text-[10px] text-neutral-400 font-medium">{t.quantity} {t.products?.unit} x ₹{t.sell_price}</p>
+                                <div className="overflow-y-auto p-4 space-y-4 bg-neutral-900">
+                                    {(() => {
+                                        // 1. Group transactions by Product
+                                        const grouped: Record<string, { name: string, quantity: number, revenue: number, cost: number, txs: any[] }> = {};
+
+                                        transactions.forEach((t: any) => {
+                                            const pName = t.products?.name || 'Unknown Product';
+                                            if (!grouped[pName]) {
+                                                grouped[pName] = { name: pName, quantity: 0, revenue: 0, cost: 0, txs: [] };
+                                            }
+                                            grouped[pName].quantity += t.quantity;
+                                            grouped[pName].revenue += (t.quantity * t.sell_price);
+                                            grouped[pName].cost += (t.quantity * t.buy_price);
+                                            grouped[pName].txs.push(t);
+                                        });
+
+                                        // 2. Sort products by revenue (desc)
+                                        const sortedGroups = Object.values(grouped).sort((a, b) => b.revenue - a.revenue);
+
+                                        if (sortedGroups.length === 0) {
+                                            return <p className="text-center text-zinc-500 py-8">No purchase history.</p>;
+                                        }
+
+                                        return sortedGroups.map((group) => {
+                                            const isExpanded = expandedProductGroups.has(group.name);
+
+                                            return (
+                                                <div key={group.name} className="bg-black/40 border border-neutral-800 rounded-xl overflow-hidden transition-all">
+                                                    {/* Product Header - Clickable to Toggle */}
+                                                    <div
+                                                        onClick={() => {
+                                                            const newSet = new Set(expandedProductGroups);
+                                                            if (isExpanded) newSet.delete(group.name);
+                                                            else newSet.add(group.name);
+                                                            setExpandedProductGroups(newSet);
+                                                        }}
+                                                        className="p-3 bg-white/5 space-y-3 cursor-pointer hover:bg-white/10 transition-colors"
+                                                    >
+                                                        <div className="flex justify-between items-center">
+                                                            <div className="flex items-center gap-2">
+                                                                <div className={cn("text-neutral-500 transition-transform duration-200", isExpanded ? "rotate-90" : "")}>
+                                                                    <ChevronRight size={16} />
+                                                                </div>
+                                                                <div>
+                                                                    <h4 className="font-bold text-neutral-200 text-sm">{group.name}</h4>
+                                                                    <p className="text-[10px] text-neutral-400 font-medium">
+                                                                        {group.quantity} items • {group.txs.length} orders
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                            <div className="text-right">
+                                                                <p className="text-[10px] font-bold text-neutral-500 uppercase">Profit</p>
+                                                                <p className={cn("text-base font-black", (group.revenue - group.cost) >= 0 ? "text-emerald-500" : "text-rose-500")}>
+                                                                    ₹{(group.revenue - group.cost).toLocaleString()}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Financial Breakdown Row */}
+                                                        <div className="flex items-center gap-4 pt-1 ml-6">
+                                                            <div className="flex-1">
+                                                                <p className="text-[9px] text-neutral-500 font-bold uppercase mb-0.5">Total Sold</p>
+                                                                <p className="text-emerald-500 font-bold text-sm">₹{group.revenue.toLocaleString()}</p>
+                                                            </div>
+                                                            <div className="w-px h-6 bg-white/10"></div>
+                                                            <div className="flex-1 text-right">
+                                                                <p className="text-[9px] text-neutral-500 font-bold uppercase mb-0.5">Total Bought</p>
+                                                                <p className="text-rose-500 font-bold text-sm">₹{group.cost.toLocaleString()}</p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Transactions List - Only visible when expanded */}
+                                                    {isExpanded && (
+                                                        <div className="divide-y divide-white/5 border-t border-white/5 animate-in slide-in-from-top-2 fade-in duration-200">
+                                                            {group.txs.map((t: any, idx: number) => (
+                                                                <div key={t.id || idx} className="p-3 hover:bg-white/5 transition-colors">
+                                                                    <div className="flex justify-between items-start mb-2">
+                                                                        <div className="flex items-center gap-2">
+                                                                            <div className="text-[10px] font-bold text-neutral-400 bg-neutral-800 px-1.5 py-0.5 rounded border border-neutral-700">
+                                                                                {new Date(t.date).toLocaleDateString(undefined, { day: '2-digit', month: 'short' })}
+                                                                            </div>
+                                                                            <span className="text-xs font-bold text-neutral-300">{t.quantity} {t.products?.unit}</span>
+                                                                        </div>
+                                                                        <div className="text-right">
+                                                                            <p className={cn("text-xs font-black", ((t.quantity * t.sell_price) - (t.quantity * t.buy_price)) >= 0 ? "text-emerald-500" : "text-rose-500")}>
+                                                                                {((t.quantity * t.sell_price) - (t.quantity * t.buy_price)) >= 0 ? '+' : ''}₹{((t.quantity * t.sell_price) - (t.quantity * t.buy_price)).toLocaleString()}
+                                                                            </p>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    <div className="flex items-center gap-2 text-[10px] bg-white/5 rounded-lg p-2">
+                                                                        <div className="flex-1">
+                                                                            <span className="text-neutral-500 font-bold uppercase block mb-0.5">Sold</span>
+                                                                            <span className="text-emerald-500 font-bold text-xs">₹{(t.quantity * t.sell_price).toLocaleString()}</span>
+                                                                            <span className="text-neutral-500 ml-1">(@ {t.sell_price})</span>
+                                                                        </div>
+                                                                        <div className="w-px h-6 bg-white/10 mx-1"></div>
+                                                                        <div className="flex-1 text-right">
+                                                                            <span className="text-neutral-500 font-bold uppercase block mb-0.5">Cost</span>
+                                                                            <span className="text-rose-500 font-bold text-xs">₹{(t.quantity * t.buy_price).toLocaleString()}</span>
+                                                                            <span className="text-neutral-500 ml-1">(@ {t.buy_price})</span>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
                                                 </div>
-                                                <div className="w-px h-8 bg-neutral-800"></div>
-                                                <div className="flex-1 text-right">
-                                                    <p className="text-[10px] text-neutral-500 font-bold uppercase mb-0.5">Bought For</p>
-                                                    <p className="text-rose-500 font-black text-base">₹{(t.quantity * t.buy_price).toLocaleString()}</p>
-                                                    <p className="text-[10px] text-neutral-400 font-medium">{t.quantity} {t.products?.unit} x ₹{t.buy_price}</p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
+                                            );
+                                        });
+                                    })()}
                                 </div>
 
                                 <div className="p-5 border-t border-neutral-800 bg-neutral-900 shrink-0">

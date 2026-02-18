@@ -30,6 +30,12 @@ export default function BusinessInsights() {
     const [rangeType, setRangeType] = useState<DateRangeType>("month");
     const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
     const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
+    const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+
+    // Reset expanded groups when modal selection changes
+    useEffect(() => {
+        if (selectedProduct || selectedCustomer) setExpandedGroups(new Set());
+    }, [selectedProduct, selectedCustomer]);
     const [selectedChartDay, setSelectedChartDay] = useState<string | null>(null);
     const [chartAggregation, setChartAggregation] = useState<ChartAggregationType>('day');
     const chartRef = useRef<HTMLDivElement>(null);
@@ -1254,37 +1260,120 @@ export default function BusinessInsights() {
                                 <p className="text-xs text-zinc-400">Customer Wise Breakdown ({rangeType})</p>
                             </div>
                         </div>
-                        <div className="p-4 overflow-y-auto space-y-2 max-h-[400px]">
-                            {data.transactions
-                                .filter(t => (t.products?.name === selectedProduct.name))
-                                .sort((a, b) => b.quantity - a.quantity)
-                                .map((t, i) => (
-                                    <div key={i} className="flex justify-between items-center p-3 bg-zinc-900 rounded-xl border border-zinc-800/50">
-                                        <div>
-                                            <p className="text-sm font-bold text-zinc-200">{t.customers?.name || 'Walk-in'}</p>
-                                            <p className="text-[10px] text-zinc-500">{format(new Date(t.date), 'dd MMM yyyy')}</p>
+                        <div className="p-4 overflow-y-auto space-y-4 max-h-[60vh] bg-zinc-950">
+                            {(() => {
+                                // 1. Group transactions by Customer
+                                const grouped: Record<string, { name: string, quantity: number, revenue: number, cost: number, txs: any[] }> = {};
+
+                                const productTxs = data.transactions.filter(t => t.products?.name === selectedProduct.name);
+
+                                if (productTxs.length === 0) {
+                                    return <p className="text-center text-zinc-500 py-8">No sales found for this period.</p>;
+                                }
+
+                                productTxs.forEach((t: any) => {
+                                    const cName = t.customers?.name || 'Walk-in Customer';
+                                    if (!grouped[cName]) {
+                                        grouped[cName] = { name: cName, quantity: 0, revenue: 0, cost: 0, txs: [] };
+                                    }
+                                    grouped[cName].quantity += t.quantity;
+                                    grouped[cName].revenue += (t.quantity * t.sell_price);
+                                    grouped[cName].cost += (t.quantity * t.buy_price);
+                                    grouped[cName].txs.push(t);
+                                });
+
+                                // 2. Sort customers by revenue
+                                const sortedGroups = Object.values(grouped).sort((a, b) => b.revenue - a.revenue);
+
+                                return sortedGroups.map((group) => {
+                                    const isExpanded = expandedGroups.has(group.name);
+
+                                    return (
+                                        <div key={group.name} className="bg-black/40 border border-zinc-800 rounded-xl overflow-hidden transition-all">
+                                            {/* Header - Toggle */}
+                                            <div
+                                                onClick={() => {
+                                                    const newSet = new Set(expandedGroups);
+                                                    if (isExpanded) newSet.delete(group.name);
+                                                    else newSet.add(group.name);
+                                                    setExpandedGroups(newSet);
+                                                }}
+                                                className="p-3 bg-white/5 space-y-3 cursor-pointer hover:bg-white/10 transition-colors"
+                                            >
+                                                <div className="flex justify-between items-center">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className={cn("text-zinc-500 transition-transform duration-200", isExpanded ? "rotate-90" : "")}>
+                                                            <ChevronRight size={16} />
+                                                        </div>
+                                                        <div>
+                                                            <h4 className="font-bold text-zinc-200 text-sm">{group.name}</h4>
+                                                            <p className="text-[10px] text-zinc-400 font-medium">
+                                                                Bought {group.quantity} {selectedProduct.unit} • {group.txs.length} orders
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className="text-[10px] font-bold text-zinc-500 uppercase">Profit</p>
+                                                        <p className={cn("text-base font-black", (group.revenue - group.cost) >= 0 ? "text-emerald-500" : "text-rose-500")}>
+                                                            ₹{(group.revenue - group.cost).toLocaleString()}
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                {/* Financial Breakdown */}
+                                                <div className="flex items-center gap-4 pt-1 ml-6">
+                                                    <div className="flex-1">
+                                                        <p className="text-[9px] text-zinc-500 font-bold uppercase mb-0.5">Total Sold</p>
+                                                        <p className="text-emerald-500 font-bold text-sm">₹{group.revenue.toLocaleString()}</p>
+                                                    </div>
+                                                    <div className="w-px h-6 bg-white/10"></div>
+                                                    <div className="flex-1 text-right">
+                                                        <p className="text-[9px] text-zinc-500 font-bold uppercase mb-0.5">Total Cost</p>
+                                                        <p className="text-rose-500 font-bold text-sm">₹{group.cost.toLocaleString()}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Transactions List */}
+                                            {isExpanded && (
+                                                <div className="divide-y divide-white/5 border-t border-white/5 animate-in slide-in-from-top-2 fade-in duration-200">
+                                                    {group.txs.map((t: any, idx: number) => (
+                                                        <div key={t.id || idx} className="p-3 hover:bg-white/5 transition-colors">
+                                                            <div className="flex justify-between items-start mb-2">
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className="text-[10px] font-bold text-zinc-400 bg-zinc-800 px-1.5 py-0.5 rounded border border-zinc-700">
+                                                                        {new Date(t.date).toLocaleDateString(undefined, { day: '2-digit', month: 'short' })}
+                                                                    </div>
+                                                                    <span className="text-xs font-bold text-zinc-300">{t.quantity} {selectedProduct.unit}</span>
+                                                                </div>
+                                                                <div className="text-right">
+                                                                    <p className={cn("text-xs font-black", ((t.quantity * t.sell_price) - (t.quantity * t.buy_price)) >= 0 ? "text-emerald-500" : "text-rose-500")}>
+                                                                        {((t.quantity * t.sell_price) - (t.quantity * t.buy_price)) >= 0 ? '+' : ''}₹{((t.quantity * t.sell_price) - (t.quantity * t.buy_price)).toLocaleString()}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="flex items-center gap-2 text-[10px] bg-white/5 rounded-lg p-2">
+                                                                <div className="flex-1">
+                                                                    <span className="text-zinc-500 font-bold uppercase block mb-0.5">Sold</span>
+                                                                    <span className="text-emerald-500 font-bold text-xs">₹{(t.quantity * t.sell_price).toLocaleString()}</span>
+                                                                    <span className="text-zinc-500 ml-1">(@ {t.sell_price})</span>
+                                                                </div>
+                                                                <div className="w-px h-6 bg-white/10 mx-1"></div>
+                                                                <div className="flex-1 text-right">
+                                                                    <span className="text-zinc-500 font-bold uppercase block mb-0.5">Cost</span>
+                                                                    <span className="text-rose-500 font-bold text-xs">₹{(t.quantity * t.buy_price).toLocaleString()}</span>
+                                                                    <span className="text-zinc-500 ml-1">(@ {t.buy_price})</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
-                                        <div className="text-right">
-                                            <p className="text-sm font-bold text-emerald-500">₹{(t.quantity * t.sell_price).toLocaleString()}</p>
-                                            <p className="text-[10px] text-zinc-400">{t.quantity} {t.products?.unit}</p>
-                                        </div>
-                                    </div>
-                                ))}
-                            {data.transactions.filter(t => t.products?.name === selectedProduct.name).length === 0 && (
-                                <p className="text-center text-zinc-500 py-4">No transactions found.</p>
-                            )}
-                        </div>
-                        {/* Summary Footer */}
-                        <div className="p-4 border-t border-zinc-800 bg-zinc-900/50">
-                            <div className="flex justify-between items-center">
-                                <p className="text-xs font-bold text-zinc-400 uppercase">Total Revenue</p>
-                                <p className="text-lg font-black text-emerald-500">
-                                    ₹{data.transactions
-                                        .filter(t => t.products?.name === selectedProduct.name)
-                                        .reduce((sum, t) => sum + (t.quantity * t.sell_price), 0)
-                                        .toLocaleString()}
-                                </p>
-                            </div>
+                                    );
+                                });
+                            })()}
                         </div>
                     </>
                 )}
@@ -1304,53 +1393,120 @@ export default function BusinessInsights() {
                                 <p className="text-xs text-zinc-400">Product Wise Breakdown ({rangeType})</p>
                             </div>
                         </div>
-                        <div className="p-4 overflow-y-auto space-y-2 max-h-[400px]">
+                        <div className="p-4 overflow-y-auto space-y-4 max-h-[60vh] bg-zinc-950">
                             {(() => {
-                                // Aggregate products for this customer
-                                const productStats: Record<string, { name: string; quantity: number; revenue: number; unit: string }> = {};
-                                data.transactions
-                                    .filter(t => t.customer_id === selectedCustomer.id)
-                                    .forEach(t => {
-                                        const name = t.products?.name || 'Unknown';
-                                        if (!productStats[name]) {
-                                            productStats[name] = { name, quantity: 0, revenue: 0, unit: t.products?.unit || '' };
-                                        }
-                                        productStats[name].quantity += t.quantity;
-                                        productStats[name].revenue += (t.quantity * t.sell_price);
-                                    });
+                                // 1. Group transactions by Product
+                                const grouped: Record<string, { name: string, quantity: number, revenue: number, cost: number, txs: any[], unit: string }> = {};
 
-                                const sortedProducts = Object.values(productStats).sort((a, b) => b.revenue - a.revenue);
+                                const customerTxs = data.transactions.filter(t => t.customer_id === selectedCustomer.id);
 
-                                if (sortedProducts.length === 0) {
-                                    return <p className="text-center text-zinc-500 py-4">No purchases found.</p>;
+                                if (customerTxs.length === 0) {
+                                    return <p className="text-center text-zinc-500 py-8">No purchases found for this period.</p>;
                                 }
 
-                                return sortedProducts.map((prod, i) => (
-                                    <div key={i} className="flex justify-between items-center p-3 bg-zinc-900 rounded-xl border border-zinc-800/50">
-                                        <div>
-                                            <p className="text-sm font-bold text-zinc-200">{prod.name}</p>
-                                            <div className="flex items-center gap-2">
-                                                <span className={cn("text-[10px] px-1.5 py-0.5 rounded text-zinc-950 font-bold", i === 0 ? "bg-amber-500" : i === 1 ? "bg-zinc-400" : "bg-zinc-700 text-zinc-300")}>
-                                                    #{i + 1}
-                                                </span>
+                                customerTxs.forEach((t: any) => {
+                                    const pName = t.products?.name || 'Unknown Product';
+                                    if (!grouped[pName]) {
+                                        grouped[pName] = { name: pName, quantity: 0, revenue: 0, cost: 0, txs: [], unit: t.products?.unit || '' };
+                                    }
+                                    grouped[pName].quantity += t.quantity;
+                                    grouped[pName].revenue += (t.quantity * t.sell_price);
+                                    grouped[pName].cost += (t.quantity * t.buy_price);
+                                    grouped[pName].txs.push(t);
+                                });
+
+                                // 2. Sort by revenue
+                                const sortedGroups = Object.values(grouped).sort((a, b) => b.revenue - a.revenue);
+
+                                return sortedGroups.map((group) => {
+                                    const isExpanded = expandedGroups.has(group.name);
+
+                                    return (
+                                        <div key={group.name} className="bg-black/40 border border-zinc-800 rounded-xl overflow-hidden transition-all">
+                                            {/* Header - Toggle */}
+                                            <div
+                                                onClick={() => {
+                                                    const newSet = new Set(expandedGroups);
+                                                    if (isExpanded) newSet.delete(group.name);
+                                                    else newSet.add(group.name);
+                                                    setExpandedGroups(newSet);
+                                                }}
+                                                className="p-3 bg-white/5 space-y-3 cursor-pointer hover:bg-white/10 transition-colors"
+                                            >
+                                                <div className="flex justify-between items-center">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className={cn("text-zinc-500 transition-transform duration-200", isExpanded ? "rotate-90" : "")}>
+                                                            <ChevronRight size={16} />
+                                                        </div>
+                                                        <div>
+                                                            <h4 className="font-bold text-zinc-200 text-sm">{group.name}</h4>
+                                                            <p className="text-[10px] text-zinc-400 font-medium">
+                                                                Bought {group.quantity} {group.unit} • {group.txs.length} orders
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className="text-[10px] font-bold text-zinc-500 uppercase">Profit</p>
+                                                        <p className={cn("text-base font-black", (group.revenue - group.cost) >= 0 ? "text-emerald-500" : "text-rose-500")}>
+                                                            ₹{(group.revenue - group.cost).toLocaleString()}
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                {/* Financial Breakdown */}
+                                                <div className="flex items-center gap-4 pt-1 ml-6">
+                                                    <div className="flex-1">
+                                                        <p className="text-[9px] text-zinc-500 font-bold uppercase mb-0.5">Total Sold</p>
+                                                        <p className="text-emerald-500 font-bold text-sm">₹{group.revenue.toLocaleString()}</p>
+                                                    </div>
+                                                    <div className="w-px h-6 bg-white/10"></div>
+                                                    <div className="flex-1 text-right">
+                                                        <p className="text-[9px] text-zinc-500 font-bold uppercase mb-0.5">Total Cost</p>
+                                                        <p className="text-rose-500 font-bold text-sm">₹{group.cost.toLocaleString()}</p>
+                                                    </div>
+                                                </div>
                                             </div>
+
+                                            {/* Transactions List */}
+                                            {isExpanded && (
+                                                <div className="divide-y divide-white/5 border-t border-white/5 animate-in slide-in-from-top-2 fade-in duration-200">
+                                                    {group.txs.map((t: any, idx: number) => (
+                                                        <div key={t.id || idx} className="p-3 hover:bg-white/5 transition-colors">
+                                                            <div className="flex justify-between items-start mb-2">
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className="text-[10px] font-bold text-zinc-400 bg-zinc-800 px-1.5 py-0.5 rounded border border-zinc-700">
+                                                                        {new Date(t.date).toLocaleDateString(undefined, { day: '2-digit', month: 'short' })}
+                                                                    </div>
+                                                                    <span className="text-xs font-bold text-zinc-300">{t.quantity} {group.unit}</span>
+                                                                </div>
+                                                                <div className="text-right">
+                                                                    <p className={cn("text-xs font-black", ((t.quantity * t.sell_price) - (t.quantity * t.buy_price)) >= 0 ? "text-emerald-500" : "text-rose-500")}>
+                                                                        {((t.quantity * t.sell_price) - (t.quantity * t.buy_price)) >= 0 ? '+' : ''}₹{((t.quantity * t.sell_price) - (t.quantity * t.buy_price)).toLocaleString()}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="flex items-center gap-2 text-[10px] bg-white/5 rounded-lg p-2">
+                                                                <div className="flex-1">
+                                                                    <span className="text-zinc-500 font-bold uppercase block mb-0.5">Sold</span>
+                                                                    <span className="text-emerald-500 font-bold text-xs">₹{(t.quantity * t.sell_price).toLocaleString()}</span>
+                                                                    <span className="text-zinc-500 ml-1">(@ {t.sell_price})</span>
+                                                                </div>
+                                                                <div className="w-px h-6 bg-white/10 mx-1"></div>
+                                                                <div className="flex-1 text-right">
+                                                                    <span className="text-zinc-500 font-bold uppercase block mb-0.5">Cost</span>
+                                                                    <span className="text-rose-500 font-bold text-xs">₹{(t.quantity * t.buy_price).toLocaleString()}</span>
+                                                                    <span className="text-zinc-500 ml-1">(@ {t.buy_price})</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
-                                        <div className="text-right">
-                                            <p className="text-sm font-bold text-emerald-500">₹{prod.revenue.toLocaleString()}</p>
-                                            <p className="text-[10px] text-zinc-400">{prod.quantity} {prod.unit}</p>
-                                        </div>
-                                    </div>
-                                ));
+                                    );
+                                });
                             })()}
-                        </div>
-                        {/* Summary Footer */}
-                        <div className="p-4 border-t border-zinc-800 bg-zinc-900/50">
-                            <div className="flex justify-between items-center">
-                                <p className="text-xs font-bold text-zinc-400 uppercase">Total Spent</p>
-                                <p className="text-lg font-black text-emerald-500">
-                                    ₹{selectedCustomer.revenue.toLocaleString()}
-                                </p>
-                            </div>
                         </div>
                     </>
                 )}
