@@ -23,6 +23,16 @@ const base64urlToBuffer = (base64url: string) => {
     return bytes.buffer;
 };
 
+// Timeout helper for supabase requests
+const withTimeout = (promise: any, ms = 8000): Promise<any> => {
+    return Promise.race([
+        Promise.resolve(promise),
+        new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Request timed out. Please check your internet connection.')), ms)
+        )
+    ]);
+};
+
 // Random challenge generator for WebAuthn
 const getChallenge = () => {
     return Uint8Array.from(window.crypto.getRandomValues(new Uint8Array(32)));
@@ -226,11 +236,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             let serverPinVersion = 1;
             let hasSuperAdmin = false;
             try {
-                const { data: settings } = await supabase
-                    .from('app_settings')
-                    .select('pin_version, super_admin_pin')
-                    .eq('id', 1)
-                    .single();
+                const { data: settings } = await withTimeout(
+                    supabase
+                        .from('app_settings')
+                        .select('pin_version, super_admin_pin')
+                        .eq('id', 1)
+                        .single()
+                );
                 serverPinVersion = settings?.pin_version || 1;
                 hasSuperAdmin = !!settings?.super_admin_pin;
 
@@ -264,15 +276,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
             // Check device specific revocation
             if (deviceId) {
-                const { data: deviceData } = await supabase
-                    .from('authorized_devices')
-                    .select('fingerprint_enabled')
-                    .eq('device_id', deviceId)
-                    .single();
+                try {
+                    const { data: deviceData } = await withTimeout(
+                        supabase
+                            .from('authorized_devices')
+                            .select('fingerprint_enabled')
+                            .eq('device_id', deviceId)
+                            .single(),
+                        5000 // Shorter timeout for background checks
+                    );
 
-                // If fingerprint was revoked remotely but we think we have it, disable it locally
-                if (deviceData && !deviceData.fingerprint_enabled && hasBiometrics) {
-                    revokeLocalBiometrics("Access revoked by administrator.");
+                    // If fingerprint was revoked remotely but we think we have it, disable it locally
+                    if (deviceData && !deviceData.fingerprint_enabled && hasBiometrics) {
+                        revokeLocalBiometrics("Access revoked by administrator.");
+                    }
+                } catch (e) {
+                    console.warn('[CheckAuthStatus] Failed to check device specific revocation:', e);
                 }
             }
 
@@ -403,8 +422,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             await logLoginActivity(deviceId, getDeviceName(), 'security_bypass');
 
             return { success: true };
-        } catch (error) {
+        } catch (error: any) {
             console.error('Failed to enable security bypass:', error);
+            if (error?.message?.includes('timed out') || error?.message?.includes('Failed to fetch') || error?.message?.includes('NetworkError')) {
+                return { success: false, error: 'Network error. Please check your connection.' };
+            }
             return { success: false, error: 'Failed to enable security bypass' };
         }
     };
@@ -592,11 +614,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const authenticateMasterPin = async (pin: string) => {
         try {
             // Only select master_pin to avoid errors if pin_version doesn't exist
-            const { data, error } = await supabase
-                .from('app_settings')
-                .select('master_pin')
-                .eq('id', 1)
-                .single();
+            const { data, error } = await withTimeout(
+                supabase
+                    .from('app_settings')
+                    .select('master_pin')
+                    .eq('id', 1)
+                    .single()
+            );
 
             if (error && error.code !== 'PGRST116') throw error;
 
@@ -633,8 +657,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             } else {
                 return false;
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('PIN verification error:', error);
+            if (error?.message?.includes('timed out') || error?.message?.includes('Failed to fetch') || error?.message?.includes('NetworkError')) {
+                toast("Network error. Please check your connection.", "error");
+                throw error;
+            }
             toast("Error verifying PIN", "error");
             return false;
         }
@@ -643,17 +671,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Validate Super Admin PIN
     const validateSuperAdminPin = async (pin: string): Promise<boolean> => {
         try {
-            const { data, error } = await supabase
-                .from('app_settings')
-                .select('super_admin_pin')
-                .eq('id', 1)
-                .single();
+            const { data, error } = await withTimeout(
+                supabase
+                    .from('app_settings')
+                    .select('super_admin_pin')
+                    .eq('id', 1)
+                    .single()
+            );
 
             if (error && error.code !== 'PGRST116') throw error;
 
             return data?.super_admin_pin === pin;
-        } catch (error) {
+        } catch (error: any) {
             console.error('Super Admin PIN validation error:', error);
+            if (error?.message?.includes('timed out') || error?.message?.includes('Failed to fetch') || error?.message?.includes('NetworkError')) {
+                throw error;
+            }
             return false;
         }
     };
@@ -690,8 +723,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             await logLoginActivity(deviceId, getDeviceName(), 'super_admin_pin');
 
             return true;
-        } catch (error) {
+        } catch (error: any) {
             console.error('Super Admin authentication error:', error);
+            if (error?.message?.includes('timed out') || error?.message?.includes('Failed to fetch') || error?.message?.includes('NetworkError')) {
+                toast("Network error. Please check your connection.", "error");
+                throw error;
+            }
             toast("Error verifying Super Admin PIN", "error");
             return false;
         }

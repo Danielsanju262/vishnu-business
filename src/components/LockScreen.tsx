@@ -189,18 +189,24 @@ export default function LockScreen() {
         }
 
         setLoading(true);
-        const success = await authenticateMasterPin(pin);
-        setLoading(false);
+        try {
+            const success = await authenticateMasterPin(pin);
 
-        if (!success) {
-            setError(true);
+            if (!success) {
+                setError(true);
+                setPin("");
+                setTimeout(() => setError(false), 500);
+                handleFailedAttempt();
+            } else {
+                // Clear lockout on success
+                clearLockoutState();
+                setLockoutState(getDefaultLockoutState());
+            }
+        } catch (error) {
             setPin("");
-            setTimeout(() => setError(false), 500);
-            handleFailedAttempt();
-        } else {
-            // Clear lockout on success
-            clearLockoutState();
-            setLockoutState(getDefaultLockoutState());
+            // Don't call handleFailedAttempt on network errors
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -213,20 +219,25 @@ export default function LockScreen() {
 
         setLoading(true);
 
-        const success = await authenticateSuperAdmin(superAdminPin);
+        try {
+            const success = await authenticateSuperAdmin(superAdminPin);
 
-        if (!success) {
-            setError(true);
+            if (!success) {
+                setError(true);
+                setSuperAdminPin("");
+                setTimeout(() => setError(false), 500);
+                handleFailedAttempt();
+            } else {
+                // Clear lockout on success
+                clearLockoutState();
+                setLockoutState(getDefaultLockoutState());
+            }
+        } catch (error) {
             setSuperAdminPin("");
-            setTimeout(() => setError(false), 500);
-            handleFailedAttempt();
-        } else {
-            // Clear lockout on success
-            clearLockoutState();
-            setLockoutState(getDefaultLockoutState());
+            // Don't call handleFailedAttempt on network errors
+        } finally {
+            setLoading(false);
         }
-
-        setLoading(false);
     };
 
     // Handle security bypass (skip login for 3 days)
@@ -245,9 +256,14 @@ export default function LockScreen() {
             setError(true);
             setBypassPin("");
             setTimeout(() => setError(false), 500);
-            handleFailedAttempt();
-            if (result.error) {
+
+            if (result.error?.includes('Network error')) {
                 toast(result.error, "error");
+            } else {
+                handleFailedAttempt();
+                if (result.error) {
+                    toast(result.error, "error");
+                }
             }
         } else {
             // Clear lockout on success

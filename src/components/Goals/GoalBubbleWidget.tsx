@@ -31,6 +31,7 @@ import { supabase } from '../../lib/supabase';
 const WIDGET_VISIBLE_KEY = 'goal_widget_visible';
 const WIDGET_POSITION_KEY = 'goal_widget_position_v2';
 const WIDGET_AUTO_OPENED_KEY = 'goal_widget_auto_opened'; // Session storage - tracks if we auto-opened this session
+const WIDGET_FIRST_CLOSE_DONE_KEY = 'goal_widget_first_close_done';
 
 interface WidgetPosition {
     side: 'left' | 'right';
@@ -53,6 +54,14 @@ function shouldAutoOpen(): boolean {
 // Mark that we've auto-opened this session
 function markAutoOpened(): void {
     sessionStorage.setItem(WIDGET_AUTO_OPENED_KEY, 'true');
+}
+
+function hasCompletedFirstClose(): boolean {
+    return sessionStorage.getItem(WIDGET_FIRST_CLOSE_DONE_KEY) === 'true';
+}
+
+function markFirstCloseCompleted(): void {
+    sessionStorage.setItem(WIDGET_FIRST_CLOSE_DONE_KEY, 'true');
 }
 
 function setWidgetVisibility(visible: boolean): void {
@@ -86,6 +95,8 @@ export default function GoalBubbleWidget() {
     const [isOpen, setIsOpen] = useState(false);
     const [openModalCount, setOpenModalCount] = useState(0);
     const [listenerRefreshKey, setListenerRefreshKey] = useState(0);
+    const [isCountingDown, setIsCountingDown] = useState(false);
+    const abortCountdownRef = useRef(false);
 
     // Goals data
     const [goals, setGoals] = useState<UserGoal[]>([]);
@@ -250,6 +261,8 @@ export default function GoalBubbleWidget() {
     // Back button handling
     useEffect(() => {
         const handlePopState = () => {
+            abortCountdownRef.current = true;
+            setIsCountingDown(false);
             if (isOpen) setIsOpen(false);
         };
         window.addEventListener('popstate', handlePopState);
@@ -261,8 +274,30 @@ export default function GoalBubbleWidget() {
         if (isOpen) window.history.back();
     };
 
+    // Handle closing attempt (X or click outside)
+    const handleAttemptClose = () => {
+        if (isCountingDown) return;
+
+        if (!hasCompletedFirstClose()) {
+            setIsCountingDown(true);
+            abortCountdownRef.current = false;
+
+            setTimeout(() => {
+                if (abortCountdownRef.current) return;
+                setIsCountingDown(false);
+                markFirstCloseCompleted();
+                if (isOpen) {
+                    window.history.back();
+                }
+            }, 3000);
+        } else {
+            handleClose();
+        }
+    };
+
     // Hide widget
     const hideWidget = () => {
+        abortCountdownRef.current = true;
         setIsVisible(false);
         setWidgetVisibility(false);
         handleClose();
@@ -271,6 +306,7 @@ export default function GoalBubbleWidget() {
 
     // Expand to full goals dashboard
     const handleExpand = () => {
+        abortCountdownRef.current = true;
         if (isOpen) {
             window.history.back();
             setTimeout(() => navigate('/insights/goals'), 10);
@@ -459,6 +495,17 @@ export default function GoalBubbleWidget() {
 
     return createPortal(
         <>
+            <style>{`
+                @keyframes goalFlicker {
+                    0%, 100% { opacity: 1; box-shadow: 0 0 20px rgba(168,85,247,0.9); border-color: rgba(168,85,247,1); background-color: rgba(168,85,247,0.35); transform: scale(1.02); }
+                    50% { opacity: 0.8; box-shadow: 0 0 5px rgba(168,85,247,0.2); border-color: rgba(168,85,247,0.4); background-color: rgba(168,85,247,0.1); transform: scale(1); }
+                }
+                .goal-flicker-active {
+                    animation: goalFlicker 0.4s infinite ease-in-out;
+                    z-index: 10;
+                    position: relative;
+                }
+            `}</style>
             {/* Remove Zone */}
             {isDragging && (
                 <div
@@ -512,7 +559,7 @@ export default function GoalBubbleWidget() {
             {isOpen && (
                 <div
                     className="fixed inset-0 z-[210] flex items-start justify-center pointer-events-auto bg-black/60 backdrop-blur-sm transition-all duration-300 pt-20"
-                    onClick={handleClose}
+                    onClick={handleAttemptClose}
                 >
                     <div
                         onClick={(e) => e.stopPropagation()}
@@ -543,7 +590,7 @@ export default function GoalBubbleWidget() {
                                     <button onClick={handleExpand} className="p-2 rounded-lg hover:bg-white/10 text-white/50 hover:text-white transition-colors" title="View all">
                                         <Maximize2 size={16} />
                                     </button>
-                                    <button onClick={handleClose} className="p-2 rounded-lg hover:bg-white/10 text-white/50 hover:text-white transition-colors">
+                                    <button onClick={handleAttemptClose} className="p-2 rounded-lg hover:bg-white/10 text-white/50 hover:text-white transition-colors">
                                         <X size={16} />
                                     </button>
                                 </div>
@@ -565,7 +612,9 @@ export default function GoalBubbleWidget() {
                                     <p className="text-xs text-neutral-400">Set your first goal to track progress!</p>
                                 </div>
                             ) : (
-                                goals.map((goal) => {
+                                goals.map((goal, index) => {
+                                    const isFirstGoal = index === 0;
+                                    const isFlickering = isCountingDown && isFirstGoal;
                                     const progress = (goal.current_amount / goal.target_amount) * 100;
                                     const isComplete = progress >= 100;
                                     const daysLeft = goal.deadline ? differenceInDays(new Date(goal.deadline), new Date()) : null;
@@ -577,9 +626,10 @@ export default function GoalBubbleWidget() {
                                             key={goal.id}
                                             className={cn(
                                                 "p-3 rounded-xl border transition-all",
-                                                isOverdue ? "bg-red-500/10 border-red-500/30" :
-                                                    isComplete ? "bg-emerald-500/10 border-emerald-500/30" :
-                                                        "bg-white/5 border-white/10"
+                                                isFlickering ? "goal-flicker-active" :
+                                                    isOverdue ? "bg-red-500/10 border-red-500/30" :
+                                                        isComplete ? "bg-emerald-500/10 border-emerald-500/30" :
+                                                            "bg-white/5 border-white/10"
                                             )}
                                         >
                                             <div className="flex items-start justify-between mb-2">

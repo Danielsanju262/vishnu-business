@@ -38,6 +38,16 @@ const clearLockoutState = () => {
     localStorage.removeItem(LOCKOUT_STORAGE_KEY);
 };
 
+// Timeout helper for supabase requests
+const withTimeout = (promise: any, ms = 8000): Promise<any> => {
+    return Promise.race([
+        Promise.resolve(promise),
+        new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Request timed out. Please check your internet connection.')), ms)
+        )
+    ]);
+};
+
 export default function MasterPinSetup({ onSuccess }: { onSuccess: () => void }) {
     const { toast } = useToast();
     const [pin, setPin] = useState('');
@@ -97,18 +107,14 @@ export default function MasterPinSetup({ onSuccess }: { onSuccess: () => void })
 
     const checkExistingPin = async () => {
         try {
-            const checkQuery = supabase
-                .from('app_settings')
-                .select('master_pin')
-                .eq('id', 1)
-                .single();
-
-            const timeout = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('Timeout')), 5000)
-            );
-
-            // Use race to prevent hanging
-            const { data, error } = await Promise.race([checkQuery, timeout]) as any;
+            const { data, error } = await withTimeout(
+                supabase
+                    .from('app_settings')
+                    .select('master_pin')
+                    .eq('id', 1)
+                    .single(),
+                5000
+            ) as any;
 
             if (error && error.code !== 'PGRST116') {
                 console.error(error);
@@ -190,9 +196,11 @@ export default function MasterPinSetup({ onSuccess }: { onSuccess: () => void })
 
         setIsCreating(true);
         try {
-            const { error } = await supabase
-                .from('app_settings')
-                .upsert({ id: 1, master_pin: pin, pin_version: 1 });
+            const { error } = await withTimeout(
+                supabase
+                    .from('app_settings')
+                    .upsert({ id: 1, master_pin: pin, pin_version: 1 })
+            );
 
             if (error) throw error;
 
@@ -217,11 +225,13 @@ export default function MasterPinSetup({ onSuccess }: { onSuccess: () => void })
         setIsCreating(true);
 
         try {
-            const { data, error } = await supabase
-                .from('app_settings')
-                .select('master_pin, pin_version')
-                .eq('id', 1)
-                .single();
+            const { data, error } = await withTimeout(
+                supabase
+                    .from('app_settings')
+                    .select('master_pin, pin_version')
+                    .eq('id', 1)
+                    .single()
+            );
 
             if (error) throw error;
 
@@ -265,7 +275,11 @@ export default function MasterPinSetup({ onSuccess }: { onSuccess: () => void })
                 handleFailedAttempt();
             }
         } catch (error: any) {
-            toast("Verification failed", "error");
+            if (error?.message?.includes('timed out') || error?.message?.includes('Failed to fetch') || error?.message?.includes('NetworkError')) {
+                toast("Network error. Please check your connection.", "error");
+            } else {
+                toast("Verification failed", "error");
+            }
         } finally {
             setIsCreating(false);
         }
@@ -282,11 +296,13 @@ export default function MasterPinSetup({ onSuccess }: { onSuccess: () => void })
 
         try {
             // Verify Super Admin PIN
-            const { data, error: fetchError } = await supabase
-                .from('app_settings')
-                .select('super_admin_pin, pin_version')
-                .eq('id', 1)
-                .single();
+            const { data, error: fetchError } = await withTimeout(
+                supabase
+                    .from('app_settings')
+                    .select('super_admin_pin, pin_version')
+                    .eq('id', 1)
+                    .single()
+            );
 
             if (fetchError) {
                 toast("Failed to verify. Please try again.", "error");
@@ -339,9 +355,13 @@ export default function MasterPinSetup({ onSuccess }: { onSuccess: () => void })
                 setSuperAdminPin("");
                 handleFailedAttempt();
             }
-        } catch (err) {
+        } catch (err: any) {
             console.error("Super Admin unlock error:", err);
-            toast("Something went wrong. Please try again.", "error");
+            if (err?.message?.includes('timed out') || err?.message?.includes('Failed to fetch') || err?.message?.includes('NetworkError')) {
+                toast("Network error. Please check your connection.", "error");
+            } else {
+                toast("Something went wrong. Please try again.", "error");
+            }
         } finally {
             setIsCreating(false);
         }
@@ -361,10 +381,10 @@ export default function MasterPinSetup({ onSuccess }: { onSuccess: () => void })
                 {/* Header */}
                 <div className="text-center space-y-3">
                     <div className={`w-20 h-20 mx-auto rounded-2xl flex items-center justify-center shadow-xl ${isLockedOut
-                            ? 'bg-gradient-to-br from-rose-500 to-rose-600 shadow-rose-500/30'
-                            : showForgotPin
-                                ? 'bg-gradient-to-br from-amber-500 to-amber-600 shadow-amber-500/30'
-                                : 'bg-gradient-to-br from-primary to-blue-600 shadow-primary/30'
+                        ? 'bg-gradient-to-br from-rose-500 to-rose-600 shadow-rose-500/30'
+                        : showForgotPin
+                            ? 'bg-gradient-to-br from-amber-500 to-amber-600 shadow-amber-500/30'
+                            : 'bg-gradient-to-br from-primary to-blue-600 shadow-primary/30'
                         }`}>
                         {isLockedOut ? (
                             <Clock className="text-white" size={36} />
