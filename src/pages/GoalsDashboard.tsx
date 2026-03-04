@@ -499,8 +499,8 @@ export default function GoalsDashboard() {
 
     // Separate goals by status
     const activeGoals = goals.filter(g => g.status === 'active');
-    const completedGoals = goals.filter(g => g.status === 'completed');
-    const incompleteGoals = goals.filter(g => g.status === 'incomplete');
+    const completedGoals = goals.filter(g => g.status === 'completed' && !g.metadata?.missed);
+    const incompleteGoals = goals.filter(g => g.status === 'completed' && g.metadata?.missed);
 
     // Debug logging
     console.log('[GoalsDashboard] Total goals in state:', goals.length);

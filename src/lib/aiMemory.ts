@@ -234,11 +234,16 @@ export async function markGoalIncomplete(id: string): Promise<boolean> {
 
     if (!goal) return false;
 
+    const { data: currentMeta } = await supabase.from('user_goals').select('metadata').eq('id', id).single();
+    const metadata = currentMeta?.metadata || {};
+    metadata.missed = true;
+
     const { error } = await supabase
         .from('user_goals')
         .update({
-            status: 'incomplete',
-            closed_date: new Date().toISOString()
+            status: 'completed',
+            closed_date: new Date().toISOString(),
+            metadata
         })
         .eq('id', id);
 
@@ -556,8 +561,19 @@ export async function processOverdueRecurringGoals(): Promise<{ completed: strin
                 if (newGoal) result.created.push(newGoal.title);
             }
         } else {
-            // Auto-tracked goals: mark as incomplete if target not reached
-            const progress = (goal.current_amount / goal.target_amount) * 100;
+            // Auto-tracked goals: ensure progress is totally up-to-date
+            await updateGoalProgress(goal.id);
+
+            // Re-fetch to get newest amount
+            const { data: updatedGoal } = await supabase
+                .from('user_goals')
+                .select('current_amount')
+                .eq('id', goal.id)
+                .single();
+
+            const freshAmount = updatedGoal?.current_amount ?? goal.current_amount;
+            const progress = (freshAmount / goal.target_amount) * 100;
+
             if (progress >= 100) {
                 // If target was actually reached, complete it instead
                 const { error } = await supabase
@@ -571,10 +587,18 @@ export async function processOverdueRecurringGoals(): Promise<{ completed: strin
                     if (newGoal) result.created.push(newGoal.title);
                 }
             } else {
-                // Target not reached - mark as incomplete
+                // Target not reached - mark as completed but with missed flag
+                // (using 'completed' because 'incomplete' is blocked by DB check constraint)
+                const metadata = goal.metadata || {};
+                metadata.missed = true;
+
                 const { error } = await supabase
                     .from('user_goals')
-                    .update({ status: 'incomplete', closed_date: new Date().toISOString() })
+                    .update({
+                        status: 'completed',
+                        closed_date: new Date().toISOString(),
+                        metadata
+                    })
                     .eq('id', goal.id);
 
                 if (!error) {
