@@ -167,6 +167,9 @@ function AppContent() {
 }
 
 function App() {
+  /* 
+  // TEMPORARILY DISABLED: Server Paused "Shock" Screen
+  // Uncomment this block (and remove these block comments) to re-enable
   const [showShock, setShowShock] = useState(true);
   const [isFakeLoading, setIsFakeLoading] = useState(false);
 
@@ -211,6 +214,7 @@ function App() {
       </div>
     );
   }
+  */
 
   return (
     <Router>
