@@ -202,7 +202,7 @@ function App() {
             
             <a 
               href="https://vercel.com/pricing" 
-              className="flex w-full items-center justify-center rounded-xl bg-primary px-8 py-4 text-base font-bold text-primary-foreground hover:bg-primary/90 transition-all shadow-lg shadow-primary/30 transform hover:-translate-y-1"
+              className="flex w-full items-center justify-center rounded-xl bg-primary px-8 py-4 text-lg font-black text-primary-foreground border-4 border-foreground shadow-[0_0_20px_rgba(0,0,0,0.3)] hover:bg-primary/90 transition-all transform hover:-translate-y-1 uppercase tracking-wider"
             >
               Upgrade Plan
             </a>
