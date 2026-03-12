@@ -18,12 +18,13 @@ document.addEventListener('gestureend', (e) => {
   e.preventDefault();
 });
 
-// Register PWA Service Worker
 const updateSW = registerSW({
   onNeedRefresh() {
-    if (confirm('New content available. Reload?')) {
-      updateSW(true)
-    }
+    // Forcefully update and reload without prompting the user
+    updateSW(true);
+  },
+  onOfflineReady() {
+    console.log('App ready to work offline');
   },
 })
 
