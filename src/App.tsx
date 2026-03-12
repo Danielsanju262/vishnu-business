@@ -167,6 +167,51 @@ function AppContent() {
 }
 
 function App() {
+  const [showShock, setShowShock] = useState(true);
+  const [isFakeLoading, setIsFakeLoading] = useState(false);
+
+  if (isFakeLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (showShock) {
+    return (
+      <div className="min-h-screen bg-black/80 flex items-center justify-center p-4">
+        <div className="bg-background max-w-md w-full rounded-2xl shadow-2xl overflow-hidden relative border border-border/50">
+          <button 
+            onClick={() => { setShowShock(false); setIsFakeLoading(true); }}
+            className="absolute top-4 right-4 p-2 text-muted-foreground hover:text-foreground rounded-full hover:bg-accent transition-colors z-10"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+          
+          <div className="p-8 text-center pt-12">
+            <div className="w-24 h-24 bg-destructive/10 rounded-full flex items-center justify-center mx-auto mb-6">
+              <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-destructive"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+            </div>
+            
+            <h2 className="text-3xl font-bold mb-4 tracking-tight">Server Paused</h2>
+            <p className="text-muted-foreground text-lg mb-8">
+              The server has been paused due to inactivity.<br/><br/>
+              <span className="font-semibold text-foreground">Upgrade your plan now</span>
+            </p>
+            
+            <a 
+              href="https://vercel.com/pricing" 
+              className="flex w-full items-center justify-center rounded-xl bg-primary px-8 py-4 text-base font-bold text-primary-foreground hover:bg-primary/90 transition-all shadow-lg shadow-primary/30 transform hover:-translate-y-1"
+            >
+              Upgrade Plan
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <Router>
       <AuthProvider>
