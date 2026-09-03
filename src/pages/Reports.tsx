@@ -5,7 +5,7 @@ import Papa from "papaparse";
 import { Link, useLocation } from "react-router-dom";
 import { format, subDays, startOfMonth, startOfWeek, endOfWeek, endOfMonth, addDays } from "date-fns";
 import { Button } from "../components/ui/Button";
-import { cn } from "../lib/utils";
+import { cn, formatLocalDate } from "../lib/utils";
 import { useToast } from "../components/toast-provider";
 import { Modal } from "../components/ui/Modal";
 import { useRealtimeTables } from "../hooks/useRealtimeSync";
@@ -448,7 +448,7 @@ export default function Reports() {
         setEditQty(t.quantity.toString());
         setEditPrice(t.sell_price.toString());
         setEditBuyPrice(t.buy_price.toString());
-        setEditDate(t.date ? new Date(t.date).toISOString().split('T')[0] : "");
+        setEditDate(t.date ? (typeof t.date === 'string' ? t.date.split('T')[0] : formatLocalDate(new Date(t.date))) : "");
     };
 
     const saveEdit = async () => {
@@ -804,7 +804,7 @@ export default function Reports() {
     const handleExport = async (type: 'sales' | 'customers' | 'products') => {
         setIsExporting(true);
         try {
-            const todayStr = new Date().toISOString().split('T')[0];
+            const todayStr = formatLocalDate();
             let dataToExport: any[] = [];
             let fileName = "";
 

@@ -44,7 +44,12 @@ const formatDateWithOrdinal = (dateStr: string): string => {
 
         // If it's a standard date string (YYYY-MM-DD), parse directly
         if (dateStr.includes('-') && dateStr.length >= 8) {
-            date = new Date(dateStr);
+            const parts = dateStr.split('-');
+            if (parts.length === 3) {
+                date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+            } else {
+                date = new Date(dateStr);
+            }
         } else {
             // Parse formats like "8 Jan" or "8 Jan 10:30"
             const parts = dateStr.trim().split(' ');

@@ -6,6 +6,7 @@
 
 import { supabase } from './supabase';
 import { format, startOfMonth, startOfWeek } from 'date-fns';
+import { formatLocalDate } from './utils';
 import {
     getActiveMemories,
     getActiveGoals,
@@ -1797,7 +1798,7 @@ export async function executePendingAction(action: PendingAction): Promise<strin
             target_amount: data.targetAmount,
             deadline: data.deadline,
             metric_type: data.metricType || 'manual_check',
-            start_tracking_date: data.startTrackingDate || new Date().toISOString().split('T')[0]
+            start_tracking_date: data.startTrackingDate || formatLocalDate()
         });
         return goal ? `✅ Created goal: **${goal.title}**` : "Failed to create goal.";
     }

@@ -37,18 +37,43 @@ type TransactionLog = {
 
 // Helper function to format date with ordinal suffix
 function formatDateWithOrdinal(dateStr: string): string {
-    const date = new Date(dateStr);
-    const day = date.getDate();
-    const month = date.toLocaleDateString('en-US', { month: 'short' });
-    const year = date.getFullYear();
+    try {
+        let date: Date;
+        if (dateStr.includes('-') && dateStr.length >= 8) {
+            const parts = dateStr.split('-');
+            if (parts.length === 3) {
+                date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+            } else {
+                date = new Date(dateStr);
+            }
+        } else {
+            const parts = dateStr.trim().split(' ');
+            if (parts.length < 2) return dateStr;
+            const day = parseInt(parts[0]);
+            const monthStr = parts[1];
+            const currentYear = new Date().getFullYear();
+            const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+            const month = monthNames.indexOf(monthStr.toLowerCase());
+            if (month === -1 || isNaN(day) || day < 1 || day > 31) return dateStr;
+            date = new Date(currentYear, month, day);
+        }
 
-    const getOrdinal = (n: number) => {
-        const s = ["th", "st", "nd", "rd"];
-        const v = n % 100;
-        return n + (s[(v - 20) % 10] || s[v] || s[0]);
-    };
+        if (isNaN(date.getTime())) return dateStr;
 
-    return `${getOrdinal(day)} ${month} ${year}`;
+        const day = date.getDate();
+        const month = date.toLocaleDateString('en-US', { month: 'short' });
+        const year = date.getFullYear();
+
+        const getOrdinal = (n: number) => {
+            const s = ["th", "st", "nd", "rd"];
+            const v = n % 100;
+            return n + (s[(v - 20) % 10] || s[v] || s[0]);
+        };
+
+        return `${getOrdinal(day)} ${month} ${year}`;
+    } catch {
+        return dateStr;
+    }
 }
 
 export default function CustomerPaymentDetail() {

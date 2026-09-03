@@ -4,10 +4,12 @@
  */
 
 import { supabase } from './supabase';
+import { formatLocalDate } from './utils';
 import type { AIMemory, UserGoal, AIChatMessage, AIChatSession, AIConfig } from '../types/aiTypes';
 
-// Re-export types for convenience
+// Re-export types and utilities for convenience
 export type { AIMemory, UserGoal, AIChatMessage, AIChatSession, AIConfig };
+export { formatLocalDate };
 
 // ===== AI CONFIG (Bot Name, User Name) =====
 export async function getAIConfig(): Promise<Record<string, string>> {
@@ -285,17 +287,6 @@ export async function deleteGoal(id: string): Promise<boolean> {
     return !error;
 }
 
-/**
- * Format a Date as YYYY-MM-DD using LOCAL time (not UTC).
- * IMPORTANT: Do NOT use .toISOString().split('T')[0] for this — that converts to UTC
- * and shifts dates backward in positive UTC offset timezones like IST (+5:30).
- */
-export function formatLocalDate(date: Date): string {
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, '0');
-    const d = String(date.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-}
 
 /**
  * Get the start of the period for a given date and recurrence type.
@@ -732,7 +723,7 @@ export async function calculateAvailableSurplus(): Promise<{
     completedEMIsTotal: number;
     availableSurplus: number;
 }> {
-    const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+    const startOfMonth = formatLocalDate(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
 
     // Get net profit this month
     const netProfitThisMonth = await calculateNetProfitSince(startOfMonth);
@@ -855,7 +846,7 @@ export async function calculateWaterfallGoals(): Promise<WaterfallGoalStatus[]> 
         // 2. Calculate Total Available "Pool" (Net Profit This Month)
         // We assume the "pool" is the Net Profit for the current month because usually EMI/Goals are paid from monthly income.
         // If a goal started *before* this month, we might need a different pool, but "Net Profit This Month" is the safest "Active Cash Flow" metric for now.
-        const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+        const startOfMonth = formatLocalDate(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
         let availablePool = await calculateNetProfitSince(startOfMonth);
 
         // Ensure pool isn't negative for allocation purposes
@@ -940,7 +931,7 @@ export async function updateGoalProgress(goalId: string): Promise<UserGoal | nul
 
     // For auto-tracked profit/revenue goals
     const trackingStartDate = goal.start_tracking_date.split('T')[0];
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = formatLocalDate();
 
     // Determine the end date for calculations
     // If a deadline exists and is in the past, stop calculating at the deadline
@@ -1201,8 +1192,8 @@ export interface MorningBriefing {
 }
 
 export async function generateMorningBriefing(): Promise<MorningBriefing> {
-    const todayStr = new Date().toISOString().split('T')[0];
-    const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+    const todayStr = formatLocalDate();
+    const startOfMonth = formatLocalDate(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
 
     // Get overdue and today's payment reminders
     const { data: reminders } = await supabase

@@ -1114,9 +1114,9 @@ ADD COLUMN IF NOT EXISTS super_admin_email TEXT;`}
                                     type="password"
                                     inputMode="numeric"
                                     value={newPin}
-                                    onChange={(e) => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                    onChange={(e) => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
                                     onPaste={(e) => e.preventDefault()}
-                                    placeholder="New Master PIN"
+                                    placeholder="New Master PIN (4-8 digits)"
                                     className="text-center text-lg font-semibold tracking-widest h-14 md:h-16 bg-accent/50 focus:bg-background transition-colors placeholder:text-muted-foreground/50 placeholder:font-normal placeholder:tracking-normal"
                                     autoFocus
                                 />
@@ -1135,7 +1135,7 @@ ADD COLUMN IF NOT EXISTS super_admin_email TEXT;`}
                                     type="password"
                                     inputMode="numeric"
                                     value={confirmNewPin}
-                                    onChange={(e) => setConfirmNewPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                    onChange={(e) => setConfirmNewPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
                                     onPaste={(e) => e.preventDefault()}
                                     placeholder="Confirm New PIN"
                                     className="text-center text-lg font-semibold tracking-widest h-14 md:h-16 bg-accent/50 focus:bg-background transition-colors placeholder:text-muted-foreground/50 placeholder:font-normal placeholder:tracking-normal"

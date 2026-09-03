@@ -9,6 +9,7 @@ import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useInsightsGenerator } from './useInsightsGenerator';
 import { supabase } from '../lib/supabase';
+import { formatLocalDate } from '../lib/utils';
 import {
     isNativePlatform,
     requestNotificationPermission,
@@ -88,7 +89,7 @@ export function useNativeNotifications() {
     async function schedulePaymentReminders() {
         try {
             const now = new Date();
-            const todayStr = now.toISOString().split('T')[0];
+            const todayStr = formatLocalDate(now);
 
             // Query for payments due today or before (overdue)
             const { data, error } = await supabase

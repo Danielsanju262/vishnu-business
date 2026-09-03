@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { formatLocalDate } from '../lib/utils';
 
 export function usePaymentNotifications() {
     const navigate = useNavigate();
@@ -16,7 +17,7 @@ export function usePaymentNotifications() {
             }
 
             const now = new Date();
-            const todayStr = now.toISOString().split('T')[0];
+            const todayStr = formatLocalDate(now);
 
             // 1. Check if we are past 6 AM today
             const sixAmToday = new Date(now);

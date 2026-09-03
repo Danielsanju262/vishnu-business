@@ -17,7 +17,7 @@ import {
     ChevronUp,
     MessageSquareQuote
 } from 'lucide-react';
-import { cn } from '../lib/utils';
+import { cn, formatLocalDate } from '../lib/utils';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { useToast } from '../components/toast-provider';
@@ -347,7 +347,7 @@ export default function Brief() {
             // Fetch yesterday's stats
             const yesterdayDate = new Date();
             yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-            const yStr = yesterdayDate.toISOString().split('T')[0];
+            const yStr = formatLocalDate(yesterdayDate);
 
             // Yesterday Revenue
             const { data: ySales } = await supabase
@@ -377,7 +377,7 @@ export default function Brief() {
             // Fetch DAY BEFORE YESTERDAY stats for comparison
             const dbyDate = new Date();
             dbyDate.setDate(dbyDate.getDate() - 2);
-            const dbyStr = dbyDate.toISOString().split('T')[0];
+            const dbyStr = formatLocalDate(dbyDate);
 
             let dbyStats = null;
             try {
@@ -404,10 +404,6 @@ export default function Brief() {
                     revenue: dbyRev,
                     netProfit: dbyRev - dbyCost - dbyExp
                 };
-                dbyStats = {
-                    revenue: dbyRev,
-                    netProfit: dbyRev - dbyCost - dbyExp
-                };
             } catch (e) {
                 console.error("Error fetching DBY stats", e);
             }
@@ -417,7 +413,7 @@ export default function Brief() {
             try {
                 const thirtyDaysAgo = new Date();
                 thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-                const thirtyDaysStr = thirtyDaysAgo.toISOString().split('T')[0];
+                const thirtyDaysStr = formatLocalDate(thirtyDaysAgo);
 
                 const { data: monthSales } = await supabase
                     .from('transactions')
@@ -444,7 +440,7 @@ export default function Brief() {
                 console.error("Error fetching history stats", e);
             }
 
-            const todayStr = new Date().toISOString().split('T')[0];
+            const todayStr = formatLocalDate();
             let tReminders: PaymentReminder[] = [];
             let oReminders: PaymentReminder[] = [];
             let tPayables: AccountPayable[] = [];

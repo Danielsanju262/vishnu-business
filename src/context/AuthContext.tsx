@@ -743,20 +743,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 return { success: false, error: 'Invalid Super Admin PIN. Contact Super Admin for the correct PIN.' };
             }
 
-            // Check against last 2 used PINs
-            const pinHistoryStr = localStorage.getItem('pin_history');
-            const pinHistory: string[] = pinHistoryStr ? JSON.parse(pinHistoryStr) : [];
-
-            // Get current master PIN to add to history
+            // Get current master PIN and version
             const { data: currentSettings } = await supabase
                 .from('app_settings')
                 .select('master_pin, pin_version')
                 .eq('id', 1)
                 .single();
-
-            if (pinHistory.includes(newPin) || currentSettings?.master_pin === newPin) {
-                return { success: false, error: 'Cannot reuse recent PINs. Please choose a different PIN.' };
-            }
 
             const newVersion = (currentSettings?.pin_version || 1) + 1;
 
@@ -781,6 +773,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 .neq('device_id', 'none'); // Update all devices
 
             // Update PIN history in localStorage (keep last 2)
+            const pinHistoryStr = localStorage.getItem('pin_history');
+            const pinHistory: string[] = pinHistoryStr ? JSON.parse(pinHistoryStr) : [];
             const updatedHistory = [...pinHistory, currentSettings?.master_pin].filter(Boolean).slice(-2);
             localStorage.setItem('pin_history', JSON.stringify(updatedHistory));
 

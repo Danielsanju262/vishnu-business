@@ -36,7 +36,7 @@ import {
     RefreshCw,
     ChevronDown
 } from 'lucide-react';
-import { cn } from '../lib/utils';
+import { cn, formatLocalDate } from '../lib/utils';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
@@ -52,7 +52,6 @@ import {
     processOverdueRecurringGoals,
     getRecurringPeriodStart,
     getRecurringPeriodEnd,
-    formatLocalDate,
     type UserGoal
 } from '../lib/aiMemory';
 import { supabase } from '../lib/supabase';
@@ -133,7 +132,7 @@ export default function GoalsDashboard() {
     const [formMetricType, setFormMetricType] = useState<'net_profit' | 'revenue' | 'sales_count' | 'manual_check' | 'customer_count' | 'gross_profit' | 'margin' | 'product_sales' | 'daily_revenue' | 'daily_margin' | 'avg_margin' | 'avg_revenue' | 'avg_profit'>('net_profit');
     const [formIsRecurring, setFormIsRecurring] = useState(false);
     const [formRecurrenceType, setFormRecurrenceType] = useState<'daily' | 'monthly' | 'weekly' | 'yearly'>('monthly');
-    const [formStartDate, setFormStartDate] = useState(new Date().toISOString().split('T')[0]);
+    const [formStartDate, setFormStartDate] = useState(formatLocalDate());
 
     // Auto-set start date for recurring goals (only when creating new or changing recurrence type, not when editing)
     useEffect(() => {
@@ -147,7 +146,7 @@ export default function GoalsDashboard() {
             } else if (formRecurrenceType === 'monthly') {
                 setFormStartDate(format(startOfMonth(today), 'yyyy-MM-dd'));
             } else if (formRecurrenceType === 'weekly') {
-                setFormStartDate(format(startOfWeek(today), 'yyyy-MM-dd'));
+                setFormStartDate(format(startOfWeek(today, { weekStartsOn: 1 }), 'yyyy-MM-dd'));
             } else if (formRecurrenceType === 'yearly') {
                 setFormStartDate(format(new Date(today.getFullYear(), 0, 1), 'yyyy-MM-dd'));
             }
@@ -232,7 +231,7 @@ export default function GoalsDashboard() {
         setFormMetricType('net_profit');
         setFormIsRecurring(false);
         setFormRecurrenceType('monthly');
-        setFormStartDate(new Date().toISOString().split('T')[0]);
+        setFormStartDate(formatLocalDate());
         setEditingGoal(null);
     };
 
@@ -257,7 +256,7 @@ export default function GoalsDashboard() {
         setFormMetricType(goal.metric_type);
         setFormIsRecurring(!!goal.is_recurring);
         setFormRecurrenceType((goal.recurrence_type as 'daily' | 'monthly' | 'weekly' | 'yearly') || 'monthly');
-        setFormStartDate(goal.start_tracking_date?.split('T')[0] || new Date().toISOString().split('T')[0]);
+        setFormStartDate(goal.start_tracking_date?.split('T')[0] || formatLocalDate());
         setEditingGoal(goal);
         setShowAddModal(true);
     };
